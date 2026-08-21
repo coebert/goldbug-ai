@@ -2829,6 +2829,44 @@ export type Database = {
         }
         Relationships: []
       }
+      risk_halt_overrides: {
+        Row: {
+          created_at: string
+          expires_at: string
+          halt_snapshot: Json | null
+          id: string
+          portfolio_id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          halt_snapshot?: Json | null
+          id?: string
+          portfolio_id: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          halt_snapshot?: Json | null
+          id?: string
+          portfolio_id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_halt_overrides_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       run_locks: {
         Row: {
           acquired_at: string
