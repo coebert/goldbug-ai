@@ -8,6 +8,7 @@
 // Never throws into the caller: a reconciliation failure must not break a tick.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Json } from "@/integrations/supabase/types";
 import {
   reconcileTradeLegs,
   type ExecutedOrder,
@@ -212,7 +213,7 @@ export function maybeReconcileTradeLegs(params: {
           broker_status: d.brokerStatus,
           summary: { ...result.summary },
           portfolio_name: params.portfolioName ?? null,
-        },
+        } as unknown as Json,
       }));
 
       const { error } = await supabaseAdmin.from("notifications").insert(inserts);
