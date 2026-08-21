@@ -344,12 +344,21 @@ export function planAdmissions(
   let buysAdmitted = 0;
 
   const stalled = (cfg.daysSinceLastBuyFill ?? 0) >= STALL_DAYS;
-  const reserveEdgeMultiple = stalled ? STALL_RESERVE_EDGE_MULTIPLE : RESERVE_EDGE_MULTIPLE;
-  const reserveMinConviction = stalled ? STALL_RESERVE_MIN_CONVICTION : RESERVE_MIN_CONVICTION;
-  let reserveLeft = Math.max(
-    0,
-    (cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS) + (stalled ? 1 : 0),
-  );
+  const reserveCap = adaptiveReserveCap({
+    baseTickets: Math.max(
+      0,
+      (cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS) + (stalled ? 1 : 0),
+    ),
+    recentBuyFills: cfg.recentBuyFills,
+    churnWindowDays: cfg.churnWindowDays,
+    tapeVolZ: cfg.tapeVolZ,
+    stalled,
+  });
+  const stallRelief = stalled && !reserveCap.suppressStallRelief;
+  const reserveEdgeMultiple = stallRelief ? STALL_RESERVE_EDGE_MULTIPLE : RESERVE_EDGE_MULTIPLE;
+  const reserveMinConviction = stallRelief ? STALL_RESERVE_MIN_CONVICTION : RESERVE_MIN_CONVICTION;
+  let reserveLeft = reserveCap.tickets;
+
 
 
   const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
