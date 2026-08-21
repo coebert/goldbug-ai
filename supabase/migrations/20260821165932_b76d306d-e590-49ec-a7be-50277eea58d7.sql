@@ -1,0 +1,1 @@
+UPDATE public.portfolios SET broker_account_id = 'SZyBdMOCd6vUHSvC5QGq4A==' WHERE id = '7c825889-81a1-4c32-9087-26d3847be6b1';

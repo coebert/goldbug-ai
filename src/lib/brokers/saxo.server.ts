@@ -95,6 +95,8 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly portfolioId: string | null;
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
+  /** When true, a configured key that fails environment validation throws. */
+  private readonly strictAccountKey: boolean;
   private resolvedAccountKey: string | undefined;
   private accountKeyResolution: SaxoAccountKeyResolution | undefined;
   // Saxo throttles /trade/v2/orders at roughly 1 req/sec per app. Track the
@@ -114,6 +116,7 @@ export class SaxoAdapter implements BrokerAdapter {
     portfolioId?: string | null;
     accountKey?: string;
     clientKey?: string;
+    strictAccountKey?: boolean;
   }) {
     this.env = opts.env;
     this.token = opts.token;
@@ -121,7 +124,9 @@ export class SaxoAdapter implements BrokerAdapter {
     this.portfolioId = opts.portfolioId ?? null;
     this.accountKey = opts.accountKey;
     this.clientKey = opts.clientKey;
+    this.strictAccountKey = opts.strictAccountKey ?? false;
   }
+
 
 
   private url(path: string, query?: Record<string, string | number | undefined>): string {
@@ -1467,7 +1472,13 @@ export class SaxoAdapter implements BrokerAdapter {
           error: resolution.message,
         });
       }
+      // Portfolio-scoped callers must never silently trade a different
+      // account than the one they were bound to: fail loudly instead.
+      if (this.strictAccountKey && resolution.mismatch) {
+        throw new Error(`Saxo account key mismatch: ${resolution.message}`);
+      }
       return this.resolvedAccountKey;
+
     } catch (e) {
       await log({
         portfolioId: this.portfolioId,
@@ -1524,17 +1535,28 @@ export async function buildSaxoAdapter(opts: {
    * probes may omit it.
    */
   accountKey?: string | null;
+  /**
+   * Throw instead of silently substituting a discovered account when the
+   * supplied key does not validate against this environment. Defaults to true
+   * whenever an explicit portfolio account key is supplied.
+   */
+  strictAccountKey?: boolean;
 }): Promise<SaxoAdapter> {
   const env = (opts.envOverride ?? (process.env.SAXO_ENV as BrokerEnv) ?? "sim");
   if (env !== "sim" && env !== "live") throw new Error(`Invalid SAXO_ENV=${env}`);
   const { getAccessToken } = await import("./saxo-oauth.server");
   const token = await getAccessToken(env);
+  const explicitKey = (opts.accountKey ?? "").trim() || undefined;
   return new SaxoAdapter({
     env, token, userId: opts.userId, portfolioId: opts.portfolioId ?? null,
-    accountKey: opts.accountKey ?? process.env.SAXO_ACCOUNT_KEY,
+    // A process-wide SAXO_ACCOUNT_KEY is only a hint; it is validated against
+    // the environment's account list before any call uses it.
+    accountKey: explicitKey ?? process.env.SAXO_ACCOUNT_KEY,
     clientKey: process.env.SAXO_CLIENT_KEY,
+    strictAccountKey: opts.strictAccountKey ?? !!explicitKey,
   });
 }
+
 
 // ---------------------------------------------------------------------------
 // Pure helpers for Yahoo → Saxo symbol resolution. Exported for unit tests.
