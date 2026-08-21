@@ -4,6 +4,13 @@
 //   bun run scripts/run-governor-replay.ts --from 2021-01-01 --to 2026-08-20
 //   bun run scripts/run-governor-replay.ts --symbols AAPL,MSFT,SPY --nav 10300
 //
+// Execution assumptions (fees / spread / slippage) are configurable:
+//   --assumptions optimistic|live|realistic|pessimistic|frictionless
+//   --spread-bps 20 --slippage-bps 5 --impact-bps 8 --impact-ref 10000
+//   --delay-bps 2 --commission-mult 1.25 --commission-floor 3 --fx-spread-bps 6
+//   --no-stamp --no-ptm
+// Both arms are always priced under the same assumptions.
+//
 // Two arms, identical signals/sizing/fills:
 //   legacy  — hard 30d friction sum, no high-edge reserve, raw FX amount
 //   revised — decaying friction bucket, one reserve ticket, floored FX amount
@@ -14,6 +21,10 @@ import {
   governorReplayReport,
   type ReplayBar,
 } from "../src/lib/backtest/governor-replay";
+import {
+  assumptionsFromFlags,
+  describeAssumptions,
+} from "../src/lib/backtest/execution-assumptions";
 
 const argv = process.argv.slice(2);
 const arg = (n: string, d: string) => {
@@ -30,6 +41,7 @@ const symbols = arg("symbols", DEFAULT.join(",")).split(",").map((s) => s.trim()
 // an FX funding leg — the exact path that was silently killing USD buys.
 const foreign = arg("foreign", symbols.join(",")).split(",").map((s) => s.trim());
 const seed = Number(arg("seed-friction", "0"));
+const assumptions = assumptionsFromFlags(argv);
 const signal = (arg("signal", "cross") === "churn" ? "churn" : "cross") as "cross" | "churn";
 
 const histories = await fetchUniverseHistory(symbols, { from, to });
@@ -52,7 +64,7 @@ if (bars.length < 220) {
   process.exit(1);
 }
 
-console.log(`\n${symbols.length} symbols, ${bars.length} bars, ${bars[0]!.date} → ${bars.at(-1)!.date}, NAV £${nav}, signal=${signal}\n`);
+console.log(`\n${symbols.length} symbols, ${bars.length} bars, ${bars[0]!.date} → ${bars.at(-1)!.date}, NAV £${nav}, signal=${signal}\nassumptions: ${describeAssumptions(assumptions)}\n`);
 
 const windows: Array<{ label: string; slice: ReplayBar[] }> = [
   { label: "full period", slice: bars },
@@ -73,6 +85,7 @@ for (const w of windows) {
     foreignSymbols: foreign,
     signal,
     seedFrictionBase: seed,
+    assumptions,
   });
   console.log(`── ${w.label} (${w.slice.length} bars)`);
   console.log(governorReplayReport(cmp));
