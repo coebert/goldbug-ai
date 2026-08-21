@@ -470,7 +470,8 @@ export function planAdmissions(
           `trailing cost budget exhausted: ${cfg.trailingCostBase.toFixed(2)} of ` +
           `${budgetTotal.toFixed(2)} (${(cfg.costBudgetPctOfNav * 100).toFixed(2)}% of NAV) spent; ` +
           `this ticket needs ${c.estCostBase.toFixed(2)}` +
-          (stalled ? ` [stalled ${Math.round(cfg.daysSinceLastBuyFill ?? 0)}d: relaxed reserve bar]` : "") +
+          (stallRelief ? ` [stalled ${Math.round(cfg.daysSinceLastBuyFill ?? 0)}d: relaxed reserve bar]` : "") +
+          (reserveCap.reason ? ` [${reserveCap.reason}]` : "") +
           (reserveLeft > 0
             ? ` (high-edge reserve needs conviction ≥ ${reserveMinConviction} and ` +
               `${reserveEdgeMultiple}x edge cover; this idea has ${grossEdge.toFixed(2)})`
