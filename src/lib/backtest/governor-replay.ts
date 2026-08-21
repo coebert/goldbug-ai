@@ -78,6 +78,13 @@ export type ReplayOptions = {
    * assumptions, so a comparison never confounds cost policy with cost model.
    */
   assumptions?: ExecutionAssumptionsInput | AssumptionPresetId;
+  /**
+   * First bar the arm is allowed to trade on. Bars before it are used purely
+   * to warm the moving averages, so a stress window can carry the 200-bar
+   * history an SMA200 filter needs without the calm run-up polluting the
+   * window's return, drawdown and friction.
+   */
+  tradeFromIndex?: number;
 };
 
 export type ReplayTrade = {
@@ -203,6 +210,7 @@ export function runGovernorReplay(
   const fxRule = opts.fxRule ?? DEFAULT_FX_RULE;
   const signalMode = opts.signal ?? "cross";
   const assumptions = resolveAssumptions(opts.assumptions);
+  const tradeFrom = Math.max(0, Math.floor(opts.tradeFromIndex ?? 0));
   const foreign = new Set((opts.foreignSymbols ?? []).map((s) => s.toUpperCase()));
 
   const symbols = Array.from(
@@ -291,12 +299,14 @@ export function runGovernorReplay(
     }
 
     // ---- mark to market --------------------------------------------------
+    // (warm-up bars are silent: no candidates, no curve, no drawdown)
     let holdingsValue = 0;
     for (const pos of positions.values()) {
       const px = price(pos.symbol);
       holdingsValue += pos.qty * (Number.isFinite(px) ? px : pos.entryPrice);
     }
     const nav = cash + holdingsValue;
+    if (i < tradeFrom) continue;
     equityCurve.push({ date: bar.date, equity: nav });
     peakEquity = Math.max(peakEquity, nav);
     if (peakEquity > 0) {
