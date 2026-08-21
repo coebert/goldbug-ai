@@ -117,6 +117,11 @@ export type ArmOutcome = {
   /** Bars until the first admitted buy (null = never traded). */
   barsToFirstBuy: number | null;
   frictionPaid: number;
+  /** Friction paid as bps of starting equity. */
+  frictionBpsOfEquity: number;
+  /** Fee / spread / slippage assumptions this arm was priced under. */
+  assumptions: ExecutionAssumptions;
+  assumptionsLabel: string;
   trades: ReplayTrade[];
   blocked: BlockedBuy[];
   equityCurve: Array<{ date: string; equity: number }>;
@@ -458,7 +463,7 @@ export function runGovernorReplay(
         entryDate: bar.date,
         entryIndex: i,
         peak: m.price,
-        costPaid: costs.oneWayCost,
+        costPaid: costs.totalCost,
       });
       buysAdmitted += 1;
       admittedToday += 1;
@@ -491,6 +496,9 @@ export function runGovernorReplay(
     longestIdleStreakDays,
     barsToFirstBuy: firstBuyIndex,
     frictionPaid,
+    frictionBpsOfEquity: startingCash > 0 ? (frictionPaid / startingCash) * 10_000 : 0,
+    assumptions,
+    assumptionsLabel: describeAssumptions(assumptions),
     trades,
     blocked,
     equityCurve,
