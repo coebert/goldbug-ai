@@ -95,6 +95,8 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly portfolioId: string | null;
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
+  /** When true, a configured key that fails environment validation throws. */
+  private readonly strictAccountKey: boolean;
   private resolvedAccountKey: string | undefined;
   private accountKeyResolution: SaxoAccountKeyResolution | undefined;
   // Saxo throttles /trade/v2/orders at roughly 1 req/sec per app. Track the
@@ -114,6 +116,7 @@ export class SaxoAdapter implements BrokerAdapter {
     portfolioId?: string | null;
     accountKey?: string;
     clientKey?: string;
+    strictAccountKey?: boolean;
   }) {
     this.env = opts.env;
     this.token = opts.token;
@@ -121,7 +124,9 @@ export class SaxoAdapter implements BrokerAdapter {
     this.portfolioId = opts.portfolioId ?? null;
     this.accountKey = opts.accountKey;
     this.clientKey = opts.clientKey;
+    this.strictAccountKey = opts.strictAccountKey ?? false;
   }
+
 
 
   private url(path: string, query?: Record<string, string | number | undefined>): string {
