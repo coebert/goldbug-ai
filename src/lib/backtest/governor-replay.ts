@@ -20,7 +20,14 @@
 // Pure and I/O-free: the caller supplies bars.
 
 import { planAdmissions, governorForNav, type GovernorCandidate } from "../cost-governor";
-import { estimateTradeCosts } from "../trade-viability-gate";
+import {
+  priceTicket,
+  resolveAssumptions,
+  describeAssumptions,
+  type ExecutionAssumptions,
+  type ExecutionAssumptionsInput,
+  type AssumptionPresetId,
+} from "./execution-assumptions";
 
 export type ReplayBar = { date: string; closes: Record<string, number> };
 
@@ -64,6 +71,13 @@ export type ReplayOptions = {
    * headroom refills a little each day.
    */
   seedFrictionBase?: number;
+  /**
+   * Fee / spread / slippage assumptions. Either a preset id
+   * ("optimistic" | "live" | "realistic" | "pessimistic" | "frictionless") or
+   * a partial override of the live model. Both arms always share the same
+   * assumptions, so a comparison never confounds cost policy with cost model.
+   */
+  assumptions?: ExecutionAssumptionsInput | AssumptionPresetId;
 };
 
 export type ReplayTrade = {
@@ -183,6 +197,7 @@ export function runGovernorReplay(
   const horizon = opts.edgeHorizonBars ?? 20;
   const fxRule = opts.fxRule ?? DEFAULT_FX_RULE;
   const signalMode = opts.signal ?? "cross";
+  const assumptions = resolveAssumptions(opts.assumptions);
   const foreign = new Set((opts.foreignSymbols ?? []).map((s) => s.toUpperCase()));
 
   const symbols = Array.from(
@@ -237,16 +252,25 @@ export function runGovernorReplay(
       const last = i === bars.length - 1;
       if (!(stopped || trendOut || aged || last)) continue;
 
-      const exitCosts = estimateTradeCosts({
-        symbol: pos.symbol,
-        side: "sell",
-        quantity: pos.qty,
-        price: px,
-      });
-      const proceeds = pos.qty * px - exitCosts.oneWayCost;
+      const exitCosts = priceTicket(
+        {
+          symbol: pos.symbol,
+          side: "sell",
+          quantity: pos.qty,
+          price: px,
+          foreign: foreign.has(pos.symbol.toUpperCase()),
+        },
+        assumptions,
+      );
+      // Sells fill at the assumed execution price (spread/slippage/impact move
+      // the print against us); the explicit fees are charged on top.
+      const exitPrice = exitCosts.fillPrice;
+      const explicitExitFees =
+        exitCosts.commission + exitCosts.stampDuty + exitCosts.ptmLevy + exitCosts.fxSpread;
+      const proceeds = pos.qty * exitPrice - explicitExitFees;
       cash += proceeds;
-      frictionPaid += exitCosts.oneWayCost;
-      costLedger.push({ index: i, cost: exitCosts.oneWayCost });
+      frictionPaid += exitCosts.totalCost;
+      costLedger.push({ index: i, cost: exitCosts.totalCost });
       const notional = pos.qty * pos.entryPrice;
       const gross = pos.qty * (px - pos.entryPrice);
       trades.push({
@@ -255,8 +279,8 @@ export function runGovernorReplay(
         exitDate: bar.date,
         notional,
         grossPnl: gross,
-        cost: pos.costPaid + exitCosts.oneWayCost,
-        netPnl: gross - pos.costPaid - exitCosts.oneWayCost,
+        cost: pos.costPaid + exitCosts.totalCost,
+        netPnl: gross - pos.costPaid - exitCosts.totalCost,
       });
       positions.delete(pos.symbol);
     }
@@ -298,7 +322,10 @@ export function runGovernorReplay(
       const qty = Math.floor(notional / px);
       if (qty <= 0) continue;
       const realNotional = qty * px;
-      const costs = estimateTradeCosts({ symbol: s, side: "buy", quantity: qty, price: px });
+      const costs = priceTicket(
+        { symbol: s, side: "buy", quantity: qty, price: px, foreign: foreign.has(s.toUpperCase()) },
+        assumptions,
+      );
       const strength = slow > 0 ? Math.min(1, Math.max(0, (fast - slow) / slow) * 20) : 0;
       candidates.push({
         symbol: s,
@@ -395,13 +422,20 @@ export function runGovernorReplay(
         }
       }
 
-      const costs = estimateTradeCosts({
-        symbol: c.symbol,
-        side: "buy",
-        quantity: m.qty,
-        price: m.price,
-      });
-      const outlay = m.qty * m.price + costs.oneWayCost;
+      const costs = priceTicket(
+        {
+          symbol: c.symbol,
+          side: "buy",
+          quantity: m.qty,
+          price: m.price,
+          foreign: foreign.has(c.symbol.toUpperCase()),
+        },
+        assumptions,
+      );
+      const entryPrice = costs.fillPrice;
+      const explicitFees =
+        costs.commission + costs.stampDuty + costs.ptmLevy + costs.fxSpread;
+      const outlay = m.qty * entryPrice + explicitFees;
       if (outlay > cash) {
         buysBlocked += 1;
         blocked.push({
@@ -414,8 +448,8 @@ export function runGovernorReplay(
         continue;
       }
       cash -= outlay;
-      frictionPaid += costs.oneWayCost;
-      costLedger.push({ index: i, cost: costs.oneWayCost });
+      frictionPaid += costs.totalCost;
+      costLedger.push({ index: i, cost: costs.totalCost });
       lastBuyIndex.set(c.symbol, i);
       positions.set(c.symbol, {
         symbol: c.symbol,
