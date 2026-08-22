@@ -245,10 +245,16 @@ export async function reconcileLiveHoldingsFromBroker(
 
   // The broker just told us each instrument's live price; bucket it by hour so
   // holding sparklines can show intraday detail instead of one daily close.
-  await recordIntradayPrices(
-    db as never,
-    positions.map((p) => ({ symbol: p.symbol, price: p.marketPrice || p.avgPrice || 0 })),
-  );
+  // price_intraday is shared reference data: only service_role may write it, so
+  // this must NOT go through the request-scoped (user JWT) client or every
+  // upsert is rejected by RLS and sparklines stay flat.
+  {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await recordIntradayPrices(
+      supabaseAdmin as never,
+      positions.map((p) => ({ symbol: p.symbol, price: p.marketPrice || p.avgPrice || 0 })),
+    );
+  }
 
 
   await db.from("live_broker_log").insert({
