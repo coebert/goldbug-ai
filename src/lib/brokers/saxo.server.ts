@@ -1442,13 +1442,19 @@ export class SaxoAdapter implements BrokerAdapter {
   }
 
   private async getDefaultAccountKey(): Promise<string | undefined> {
+    // A strict mismatch must fail on EVERY call, not just the first: the cache
+    // would otherwise hand later calls the wrong account key silently.
+    if (this.strictAccountKey && this.accountKeyResolution?.mismatch) {
+      throw new Error(`Saxo account key mismatch: ${this.accountKeyResolution.message}`);
+    }
     if (this.resolvedAccountKey) return this.resolvedAccountKey;
+    let resolution: SaxoAccountKeyResolution | undefined;
     try {
       const res = await this.req<{ Data?: SaxoAccountSummary[] }>("GET", "/port/v1/accounts/me", {
         schema: SaxoAccountsSchema,
       });
       // Validate the configured key against THIS environment before trusting it.
-      const resolution = resolveSaxoAccountKey({
+      resolution = resolveSaxoAccountKey({
         env: this.env,
         configured: this.accountKey,
         accounts: res.Data ?? [],
@@ -1472,13 +1478,6 @@ export class SaxoAdapter implements BrokerAdapter {
           error: resolution.message,
         });
       }
-      // Portfolio-scoped callers must never silently trade a different
-      // account than the one they were bound to: fail loudly instead.
-      if (this.strictAccountKey && resolution.mismatch) {
-        throw new Error(`Saxo account key mismatch: ${resolution.message}`);
-      }
-      return this.resolvedAccountKey;
-
     } catch (e) {
       await log({
         portfolioId: this.portfolioId,
@@ -1493,11 +1492,23 @@ export class SaxoAdapter implements BrokerAdapter {
       // rather than blocking the run, but do not cache it as validated.
       return this.accountKey;
     }
+    // Outside the try: a validation failure must propagate to the caller rather
+    // than be caught by the account-lookup fallback above.
+    if (this.strictAccountKey && resolution.mismatch) {
+      throw new Error(`Saxo account key mismatch: ${resolution.message}`);
+    }
+    return this.resolvedAccountKey;
   }
 
   /** Last validation outcome for the configured account key (undefined until resolved). */
   async validateAccountKey(): Promise<SaxoAccountKeyResolution | undefined> {
-    await this.getDefaultAccountKey();
+    // Reporting a mismatch is the whole point here, so the strict-mode throw
+    // must not turn an audit into a failure.
+    try {
+      await this.getDefaultAccountKey();
+    } catch {
+      /* resolution is recorded below */
+    }
     return this.accountKeyResolution;
   }
 
