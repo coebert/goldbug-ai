@@ -1492,6 +1492,12 @@ export class SaxoAdapter implements BrokerAdapter {
       // rather than blocking the run, but do not cache it as validated.
       return this.accountKey;
     }
+    // Outside the try: a validation failure must propagate to the caller rather
+    // than be caught by the account-lookup fallback above.
+    if (this.strictAccountKey && resolution.mismatch) {
+      throw new Error(`Saxo account key mismatch: ${resolution.message}`);
+    }
+    return this.resolvedAccountKey;
   }
 
   /** Last validation outcome for the configured account key (undefined until resolved). */
