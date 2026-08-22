@@ -54,6 +54,12 @@ export async function recordIntradayPrices(
       })),
       { onConflict: "symbol,bucket_hour" },
     );
+    // supabase-js resolves with { error } instead of throwing, so an RLS
+    // rejection would otherwise look like a successful write.
+    if (res?.error) {
+      console.warn("intraday price points rejected", res.error);
+      return 0;
+    }
     return rows.length;
   } catch (e) {
     console.warn("intraday price points skipped", e);
