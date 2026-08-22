@@ -45,7 +45,7 @@ export async function recordIntradayPrices(
   if (rows.length === 0) return 0;
   const bucket = hourBucket(at);
   try {
-    await db.from("price_intraday").upsert(
+    const res = await db.from("price_intraday").upsert(
       rows.map((r) => ({
         symbol: r.symbol,
         bucket_hour: bucket,
