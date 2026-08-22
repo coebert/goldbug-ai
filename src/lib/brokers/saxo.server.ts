@@ -1502,7 +1502,13 @@ export class SaxoAdapter implements BrokerAdapter {
 
   /** Last validation outcome for the configured account key (undefined until resolved). */
   async validateAccountKey(): Promise<SaxoAccountKeyResolution | undefined> {
-    await this.getDefaultAccountKey();
+    // Reporting a mismatch is the whole point here, so the strict-mode throw
+    // must not turn an audit into a failure.
+    try {
+      await this.getDefaultAccountKey();
+    } catch {
+      /* resolution is recorded below */
+    }
     return this.accountKeyResolution;
   }
 
