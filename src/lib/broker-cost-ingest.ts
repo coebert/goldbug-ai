@@ -13,6 +13,7 @@
  */
 
 import type { BrokerTradeCharge } from "./brokers/adapter";
+import { classifyCurrencyUnit } from "./valuation/unit-validation";
 
 export type IngestFill = {
   id: string;
@@ -75,7 +76,9 @@ function toUpdate(
   return {
     fillId: fill.id,
     brokerTradeId: charge.brokerTradeId,
-    currency: (charge.currency || fill.currency || "GBP").toUpperCase(),
+    // Kept verbatim: `GBp` and `GBP` differ only by case and mean amounts
+    // 100x apart, so upper-casing here would erase the unit.
+    currency: charge.currency || fill.currency || "GBP",
     commission: Math.max(0, charge.commission) || 0,
     exchangeFee: Math.max(0, charge.exchangeFee) || 0,
     tax: Math.max(0, charge.tax) || 0,
@@ -171,10 +174,8 @@ export function brokerCoverage(fills: readonly { feeSource: string | null }[]): 
  * Treated as a currency, not a magnitude, so it can never be double-scaled.
  */
 export function normaliseChargeCurrency(currency: string): { code: string; scale: number } {
-  const raw = String(currency ?? "").trim().toUpperCase();
-  if (raw === "GBX" || raw === "GBP.GBX") return { code: "GBP", scale: 0.01 };
-  if (raw === "ZAC") return { code: "ZAR", scale: 0.01 };
-  return { code: raw || "GBP", scale: 1 };
+  const unit = classifyCurrencyUnit(currency);
+  return { code: unit.code, scale: unit.scale };
 }
 
 export type ChargeLegs = {

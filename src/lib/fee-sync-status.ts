@@ -10,7 +10,7 @@
  * at, so the status and its reason are stored on the fill itself.
  */
 
-export const FEE_SYNC_STATUSES = ["invoiced", "pending", "unmatched", "unsupported"] as const;
+export const FEE_SYNC_STATUSES = ["invoiced", "pending", "unmatched", "unsupported", "unit_mismatch"] as const;
 export type FeeSyncStatus = (typeof FEE_SYNC_STATUSES)[number];
 
 export function isFeeSyncStatus(v: unknown): v is FeeSyncStatus {
@@ -34,6 +34,7 @@ export const FEE_SYNC_LABELS: Record<FeeSyncStatus, string> = {
   pending: "Awaiting broker",
   unmatched: "No matching charge",
   unsupported: "No cost report",
+  unit_mismatch: "Unit mismatch — held",
 };
 
 export const FEE_SYNC_EXPLANATIONS: Record<FeeSyncStatus, string> = {
@@ -41,6 +42,8 @@ export const FEE_SYNC_EXPLANATIONS: Record<FeeSyncStatus, string> = {
   pending: "Placed recently — the broker usually publishes charges the next business day.",
   unmatched: "A charge for these trades never appeared in the report; costs stay modelled.",
   unsupported: "This account's broker publishes no cost report, so costs stay modelled.",
+  unit_mismatch:
+    "The broker's charge failed the pence/pound unit check, so it was held back and costs stay modelled.",
 };
 
 export type FeeSyncRow = {
