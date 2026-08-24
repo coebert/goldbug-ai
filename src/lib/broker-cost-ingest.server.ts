@@ -16,6 +16,11 @@ import { createLogger } from "@/lib/_server/log";
 import type { FeeSyncStatus } from "./fee-sync-status";
 import { convertAmount } from "./fx.server";
 import { convertChargeLegs, matchChargesToFills, type IngestFill } from "./broker-cost-ingest";
+import {
+  checkChargeUnits,
+  summariseUnitChecks,
+  type UnitCheckResult,
+} from "./valuation/unit-validation";
 import type { BrokerAdapter, BrokerTradeCharge } from "./brokers/adapter";
 
 const log = createLogger("broker-cost-ingest");
@@ -33,6 +38,8 @@ export type CostIngestResult = {
   unmatchedCharges: number;
   /** Fills still on modelled costs after this pass. */
   unmatchedFills: number;
+  /** Charges held back because their pence/pound unit could not be trusted. */
+  unitMismatches: number;
   /** Total charge written, in each fill's own currency, summed after FX. */
   chargedTotal: number;
   currency: string;
@@ -47,6 +54,7 @@ function empty(partial: Partial<CostIngestResult>): CostIngestResult {
     fillsUpdated: 0,
     unmatchedCharges: 0,
     unmatchedFills: 0,
+    unitMismatches: 0,
     chargedTotal: 0,
     currency: "GBP",
     ...partial,
@@ -198,12 +206,46 @@ export async function ingestBrokerCostsForPortfolio(args: {
 
   let updated = 0;
   let chargedTotal = 0;
+  const unitChecks: UnitCheckResult[] = [];
   const baseCcy = fills[0]?.currency ?? "GBP";
 
   for (const u of match.updates) {
     const fill = fillById.get(u.fillId);
     if (!fill) continue;
     const target = fill.currency || "GBP";
+    // Unit gate. A charge whose scale contradicts the trade it belongs to is
+    // never written: a single pence-as-pounds fee would flow straight into the
+    // cash line and the friction KPI the kernel values the book from.
+    const unitCheck = checkChargeUnits({
+      id: u.fillId,
+      symbol: fill.symbol,
+      quantity: fill.quantity,
+      fillPrice: fill.fillPrice,
+      fillCurrency: fill.currency,
+      chargeTotal: u.total,
+      chargeCurrency: u.currency,
+    });
+    unitChecks.push(unitCheck);
+    if (unitCheck.blocked) {
+      log.warn("charge held on unit check", {
+        fillId: u.fillId,
+        symbol: fill.symbol,
+        chargeCurrency: u.currency,
+        fillCurrency: fill.currency,
+        reason: unitCheck.reason,
+      });
+      await supabaseAdmin
+        .from("live_fills")
+        .update({
+          fee_sync_status: "unit_mismatch",
+          fee_sync_reason: unitCheck.reason,
+          fee_sync_attempted_at: now.toISOString(),
+          broker_trade_id: u.brokerTradeId,
+        })
+        .eq("id", u.fillId);
+      continue;
+    }
+
     const legs = await convertChargeLegs(u, target, convertLeg);
     const total = legs.total;
 
@@ -272,6 +314,18 @@ export async function ingestBrokerCostsForPortfolio(args: {
     attemptedAt: now.toISOString(),
   });
 
+  const unitSummary = summariseUnitChecks(unitChecks);
+  if (unitSummary.blocked > 0 || unitSummary.rescaled > 0) {
+    log.info("charge unit validation", {
+      portfolioId: args.portfolioId,
+      checked: unitSummary.checked,
+      rescaled: unitSummary.rescaled,
+      blocked: unitSummary.blocked,
+      blockedIds: unitSummary.blockedIds,
+      byCode: unitSummary.byCode,
+    });
+  }
+
   return {
     supported: true,
     ...(report.endpoint !== undefined ? { endpoint: report.endpoint } : {}),
@@ -280,6 +334,7 @@ export async function ingestBrokerCostsForPortfolio(args: {
     fillsUpdated: updated,
     unmatchedCharges: match.unmatchedTradeIds.length,
     unmatchedFills: match.unmatchedFillIds.length,
+    unitMismatches: unitSummary.blocked,
     chargedTotal,
     currency: baseCcy,
   };

@@ -13,6 +13,7 @@ function result(over: Partial<CostIngestResult> = {}): CostIngestResult {
     fillsUpdated: 40,
     unmatchedCharges: 2,
     unmatchedFills: 0,
+    unitMismatches: 0,
     chargedTotal: 123.45,
     currency: "GBP",
     ...over,
