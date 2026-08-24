@@ -15,6 +15,7 @@ import {
 } from "./risk-halt-override.server";
 import { parseRiskConfig } from "./universe.server";
 import { formatUk } from "./uk-time";
+import { holdingNativeValue } from "@/lib/fx-leg-value";
 
 export const getPortfolioRiskHalts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -51,13 +52,26 @@ export const getPortfolioRiskHalts = createServerFn({ method: "POST" })
     if (!(currentEquity > 0)) {
       const { data: holdings } = await supabase
         .from("holdings")
-        .select("symbol, quantity, avg_cost")
+        .select("symbol, asset_class, quantity, avg_cost")
         .eq("portfolio_id", data.portfolioId);
       const cash = Number(portfolio.current_cash) || 0;
+      // FX spot legs must contribute unrealised P&L only — their notional is
+      // already in the cash wallet, so summing them raw fabricates a halt.
       currentEquity =
         cash +
-        (holdings ?? []).reduce((s, h) => s + Number(h.quantity) * Number(h.avg_cost), 0);
+        (holdings ?? []).reduce(
+          (s, h) =>
+            s +
+            holdingNativeValue({
+              assetClass: h.asset_class,
+              quantity: Number(h.quantity),
+              price: Number(h.avg_cost),
+              avgCost: Number(h.avg_cost),
+            }),
+          0,
+        );
     }
+
 
     const stats = await loadEquityStats(supabase, data.portfolioId, asOf).catch(
       () => ({ priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 }),

@@ -10,6 +10,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getReconMetrics } from "@/lib/recon-metrics.functions";
@@ -152,39 +162,52 @@ export function ReconMetricsCard({
 
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chart} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                  <XAxis dataKey="day" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={28} />
+                <AreaChart data={chart} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis
+                    dataKey="day"
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                    width={46}
+                  />
                   <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
                   />
                   <Area
                     type="monotone"
                     dataKey="dropped"
                     name="Dropped legs"
-                    stroke="hsl(var(--destructive))"
-                    fill="hsl(var(--destructive) / 0.2)"
+                    stroke={CHART_ROLE.negative}
+                    fill={CHART_ROLE.negative}
+                    fillOpacity={0.2}
                   />
                   <Area
                     type="monotone"
                     dataKey="stranded"
                     name="Stranded near-misses"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary) / 0.15)"
+                    stroke={CHART_ROLE.warning}
+                    fill={CHART_ROLE.warning}
+                    fillOpacity={0.15}
                   />
                   <Area
                     type="monotone"
                     dataKey="adverse"
                     name="Adverse prints"
-                    stroke="hsl(var(--muted-foreground))"
-                    fill="hsl(var(--muted-foreground) / 0.12)"
+                    stroke={CHART_ROLE.neutral}
+                    fill={CHART_ROLE.neutral}
+                    fillOpacity={0.12}
                   />
+
                 </AreaChart>
               </ResponsiveContainer>
             </div>

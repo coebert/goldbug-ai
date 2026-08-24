@@ -345,10 +345,13 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
     if (nativeQuote == null) {
       const cost = num(h.avg_cost);
       if (allowCostBasis && Number.isFinite(cost) && cost > 0) {
-        // Cost basis is stored in the SAME native units as the quote, so the
-        // divisor below still applies. Skipping it here is precisely the bug
-        // that produced a GBP 817k headline on a GBP 10.2k account.
-        nativeQuote = cost;
+        // `holdings.avg_cost` is written ALREADY normalised to base currency
+        // (every writer runs it through normalizeLseDisplayPriceToBase), so
+        // it is NOT a native/GBX quote. Re-multiply by the divisor here so
+        // the shared `/ unitDivisor` below cancels out — dividing a GBP cost
+        // by 100 again is what turned MKS at £4.04 into £0.04.
+        nativeQuote = cost * units.unitDivisor;
+
         priceSource = "cost_basis";
         degraded = true;
         warnings.push({

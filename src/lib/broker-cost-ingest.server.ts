@@ -207,6 +207,24 @@ export async function ingestBrokerCostsForPortfolio(args: {
     const legs = await convertChargeLegs(u, target, convertLeg);
     const total = legs.total;
 
+    // A matched charge line with no money on it means Saxo has not billed the
+    // trade yet — it is NOT evidence that the trade was free. Overwriting the
+    // modelled fee with 0 here is how every row in live_fills came to read
+    // zero commission on a real-money account. Leave the modelled fee alone
+    // and keep the fill queued for a later sync.
+    if (!(total > 0)) {
+      await supabaseAdmin
+        .from("live_fills")
+        .update({
+          fee_sync_status: "pending",
+          fee_sync_reason: "broker charge report returned zero charges for this trade",
+          fee_sync_attempted_at: now.toISOString(),
+          broker_trade_id: u.brokerTradeId,
+        })
+        .eq("id", u.fillId);
+      continue;
+    }
+
     const { error } = await supabaseAdmin
       .from("live_fills")
       .update({
@@ -223,6 +241,7 @@ export async function ingestBrokerCostsForPortfolio(args: {
         broker_trade_id: u.brokerTradeId,
       })
       .eq("id", u.fillId);
+
 
     if (error) {
       log.warn("failed to write broker charge", { fillId: u.fillId, error: error.message });
