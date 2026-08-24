@@ -2,6 +2,8 @@
 // Uses AI SDK -> Lovable AI Gateway with structured output.
 
 import { recordIntradayEquity } from "@/lib/equity-intraday.server";
+import { holdingNativeValue } from "./fx-leg-value";
+
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { asJson } from "@/lib/_server/db-json";
