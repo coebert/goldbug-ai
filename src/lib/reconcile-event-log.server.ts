@@ -43,6 +43,11 @@ export type ReconcileReasonCode =
   // Market-hours awareness (venue was closed for the entire life of the order):
   | "sim_keep_market_closed"
   | "sim_defer_stale_market_closed"
+  // Orphaned pending-order sweeper:
+  | "orphan_cancelled_stale_working"
+  | "orphan_closed_no_broker_id"
+  | "orphan_closed_abandoned"
+  | "orphan_cancel_failed"
   // Local-state guards:
   | "no_broker_id"
   | "invalid_timestamp"
