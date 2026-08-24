@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Ruler, RefreshCw, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Ruler, RefreshCw, AlertTriangle, ShieldCheck, Wrench } from "lucide-react";
 import {
   previewFillUnitBackfill,
   applyFillUnitBackfill,
@@ -27,21 +27,74 @@ const ACTION_LABEL: Record<string, string> = {
   ok: "Consistent",
 };
 
+/** Snapshot of the two verification passes either side of a repair. */
+type BeforeAfter = {
+  before: FillUnitBackfillResult;
+  after: FillUnitBackfillResult;
+  updated: number;
+  recompute: FillUnitBackfillResult["recompute"];
+  errors: FillUnitBackfillResult["updateErrors"];
+};
+
+const problemCount = (r: FillUnitBackfillResult) =>
+  r.changes.filter((c) => c.action === "fold_gbx" || c.action === "unfold_gbx").length;
+
 export function FillUnitBackfillCard() {
   const preview = useServerFn(previewFillUnitBackfill);
   const apply = useServerFn(applyFillUnitBackfill);
   const [result, setResult] = useState<FillUnitBackfillResult | null>(null);
   const [applied, setApplied] = useState(false);
+  const [comparison, setComparison] = useState<BeforeAfter | null>(null);
 
   const previewM = useMutation({
     mutationFn: () => preview({ data: {} }),
     onSuccess: (r) => {
       setResult(r);
       setApplied(false);
+      setComparison(null);
       toast.success(
         r.changes.length === 0
           ? "All stored fills are in the expected unit."
           : `${r.changes.length} fill${r.changes.length === 1 ? "" : "s"} need correcting.`,
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // One click: verify, repair, then re-verify so the card can show what
+  // actually changed rather than only what was planned.
+  const repairNowM = useMutation({
+    mutationFn: async (): Promise<BeforeAfter | null> => {
+      const before = await preview({ data: {} });
+      if (before.changes.length === 0) {
+        setResult(before);
+        setApplied(false);
+        setComparison(null);
+        return null;
+      }
+      const run = await apply({ data: {} });
+      const after = await preview({ data: {} });
+      return {
+        before,
+        after,
+        updated: run.updated,
+        recompute: run.recompute,
+        errors: run.updateErrors,
+      };
+    },
+    onSuccess: (c) => {
+      if (!c) {
+        toast.success("Nothing to repair — all stored fills are in the expected unit.");
+        return;
+      }
+      setComparison(c);
+      setResult(c.after);
+      setApplied(true);
+      const left = problemCount(c.after);
+      toast.success(
+        left === 0
+          ? `Repaired ${c.updated} fill${c.updated === 1 ? "" : "s"} and recomputed history.`
+          : `Repaired ${c.updated}, but ${left} still look mis-scaled.`,
       );
     },
     onError: (e: Error) => toast.error(e.message),
@@ -52,6 +105,7 @@ export function FillUnitBackfillCard() {
     onSuccess: (r) => {
       setResult(r);
       setApplied(true);
+      setComparison(null);
       toast.success(`Corrected ${r.updated} fill${r.updated === 1 ? "" : "s"} and recomputed history.`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -59,7 +113,8 @@ export function FillUnitBackfillCard() {
 
   const counts = result?.counts;
   const pending = result ? result.changes.length : 0;
-  const busy = previewM.isPending || applyM.isPending;
+  const busy = previewM.isPending || applyM.isPending || repairNowM.isPending;
+
 
   return (
     <Card>
@@ -78,7 +133,7 @@ export function FillUnitBackfillCard() {
             distorts realised P&amp;L and trading-cost figures.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={() => previewM.mutate()}>
             {previewM.isPending ? (
               <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -87,14 +142,26 @@ export function FillUnitBackfillCard() {
             )}
             Check
           </Button>
-          <Button
-            size="sm"
-            disabled={busy || pending === 0 || applied}
-            onClick={() => applyM.mutate()}
-          >
-            Repair
+          {pending > 0 && !applied && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => applyM.mutate()}
+            >
+              Repair
+            </Button>
+          )}
+          <Button size="sm" disabled={busy} onClick={() => repairNowM.mutate()}>
+            {repairNowM.isPending ? (
+              <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Wrench className="mr-1 h-3.5 w-3.5" />
+            )}
+            Repair now
           </Button>
         </div>
+
       </CardHeader>
       <CardContent className="space-y-3">
         {!result ? (
@@ -113,6 +180,54 @@ export function FillUnitBackfillCard() {
                   ))}
               {applied && <Badge>{result.updated} corrected</Badge>}
             </div>
+
+            {comparison && (
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-medium">Before / after</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-muted-foreground">Metric</div>
+                  <div className="text-right text-muted-foreground">Before</div>
+                  <div className="text-right text-muted-foreground">After</div>
+
+                  <div>Mis-scaled fills</div>
+                  <div className="text-right tabular-nums text-destructive">
+                    {problemCount(comparison.before)}
+                  </div>
+                  <div className="text-right tabular-nums text-primary">
+                    {problemCount(comparison.after)}
+                  </div>
+
+                  <div>Flagged rows</div>
+                  <div className="text-right tabular-nums">{comparison.before.changes.length}</div>
+                  <div className="text-right tabular-nums">{comparison.after.changes.length}</div>
+
+                  <div>Fills scanned</div>
+                  <div className="text-right tabular-nums">{comparison.before.fillsScanned}</div>
+                  <div className="text-right tabular-nums">{comparison.after.fillsScanned}</div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {comparison.updated} fill{comparison.updated === 1 ? "" : "s"} rewritten
+                  {comparison.recompute.length > 0 && (
+                    <>
+                      {" "}
+                      · {comparison.recompute.reduce((a, r) => a + (r.tradesRebuilt ?? 0), 0)} trades
+                      rebuilt ·{" "}
+                      {comparison.recompute.reduce((a, r) => a + (r.snapshotsRewritten ?? 0), 0)}{" "}
+                      equity snapshots revalued
+                    </>
+                  )}
+                </p>
+                {comparison.errors.length > 0 && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {comparison.errors.length} row
+                    {comparison.errors.length === 1 ? "" : "s"} could not be rewritten:{" "}
+                    {comparison.errors[0]?.message}
+                  </p>
+                )}
+              </div>
+            )}
+
+
 
             {result.changes.length > 0 && (
               <div className="overflow-x-auto">
