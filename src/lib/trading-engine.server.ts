@@ -1210,16 +1210,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Evaluated once against pre-execution equity. If either trips, every BUY
   // in this run is rejected with a halt reason — sells (including automatic
   // stop-losses above) still fire so the portfolio can de-risk.
-  const { evaluateRiskHalts, loadEquityStats } = await import("./risk-halts.server");
-  const equityStats = await loadEquityStats(supabaseAdmin, portfolioId, asOf).catch(
-    () => ({ priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 }),
-  );
+  const { evaluateRiskHalts, loadEquityStats, loadBrokerEquity } = await import("./risk-halts.server");
+  const [equityStats, brokerEquity] = await Promise.all([
+    loadEquityStats(supabaseAdmin, portfolioId, asOf).catch(
+      () => ({ priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 }),
+    ),
+    // The broker's own NAV outranks our derived valuation: a single mis-valued
+    // line (e.g. a stranded FX leg) must not be able to fabricate a halt.
+    loadBrokerEquity(supabaseAdmin, portfolioId, asOf).catch(() => null),
+  ]);
   const haltsRaw = evaluateRiskHalts({
     startingEquity: Number(portfolio.starting_cash) || totalValue,
     currentEquity: totalValue,
+    brokerEquity,
     unpricedHoldingsValue,
     priorCloseEquity: equityStats.priorCloseEquity,
     peakEquity: equityStats.peakEquity,
+
     thresholds: {
       max_position_pct: basePerSymbolPct,
       max_daily_loss_pct: cfg.max_daily_loss_pct,
