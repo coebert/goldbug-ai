@@ -512,8 +512,49 @@ async function runHourlyCycleInner(
           }
         }
 
+        // Pre-trade orphan sweep: a pending order that is stuck locally, or
+        // resting far too long at the broker (the MKS.L sell), blocks every
+        // replacement for that symbol. Clear or reconcile those BEFORE the
+        // tick decides on new trades. Best-effort — never fails the tick.
+        if ((p.mode === "live_sim" || p.mode === "live_prod") && p.user_id) {
+          try {
+            const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
+            const { resolvePortfolioBrokerLink } = await import(
+              "@/lib/brokers/portfolio-broker-link.server"
+            );
+            const { sweepOrphanOrdersForPortfolio } = await import(
+              "@/lib/orphan-order-sweep.server"
+            );
+            const link = resolvePortfolioBrokerLink(p);
+            if (!link.linked) throw new Error(link.reason);
+            const env = p.mode === "live_prod" ? "live" : "sim";
+            const sweep = await sweepOrphanOrdersForPortfolio({
+              portfolioId: p.id,
+              userId: p.user_id as string,
+              env,
+              source: "hourly-pre-tick",
+              adapter: await buildSaxoAdapter({
+                userId: p.user_id as string,
+                portfolioId: p.id,
+                envOverride: env,
+                accountKey: link.accountKey,
+              }),
+            });
+            if (sweep.cancelledAtBroker + sweep.closedLocally + sweep.cancelledUntracked > 0) {
+              srvLog.info(
+                "hourly-run: orphan orders cleared",
+                p.id,
+                `broker=${sweep.cancelledAtBroker} local=${sweep.closedLocally} untracked=${sweep.cancelledUntracked}`,
+              );
+            }
+          } catch (e) {
+            srvLog.warn("hourly-run: orphan sweep failed", p.id, e);
+          }
+        }
+
         const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
+
         tel.tickEnd(p.id, String(p.mode), tickT0, "ok");
         push({
           id: p.id,

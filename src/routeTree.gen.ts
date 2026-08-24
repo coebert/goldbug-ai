@@ -45,6 +45,7 @@ import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/a
 import { Route as ApiPublicHooksTickerWatchRouteImport } from './routes/api/public/hooks/ticker-watch'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
 import { Route as ApiPublicHooksSaxoAccountKeyAuditRouteImport } from './routes/api/public/hooks/saxo-account-key-audit'
+import { Route as ApiPublicHooksOrphanOrderSweepRouteImport } from './routes/api/public/hooks/orphan-order-sweep'
 import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/public/hooks/news-refresh'
 import { Route as ApiPublicHooksNewsBackfillRouteImport } from './routes/api/public/hooks/news-backfill'
 import { Route as ApiPublicHooksMarketOpenAlertsRouteImport } from './routes/api/public/hooks/market-open-alerts'
@@ -247,6 +248,12 @@ const ApiPublicHooksSaxoAccountKeyAuditRoute =
     path: '/api/public/hooks/saxo-account-key-audit',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksOrphanOrderSweepRoute =
+  ApiPublicHooksOrphanOrderSweepRouteImport.update({
+    id: '/api/public/hooks/orphan-order-sweep',
+    path: '/api/public/hooks/orphan-order-sweep',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksNewsRefreshRoute =
   ApiPublicHooksNewsRefreshRouteImport.update({
     id: '/api/public/hooks/news-refresh',
@@ -382,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
+  '/api/public/hooks/orphan-order-sweep': typeof ApiPublicHooksOrphanOrderSweepRoute
   '/api/public/hooks/saxo-account-key-audit': typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
@@ -435,6 +443,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
+  '/api/public/hooks/orphan-order-sweep': typeof ApiPublicHooksOrphanOrderSweepRoute
   '/api/public/hooks/saxo-account-key-audit': typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
@@ -489,6 +498,7 @@ export interface FileRoutesById {
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
+  '/api/public/hooks/orphan-order-sweep': typeof ApiPublicHooksOrphanOrderSweepRoute
   '/api/public/hooks/saxo-account-key-audit': typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
@@ -544,6 +554,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
+    | '/api/public/hooks/orphan-order-sweep'
     | '/api/public/hooks/saxo-account-key-audit'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
@@ -597,6 +608,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
+    | '/api/public/hooks/orphan-order-sweep'
     | '/api/public/hooks/saxo-account-key-audit'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
@@ -650,6 +662,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
+    | '/api/public/hooks/orphan-order-sweep'
     | '/api/public/hooks/saxo-account-key-audit'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
@@ -699,6 +712,7 @@ export interface RootRouteChildren {
   ApiPublicHooksMarketOpenAlertsRoute: typeof ApiPublicHooksMarketOpenAlertsRoute
   ApiPublicHooksNewsBackfillRoute: typeof ApiPublicHooksNewsBackfillRoute
   ApiPublicHooksNewsRefreshRoute: typeof ApiPublicHooksNewsRefreshRoute
+  ApiPublicHooksOrphanOrderSweepRoute: typeof ApiPublicHooksOrphanOrderSweepRoute
   ApiPublicHooksSaxoAccountKeyAuditRoute: typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
   ApiPublicHooksTickerWatchRoute: typeof ApiPublicHooksTickerWatchRoute
@@ -961,6 +975,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSaxoAccountKeyAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/orphan-order-sweep': {
+      id: '/api/public/hooks/orphan-order-sweep'
+      path: '/api/public/hooks/orphan-order-sweep'
+      fullPath: '/api/public/hooks/orphan-order-sweep'
+      preLoaderRoute: typeof ApiPublicHooksOrphanOrderSweepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/news-refresh': {
       id: '/api/public/hooks/news-refresh'
       path: '/api/public/hooks/news-refresh'
@@ -1133,6 +1154,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksMarketOpenAlertsRoute: ApiPublicHooksMarketOpenAlertsRoute,
   ApiPublicHooksNewsBackfillRoute: ApiPublicHooksNewsBackfillRoute,
   ApiPublicHooksNewsRefreshRoute: ApiPublicHooksNewsRefreshRoute,
+  ApiPublicHooksOrphanOrderSweepRoute: ApiPublicHooksOrphanOrderSweepRoute,
   ApiPublicHooksSaxoAccountKeyAuditRoute:
     ApiPublicHooksSaxoAccountKeyAuditRoute,
   ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
