@@ -17,6 +17,8 @@
 // `invested` locally from a mix of `equity_snapshots`, `portfolios.current_cash`
 // and raw holdings — that mix is what caused the >100% invested tile bug.
 
+import { holdingNativeValue } from "@/lib/fx-leg-value";
+
 export type LatestSnapshot = {
   total_value?: number | string | null;
   cash?: number | string | null;
@@ -25,7 +27,9 @@ export type LatestSnapshot = {
 export type HoldingLike = {
   quantity: number | string;
   avg_cost: number | string;
+  asset_class?: string | null;
 };
+
 
 export type PortfolioMetrics = {
   totalValue: number;
@@ -64,10 +68,20 @@ export function derivePortfolioMetrics(input: {
   }
 
   const cash = Math.max(0, num(input.currentCash));
+  // FX spot legs are funding conversions: their notional already sits in the
+  // cash wallet, so they contribute unrealised P&L only (zero at cost here).
   const invested = input.holdings.reduce(
-    (s, h) => s + num(h.quantity) * num(h.avg_cost),
+    (s, h) =>
+      s +
+      holdingNativeValue({
+        assetClass: h.asset_class ?? null,
+        quantity: num(h.quantity),
+        price: num(h.avg_cost),
+        avgCost: num(h.avg_cost),
+      }),
     0,
   );
+
   const safeInvested = Math.max(0, invested);
   return {
     totalValue: cash + safeInvested,

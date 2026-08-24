@@ -1,0 +1,156 @@
+// Admin card for the fill-unit backfill.
+//
+// Shows how many stored fills are recorded in the wrong unit (LSE pence
+// booked as pounds, or the reverse) and lets the repair be previewed before
+// it rewrites `live_fills`, the trades ledger and historical equity
+// snapshots.
+
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Ruler, RefreshCw, AlertTriangle, ShieldCheck } from "lucide-react";
+import {
+  previewFillUnitBackfill,
+  applyFillUnitBackfill,
+  type FillUnitBackfillResult,
+} from "@/lib/fill-unit-backfill.functions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+const ACTION_LABEL: Record<string, string> = {
+  fold_gbx: "Pence booked as pounds (÷100)",
+  unfold_gbx: "Pounds booked as pence (×100)",
+  unexplained: "Unexplained gap vs close",
+  no_reference: "No reference close",
+  ok: "Consistent",
+};
+
+export function FillUnitBackfillCard() {
+  const preview = useServerFn(previewFillUnitBackfill);
+  const apply = useServerFn(applyFillUnitBackfill);
+  const [result, setResult] = useState<FillUnitBackfillResult | null>(null);
+  const [applied, setApplied] = useState(false);
+
+  const previewM = useMutation({
+    mutationFn: () => preview({ data: {} }),
+    onSuccess: (r) => {
+      setResult(r);
+      setApplied(false);
+      toast.success(
+        r.changes.length === 0
+          ? "All stored fills are in the expected unit."
+          : `${r.changes.length} fill${r.changes.length === 1 ? "" : "s"} need correcting.`,
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const applyM = useMutation({
+    mutationFn: () => apply({ data: {} }),
+    onSuccess: (r) => {
+      setResult(r);
+      setApplied(true);
+      toast.success(`Corrected ${r.updated} fill${r.updated === 1 ? "" : "s"} and recomputed history.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const counts = result?.counts;
+  const pending = result ? result.changes.length : 0;
+  const busy = previewM.isPending || applyM.isPending;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            {pending > 0 && !applied ? (
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            ) : (
+              <ShieldCheck className="h-4 w-4 text-primary" />
+            )}
+            Fill unit integrity
+          </CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Detects fills stored in pence where pounds are expected (and the reverse), which
+            distorts realised P&amp;L and trading-cost figures.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => previewM.mutate()}>
+            {previewM.isPending ? (
+              <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Ruler className="mr-1 h-3.5 w-3.5" />
+            )}
+            Check
+          </Button>
+          <Button
+            size="sm"
+            disabled={busy || pending === 0 || applied}
+            onClick={() => applyM.mutate()}
+          >
+            Repair
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {!result ? (
+          <p className="text-sm text-muted-foreground">Run a check to see stored-fill units.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="secondary">{result.fillsScanned} scanned</Badge>
+              {counts &&
+                Object.entries(counts)
+                  .filter(([, n]) => n > 0)
+                  .map(([k, n]) => (
+                    <Badge key={k} variant={k === "ok" ? "secondary" : "destructive"}>
+                      {ACTION_LABEL[k] ?? k}: {n}
+                    </Badge>
+                  ))}
+              {applied && <Badge>{result.updated} corrected</Badge>}
+            </div>
+
+            {result.changes.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-muted-foreground">
+                    <tr className="text-left">
+                      <th className="py-1 pr-3">Symbol</th>
+                      <th className="py-1 pr-3">Issue</th>
+                      <th className="py-1 pr-3 text-right">Stored</th>
+                      <th className="py-1 text-right">Corrected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.changes.slice(0, 25).map((c) => (
+                      <tr key={c.id} className="border-t border-border/50">
+                        <td className="py-1 pr-3 font-medium">{c.symbol}</td>
+                        <td className="py-1 pr-3 text-muted-foreground">
+                          {ACTION_LABEL[c.action] ?? c.action}
+                        </td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{c.storedPrice}</td>
+                        <td className="py-1 text-right tabular-nums">{c.correctedPrice}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {result.recompute.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Recomputed {result.recompute.length} portfolio
+                {result.recompute.length === 1 ? "" : "s"}: trades rebuilt and equity snapshots
+                revalued from the corrected fills.
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

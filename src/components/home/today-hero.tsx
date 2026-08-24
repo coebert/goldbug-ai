@@ -39,8 +39,10 @@ export function TodayHero({
   // Real money leads: the headline figure is the broker-held equity.
   const realNow = safe(summary.real.now);
   const realPnl = safe(summary.real.pnl);
-  const realBase = realNow - realPnl;
-  const realPct = realBase > 0 ? (realPnl / realBase) * 100 : 0;
+  // Use the same deposit-adjusted percentage as the tile below, otherwise a
+  // day with a deposit shows two different percentages on one screen.
+  const realPct = safe(summary.real.pct);
+
   const positive = realPnl >= 0;
   const TrendIcon = positive ? TrendingUp : TrendingDown;
   const simNow = safe(summary.sim.now);
