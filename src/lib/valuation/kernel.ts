@@ -19,6 +19,8 @@
 import { instrumentCcyFor, venueCurrency } from "../instrument-ccy-rules";
 import { isLseGbxDisplayQuoted } from "../market-price-units";
 import { priceSymbolVariants } from "../price-symbol";
+import { holdingNativeValue } from "../fx-leg-value";
+
 
 export type KernelHolding = {
   symbol: string;
