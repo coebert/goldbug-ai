@@ -33,6 +33,7 @@ import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-
 import { CashSyncReconciliationCard } from "@/components/cash-sync-reconciliation-card";
 import { PriceScalingAuditCard } from "@/components/price-scaling-audit-card";
 import { FillUnitBackfillCard } from "@/components/fill-unit-backfill-card";
+import { ZeroFeeResyncCard } from "@/components/zero-fee-resync-card";
 import { SaxoAccountKeyWizard } from "@/components/admin/saxo-account-key-wizard";
 import { CreditBudgetCard } from "@/components/credit-budget-card";
 import { POLL } from "@/lib/query-keys";
@@ -651,6 +652,7 @@ function AdminPage() {
       <CashSyncReconciliationCard />
       <PriceScalingAuditCard />
       <FillUnitBackfillCard />
+      <ZeroFeeResyncCard />
 
 
 
