@@ -415,10 +415,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const holdingsValue = (holdings ?? []).reduce((sum, h) => {
     const quoted = holdingPriceBySymbol(priceMap, h.symbol);
     const p = holdingLivePrice(priceMap, h);
-    const value = p * Number(h.quantity);
+    // FX spot legs are worth their unrealised P&L, not their notional: the
+    // currency they bought is already counted in the cash wallet.
+    const value = holdingNativeValue({
+      assetClass: h.asset_class,
+      quantity: Number(h.quantity),
+      price: p,
+      avgCost: Number(h.avg_cost),
+    });
     if (quoted == null) unpricedHoldingsValue += value;
     return sum + value;
   }, 0);
+
   const totalValue = cash + holdingsValue;
 
   // Long vs short-sleeve split of the current book — feeds the prompt and the
