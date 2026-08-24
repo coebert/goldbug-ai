@@ -133,7 +133,7 @@ export function FillUnitBackfillCard() {
             distorts realised P&amp;L and trading-cost figures.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={() => previewM.mutate()}>
             {previewM.isPending ? (
               <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -142,14 +142,26 @@ export function FillUnitBackfillCard() {
             )}
             Check
           </Button>
-          <Button
-            size="sm"
-            disabled={busy || pending === 0 || applied}
-            onClick={() => applyM.mutate()}
-          >
-            Repair
+          {pending > 0 && !applied && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => applyM.mutate()}
+            >
+              Repair
+            </Button>
+          )}
+          <Button size="sm" disabled={busy} onClick={() => repairNowM.mutate()}>
+            {repairNowM.isPending ? (
+              <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Wrench className="mr-1 h-3.5 w-3.5" />
+            )}
+            Repair now
           </Button>
         </div>
+
       </CardHeader>
       <CardContent className="space-y-3">
         {!result ? (
