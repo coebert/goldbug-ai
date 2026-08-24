@@ -27,21 +27,74 @@ const ACTION_LABEL: Record<string, string> = {
   ok: "Consistent",
 };
 
+/** Snapshot of the two verification passes either side of a repair. */
+type BeforeAfter = {
+  before: FillUnitBackfillResult;
+  after: FillUnitBackfillResult;
+  updated: number;
+  recompute: FillUnitBackfillResult["recompute"];
+  errors: FillUnitBackfillResult["updateErrors"];
+};
+
+const problemCount = (r: FillUnitBackfillResult) =>
+  r.changes.filter((c) => c.action === "fold_gbx" || c.action === "unfold_gbx").length;
+
 export function FillUnitBackfillCard() {
   const preview = useServerFn(previewFillUnitBackfill);
   const apply = useServerFn(applyFillUnitBackfill);
   const [result, setResult] = useState<FillUnitBackfillResult | null>(null);
   const [applied, setApplied] = useState(false);
+  const [comparison, setComparison] = useState<BeforeAfter | null>(null);
 
   const previewM = useMutation({
     mutationFn: () => preview({ data: {} }),
     onSuccess: (r) => {
       setResult(r);
       setApplied(false);
+      setComparison(null);
       toast.success(
         r.changes.length === 0
           ? "All stored fills are in the expected unit."
           : `${r.changes.length} fill${r.changes.length === 1 ? "" : "s"} need correcting.`,
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // One click: verify, repair, then re-verify so the card can show what
+  // actually changed rather than only what was planned.
+  const repairNowM = useMutation({
+    mutationFn: async (): Promise<BeforeAfter | null> => {
+      const before = await preview({ data: {} });
+      if (before.changes.length === 0) {
+        setResult(before);
+        setApplied(false);
+        setComparison(null);
+        return null;
+      }
+      const run = await apply({ data: {} });
+      const after = await preview({ data: {} });
+      return {
+        before,
+        after,
+        updated: run.updated,
+        recompute: run.recompute,
+        errors: run.updateErrors,
+      };
+    },
+    onSuccess: (c) => {
+      if (!c) {
+        toast.success("Nothing to repair — all stored fills are in the expected unit.");
+        return;
+      }
+      setComparison(c);
+      setResult(c.after);
+      setApplied(true);
+      const left = problemCount(c.after);
+      toast.success(
+        left === 0
+          ? `Repaired ${c.updated} fill${c.updated === 1 ? "" : "s"} and recomputed history.`
+          : `Repaired ${c.updated}, but ${left} still look mis-scaled.`,
       );
     },
     onError: (e: Error) => toast.error(e.message),
@@ -52,6 +105,7 @@ export function FillUnitBackfillCard() {
     onSuccess: (r) => {
       setResult(r);
       setApplied(true);
+      setComparison(null);
       toast.success(`Corrected ${r.updated} fill${r.updated === 1 ? "" : "s"} and recomputed history.`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -59,7 +113,8 @@ export function FillUnitBackfillCard() {
 
   const counts = result?.counts;
   const pending = result ? result.changes.length : 0;
-  const busy = previewM.isPending || applyM.isPending;
+  const busy = previewM.isPending || applyM.isPending || repairNowM.isPending;
+
 
   return (
     <Card>
