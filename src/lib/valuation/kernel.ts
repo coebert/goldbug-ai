@@ -19,6 +19,8 @@
 import { instrumentCcyFor, venueCurrency } from "../instrument-ccy-rules";
 import { isLseGbxDisplayQuoted } from "../market-price-units";
 import { priceSymbolVariants } from "../price-symbol";
+import { holdingNativeValue } from "../fx-leg-value";
+
 
 export type KernelHolding = {
   symbol: string;
@@ -366,7 +368,16 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
       }
     }
 
-    const nativeValue = (quantity * nativeQuote) / units.unitDivisor;
+    // FX spot legs (broker funding conversions) contribute unrealised P&L
+    // only — their notional is already represented by the cash wallet.
+    const nativeValue =
+      holdingNativeValue({
+        assetClass: h.asset_class,
+        quantity,
+        price: nativeQuote,
+        avgCost: num(h.avg_cost),
+      }) / units.unitDivisor;
+
     const { rate, source } = rateFor(units.instrumentCurrency);
     const baseValue = nativeValue * rate;
     holdingsValue += baseValue;

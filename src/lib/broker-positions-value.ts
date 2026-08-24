@@ -6,6 +6,7 @@
 // fallback whenever Saxo's authoritative account TotalValue is unavailable.
 
 import { normalizeLseDisplayPriceToBase } from "./market-price-units";
+import { holdingNativeValue } from "./fx-leg-value";
 
 export type BrokerPositionValueInput = {
   symbol: string;
@@ -23,6 +24,16 @@ export function valueBrokerPositions(
     const qty = Number(p.quantity);
     if (!Number.isFinite(raw) || !Number.isFinite(qty)) return sum;
     const px = normalizeLseDisplayPriceToBase(p.symbol, raw, p.assetClass ?? null);
-    return sum + px * qty;
+    // FX spot legs are P&L-only; their notional lives in the cash balance.
+    return (
+      sum +
+      holdingNativeValue({
+        assetClass: p.assetClass,
+        quantity: qty,
+        price: px,
+        avgCost: normalizeLseDisplayPriceToBase(p.symbol, Number(p.avgPrice), p.assetClass ?? null),
+      })
+    );
   }, 0);
 }
+

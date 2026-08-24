@@ -209,3 +209,26 @@ export async function loadEquityStats(
   };
 }
 
+/**
+ * Today's broker-reported NAV, when the broker sync wrote one. The broker
+ * prices the whole book (including FX legs and sub-accounts), so it is the
+ * authoritative input for halt decisions; the derived valuation is the
+ * fallback. Returns null when there is no broker snapshot for `asOf`.
+ */
+export async function loadBrokerEquity(
+  client: SupabaseClient<Database>,
+  portfolioId: string,
+  asOf: string,
+): Promise<number | null> {
+  const { data } = await client
+    .from("equity_snapshots")
+    .select("total_value, snapshot_date, source")
+    .eq("portfolio_id", portfolioId)
+    .eq("source", "broker_sync")
+    .eq("snapshot_date", asOf)
+    .maybeSingle();
+  const v = Number(data?.total_value);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+
