@@ -181,6 +181,54 @@ export function FillUnitBackfillCard() {
               {applied && <Badge>{result.updated} corrected</Badge>}
             </div>
 
+            {comparison && (
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-medium">Before / after</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-muted-foreground">Metric</div>
+                  <div className="text-right text-muted-foreground">Before</div>
+                  <div className="text-right text-muted-foreground">After</div>
+
+                  <div>Mis-scaled fills</div>
+                  <div className="text-right tabular-nums text-destructive">
+                    {problemCount(comparison.before)}
+                  </div>
+                  <div className="text-right tabular-nums text-primary">
+                    {problemCount(comparison.after)}
+                  </div>
+
+                  <div>Flagged rows</div>
+                  <div className="text-right tabular-nums">{comparison.before.changes.length}</div>
+                  <div className="text-right tabular-nums">{comparison.after.changes.length}</div>
+
+                  <div>Fills scanned</div>
+                  <div className="text-right tabular-nums">{comparison.before.fillsScanned}</div>
+                  <div className="text-right tabular-nums">{comparison.after.fillsScanned}</div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {comparison.updated} fill{comparison.updated === 1 ? "" : "s"} rewritten
+                  {comparison.recompute.length > 0 && (
+                    <>
+                      {" "}
+                      · {comparison.recompute.reduce((a, r) => a + (r.tradesRebuilt ?? 0), 0)} trades
+                      rebuilt ·{" "}
+                      {comparison.recompute.reduce((a, r) => a + (r.snapshotsRewritten ?? 0), 0)}{" "}
+                      equity snapshots revalued
+                    </>
+                  )}
+                </p>
+                {comparison.errors.length > 0 && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {comparison.errors.length} row
+                    {comparison.errors.length === 1 ? "" : "s"} could not be rewritten:{" "}
+                    {comparison.errors[0]?.message}
+                  </p>
+                )}
+              </div>
+            )}
+
+
+
             {result.changes.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
