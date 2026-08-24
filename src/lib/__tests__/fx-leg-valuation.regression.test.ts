@@ -29,7 +29,7 @@ describe("FX spot legs contribute P&L, not notional", () => {
         { symbol: "BP:xlon", quantity: 154, avg_cost: 5.5, asset_class: "stock", instrument_ccy: "GBP" },
         { symbol: "GBPUSD", quantity: -1233.52, avg_cost: 1.3639, asset_class: "fx", instrument_ccy: "USD" },
       ],
-      price: { "BP:xlon": 5.5, GBPUSD: 1.3639 },
+      price: (s: string) => (s.toUpperCase().startsWith("BP") ? 5.5 : 1.3639),
       wallet: { GBP: 6341.91 },
       baseCcy: "GBP",
       fx: () => 1,
