@@ -13,9 +13,8 @@ export const Route = createFileRoute("/api/public/hooks/orphan-order-sweep")({
         const { verifyCronRequest } = await import("@/lib/_server/cron");
         const verified = await verifyCronRequest(request, {
           bucket: "hooks:orphan-order-sweep",
-          requireSignature: true,
-          capacity: 10,
-          refillPerSec: 10 / 3600,
+          capacity: 60,
+          refillPerSec: 60 / 3600,
         });
         if (!verified.ok) return verified.response;
 
