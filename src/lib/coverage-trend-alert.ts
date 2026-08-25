@@ -113,11 +113,18 @@ function windowSummary(
 
 export function evaluateCoverageTrendAlert(
   series: CoverageSeries,
-  opts: { floorPct?: number; stepPct?: number; windowDays?: number; criticalGapPct?: number } = {},
+  opts: {
+    floorPct?: number;
+    stepPct?: number;
+    windowDays?: number;
+    criticalGapPct?: number;
+    minFills?: number;
+  } = {},
 ): CoverageTrendAlert {
   const floor = opts.floorPct ?? COVERAGE_TREND_FLOOR_PCT;
   const step = opts.stepPct ?? COVERAGE_TREND_STEP_PCT;
   const criticalGap = opts.criticalGapPct ?? COVERAGE_TREND_CRITICAL_GAP_PCT;
+  const minFills = Math.max(1, Math.trunc(opts.minFills ?? COVERAGE_TREND_MIN_FILLS));
   const windowDays = Math.max(1, Math.trunc(opts.windowDays ?? COVERAGE_TREND_WINDOW_DAYS));
 
   const recent = windowSummary(series, 0, windowDays);
