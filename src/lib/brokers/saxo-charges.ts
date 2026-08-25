@@ -92,6 +92,44 @@ const OTHER_KEYS = [
   "TicketFee",
 ] as const;
 
+/**
+ * Saxo renames its cost columns per service group and environment, so a fixed
+ * candidate list silently reads every charge as zero the moment a report uses
+ * a name we never guessed — which is exactly how a real BP.L buy ended up
+ * booked as free. Anything that *looks* like a charge column and carries money
+ * is harvested here and carried as unattributed cost; a fee we cannot classify
+ * is still money that left the account.
+ */
+const FEE_LIKE_KEY = /(commission|fee|fees|tax|duty|levy|charge|cost)/i;
+/** Money-shaped names that are emphatically not charges. */
+const NOT_A_FEE_KEY =
+  /(free|costbasis|costprice|costtoclose|pricecost|opencost|closecost|estimated|indicative|percent|pct|rate|currency|decimals|type|id$|description)/i;
+
+/** Every fee-like numeric on the row, keyed by lower-cased path. */
+export function harvestFeeLikeAmounts(row: Record<string, unknown>): Map<string, number> {
+  const found = new Map<string, number>();
+  const walk = (obj: Record<string, unknown>, depth: number, prefix: string) => {
+    for (const [k, v] of Object.entries(obj)) {
+      const path = prefix ? `${prefix}.${k}` : k;
+      if (typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)))) {
+        const n = Math.abs(Number(v));
+        if (n > 0 && FEE_LIKE_KEY.test(k) && !NOT_A_FEE_KEY.test(k)) found.set(path.toLowerCase(), n);
+        continue;
+      }
+      if (depth <= 0 || !v || typeof v !== "object") continue;
+      if (Array.isArray(v)) {
+        v.forEach((el, i) => {
+          if (el && typeof el === "object") walk(el as Record<string, unknown>, depth - 1, `${path}[${i}]`);
+        });
+        continue;
+      }
+      walk(v as Record<string, unknown>, depth - 1, path);
+    }
+  };
+  walk(row, 2, "");
+  return found;
+}
+
 /** Broker's own "everything this trade cost you" column, when it publishes one. */
 const TOTAL_KEYS = [
   "TotalCost",
