@@ -117,13 +117,17 @@ describe("saxo charge mapping — unfamiliar report schemas", () => {
     expect(charge?.total).toBe(0);
   });
 
-  it("only walks two levels deep, so deeply buried echoes cannot re-add a charge", () => {
-    const found = harvestFeeLikeAmounts({
-      BrokerageFee: 4,
-      Detail: { Breakdown: { BrokerageFee: 4 } },
-    });
-    expect([...found.values()]).toEqual([4]);
+  it("counts a charge echoed in a nested breakdown only once", () => {
+    const row = { BrokerageFee: 4, Detail: { Breakdown: { BrokerageFee: 4 } } };
+    // The walk sees both paths...
+    expect([...harvestFeeLikeAmounts(row).keys()]).toEqual([
+      "brokeragefee",
+      "detail.breakdown.brokeragefee",
+    ]);
+    // ...but the same leaf name is one charge, not two.
+    expect(mapSaxoChargeRow({ TradeId: "8", ...row })?.total).toBeCloseTo(4, 6);
   });
+
 
   it("de-duplicates repeated rows for one trade across a report", () => {
     const charges = mapSaxoChargeRows([
