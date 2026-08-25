@@ -32,6 +32,14 @@ export const COVERAGE_TREND_STEP_PCT = 5;
 export const COVERAGE_TREND_WINDOW_DAYS = 7;
 /** Minimum graded days in a window before it can be compared. */
 const MIN_DAYS_PER_WINDOW = 3;
+/**
+ * Minimum gradeable fills behind the recent window before coverage is treated
+ * as a measurement. A single un-invoiced trade prints "0% coverage" on every
+ * day of the rolling window and reads as a catastrophic failure; it is really
+ * one pending charge. Below this count we stay quiet rather than grading a
+ * percentage whose denominator is one.
+ */
+export const COVERAGE_TREND_MIN_FILLS = 5;
 
 export type CoverageTrendAlertReason = "below_floor" | "deteriorating" | "both";
 export type CoverageTrendSeverity = "info" | "warning" | "critical";
