@@ -42,6 +42,8 @@ export type ChargeUpdate = {
   total: number;
   /** How the charge was tied to the fill, for diagnostics. */
   matchedBy: "trade-id" | "order-id" | "attributes";
+  /** The report row behind this charge, for schema diagnostics. */
+  raw?: unknown;
 };
 
 export type ChargeMatchResult = {
@@ -85,6 +87,7 @@ function toUpdate(
     other: Math.max(0, charge.other) || 0,
     total: Math.max(0, charge.total) || 0,
     matchedBy,
+    ...(charge.raw !== undefined ? { raw: charge.raw } : {}),
   };
 }
 
