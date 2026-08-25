@@ -103,7 +103,9 @@ const OTHER_KEYS = [
 const FEE_LIKE_KEY = /(commission|fee|fees|tax|duty|levy|charge|cost)/i;
 /** Money-shaped names that are emphatically not charges. */
 const NOT_A_FEE_KEY =
-  /(free|costbasis|costprice|costtoclose|pricecost|opencost|closecost|estimated|indicative|percent|pct|rate|currency|decimals|type|id$|description)/i;
+  /(free|costbasis|costprice|costtoclose|pricecost|opencost|closecost|estimated|indicative|percent|pct|rate|decimals|type|id$|description)/i;
+/** Saxo suffixes the same concept per currency; strip before judging a name. */
+const CCY_SUFFIX = /(accountcurrency|clientcurrency|instrumentcurrency)$/i;
 
 /** Every fee-like numeric on the row, keyed by lower-cased path. */
 export function harvestFeeLikeAmounts(row: Record<string, unknown>): Map<string, number> {
@@ -113,7 +115,10 @@ export function harvestFeeLikeAmounts(row: Record<string, unknown>): Map<string,
       const path = prefix ? `${prefix}.${k}` : k;
       if (typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)))) {
         const n = Math.abs(Number(v));
-        if (n > 0 && FEE_LIKE_KEY.test(k) && !NOT_A_FEE_KEY.test(k)) found.set(path.toLowerCase(), n);
+        const name = k.replace(CCY_SUFFIX, "");
+        if (n > 0 && FEE_LIKE_KEY.test(name) && !NOT_A_FEE_KEY.test(name)) {
+          found.set(path.toLowerCase(), n);
+        }
         continue;
       }
       if (depth <= 0 || !v || typeof v !== "object") continue;
