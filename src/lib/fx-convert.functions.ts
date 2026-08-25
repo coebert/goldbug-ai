@@ -91,6 +91,28 @@ export const convertPortfolioCash = createServerFn({ method: "POST" })
     let amountTo: number | null = null;
 
     if (spotEligible) {
+      // Same hard safety gate every other live broker order passes through:
+      // admin kill switch + daily BUY notional ceiling. Without this, a manual
+      // spot conversion could still hit the broker after an operator halt.
+      const { loadTradingGate } = await import("./trading-controls.server");
+      const gate = await loadTradingGate();
+      if (!gate.enabled) {
+        return {
+          ok: false as const,
+          reason: "TRADING_HALTED",
+          detail: gate.haltReason ?? "Trading is halted (trading_controls.trading_enabled = false).",
+        };
+      }
+      if (data.amountFrom > gate.remaining) {
+        return {
+          ok: false as const,
+          reason: "DAILY_LIMIT",
+          detail:
+            `Daily notional cap reached (limit ${gate.dailyLimit}, ` +
+            `spent ${gate.spentToday.toFixed(2)}, remaining ${gate.remaining.toFixed(2)}).`,
+        };
+      }
+
       // Real broker spot conversion.
       const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
       const adapter = await buildSaxoAdapter({
