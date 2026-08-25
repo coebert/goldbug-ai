@@ -197,6 +197,20 @@ export function mapSaxoChargeRow(
   const namedSum = commission + exchangeFee + tax + other;
   if (reportedTotal > namedSum + 1e-9) other += reportedTotal - namedSum;
 
+  // Fallback for report schemas we have not seen: only when the named columns
+  // produced nothing, so a row is never double-counted. Same-concept columns
+  // (Commission / CommissionAccountCurrency / TotalCommission) collapse to one
+  // group and contribute their largest value once.
+  if (!(commission + exchangeFee + tax + other > 0)) {
+    const groups = new Map<string, number>();
+    for (const [path, amount] of harvestFeeLikeAmounts(row)) {
+      const leaf = (path.split(".").pop() ?? path).replace(/\[\d+\]/g, "");
+      const group = leaf.replace(/(accountcurrency|clientcurrency|instrumentcurrency|sum|total|s)$/g, "");
+      groups.set(group, Math.max(groups.get(group) ?? 0, amount));
+    }
+    for (const amount of groups.values()) other += amount;
+  }
+
   const total = commission + exchangeFee + tax + other;
 
   const quantityRaw = num(row, ["Amount", "TradedAmount", "FilledAmount", "Quantity"]);
