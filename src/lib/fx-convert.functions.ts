@@ -16,14 +16,16 @@
 // call, and audit-log write.
 
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "./_server/require-aal2";
 import { z } from "zod";
 import { planFxConversion } from "./fx-convert-plan";
 import { readWallet, writeWalletFields } from "./portfolio-wallet";
 import { asJson } from "./_server/db-json";
 
 export const convertPortfolioCash = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  // Money-moving action: requires the same TOTP step-up as manual sells /
+  // going live, so a stolen single-factor session cannot convert cash.
+  .middleware([requireAal2])
   .inputValidator((input: unknown) => {
     return z
       .object({
@@ -89,6 +91,28 @@ export const convertPortfolioCash = createServerFn({ method: "POST" })
     let amountTo: number | null = null;
 
     if (spotEligible) {
+      // Same hard safety gate every other live broker order passes through:
+      // admin kill switch + daily BUY notional ceiling. Without this, a manual
+      // spot conversion could still hit the broker after an operator halt.
+      const { loadTradingGate } = await import("./trading-controls.server");
+      const gate = await loadTradingGate();
+      if (!gate.enabled) {
+        return {
+          ok: false as const,
+          reason: "TRADING_HALTED",
+          detail: gate.haltReason ?? "Trading is halted (trading_controls.trading_enabled = false).",
+        };
+      }
+      if (data.amountFrom > gate.remaining) {
+        return {
+          ok: false as const,
+          reason: "DAILY_LIMIT",
+          detail:
+            `Daily notional cap reached (limit ${gate.dailyLimit}, ` +
+            `spent ${gate.spentToday.toFixed(2)}, remaining ${gate.remaining.toFixed(2)}).`,
+        };
+      }
+
       // Real broker spot conversion.
       const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
       const adapter = await buildSaxoAdapter({
