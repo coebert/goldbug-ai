@@ -234,7 +234,7 @@ export async function ingestBrokerCostsForPortfolio(args: {
         fillCurrency: fill.currency,
         reason: unitCheck.reason,
       });
-      await supabaseAdmin
+      const held = await supabaseAdmin
         .from("live_fills")
         .update({
           fee_sync_status: "unit_mismatch",
@@ -243,7 +243,16 @@ export async function ingestBrokerCostsForPortfolio(args: {
           broker_trade_id: u.brokerTradeId,
         })
         .eq("id", u.fillId);
+      if (held.error) {
+        // A held charge that fails to record its status looks identical to a
+        // normally synced fill in the UI, so never let this pass quietly.
+        log.error("failed to record unit-mismatch hold", {
+          fillId: u.fillId,
+          error: held.error.message,
+        });
+      }
       continue;
+
     }
 
     const legs = await convertChargeLegs(u, target, convertLeg);
