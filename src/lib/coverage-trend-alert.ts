@@ -32,6 +32,14 @@ export const COVERAGE_TREND_STEP_PCT = 5;
 export const COVERAGE_TREND_WINDOW_DAYS = 7;
 /** Minimum graded days in a window before it can be compared. */
 const MIN_DAYS_PER_WINDOW = 3;
+/**
+ * Minimum gradeable fills behind the recent window before coverage is treated
+ * as a measurement. A single un-invoiced trade prints "0% coverage" on every
+ * day of the rolling window and reads as a catastrophic failure; it is really
+ * one pending charge. Below this count we stay quiet rather than grading a
+ * percentage whose denominator is one.
+ */
+export const COVERAGE_TREND_MIN_FILLS = 5;
 
 export type CoverageTrendAlertReason = "below_floor" | "deteriorating" | "both";
 export type CoverageTrendSeverity = "info" | "warning" | "critical";
@@ -105,11 +113,18 @@ function windowSummary(
 
 export function evaluateCoverageTrendAlert(
   series: CoverageSeries,
-  opts: { floorPct?: number; stepPct?: number; windowDays?: number; criticalGapPct?: number } = {},
+  opts: {
+    floorPct?: number;
+    stepPct?: number;
+    windowDays?: number;
+    criticalGapPct?: number;
+    minFills?: number;
+  } = {},
 ): CoverageTrendAlert {
   const floor = opts.floorPct ?? COVERAGE_TREND_FLOOR_PCT;
   const step = opts.stepPct ?? COVERAGE_TREND_STEP_PCT;
   const criticalGap = opts.criticalGapPct ?? COVERAGE_TREND_CRITICAL_GAP_PCT;
+  const minFills = Math.max(1, Math.trunc(opts.minFills ?? COVERAGE_TREND_MIN_FILLS));
   const windowDays = Math.max(1, Math.trunc(opts.windowDays ?? COVERAGE_TREND_WINDOW_DAYS));
 
   const recent = windowSummary(series, 0, windowDays);
@@ -137,6 +152,20 @@ export function evaluateCoverageTrendAlert(
   };
 
   if (recentPct == null) return quiet;
+
+  // Too thin a tape to grade: one pending charge on a quiet week is not a
+  // broken cost feed, and shouting "critically low" about it trains the owner
+  // to ignore the alert that matters.
+  if (recent.total < minFills) {
+    return {
+      ...quiet,
+      title: "Broker charge coverage not gradeable",
+      body:
+        `Only ${recent.total} gradeable fill${recent.total === 1 ? "" : "s"} in the last ` +
+        `${windowDays} days (coverage ${recentPct}%), below the ${minFills}-fill minimum, ` +
+        "so the coverage percentage is not yet meaningful.",
+    };
+  }
 
   const belowFloor = recentPct < floor;
   const deteriorating =

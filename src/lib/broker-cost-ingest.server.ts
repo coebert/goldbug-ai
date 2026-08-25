@@ -264,6 +264,18 @@ export async function ingestBrokerCostsForPortfolio(args: {
     // zero commission on a real-money account. Leave the modelled fee alone
     // and keep the fill queued for a later sync.
     if (!(total > 0)) {
+      // Log the column names Saxo actually sent. A zero here is almost always
+      // a schema we do not read yet, and without the key list every tick just
+      // repeats "zero charges" with nothing to act on.
+      const raw = (u as { raw?: unknown }).raw;
+      if (raw && typeof raw === "object") {
+        log.warn("matched charge row carried no money", {
+          fillId: u.fillId,
+          symbol: fill.symbol,
+          brokerTradeId: u.brokerTradeId,
+          rowKeys: Object.keys(raw as Record<string, unknown>).sort(),
+        });
+      }
       await supabaseAdmin
         .from("live_fills")
         .update({
@@ -271,6 +283,9 @@ export async function ingestBrokerCostsForPortfolio(args: {
           fee_sync_reason: "broker charge report returned zero charges for this trade",
           fee_sync_attempted_at: now.toISOString(),
           broker_trade_id: u.brokerTradeId,
+          // A zero fee stamped `broker` reads downstream as "the broker says
+          // this trade was free". It was not billed yet: keep it modelled.
+          ...(fill.feeSource === "broker" ? { fee_source: "none" } : {}),
         })
         .eq("id", u.fillId);
       continue;
