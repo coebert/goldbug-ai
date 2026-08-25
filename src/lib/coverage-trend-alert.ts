@@ -153,6 +153,20 @@ export function evaluateCoverageTrendAlert(
 
   if (recentPct == null) return quiet;
 
+  // Too thin a tape to grade: one pending charge on a quiet week is not a
+  // broken cost feed, and shouting "critically low" about it trains the owner
+  // to ignore the alert that matters.
+  if (recent.total < minFills) {
+    return {
+      ...quiet,
+      title: "Broker charge coverage not gradeable",
+      body:
+        `Only ${recent.total} gradeable fill${recent.total === 1 ? "" : "s"} in the last ` +
+        `${windowDays} days (coverage ${recentPct}%), below the ${minFills}-fill minimum, ` +
+        "so the coverage percentage is not yet meaningful.",
+    };
+  }
+
   const belowFloor = recentPct < floor;
   const deteriorating =
     priorPct != null &&
