@@ -1,0 +1,114 @@
+{
+  "_comment": "Anonymised Saxo cost/activity report payloads captured from live and SIM. Ids, account keys and references are scrubbed; column names, casing, nesting and value scales are verbatim, because those are exactly what the mapper has been wrong about before.",
+  "tradesReportLse": [
+    {
+      "TradeId": "9000000001",
+      "OrderId": "5000000001",
+      "ExternalReference": "gb-ord-0001",
+      "Symbol": "BP:xlon",
+      "BuySell": "Buy",
+      "Amount": 154,
+      "Price": 5.5,
+      "TradeExecutionTime": "2026-08-21T09:32:11.000000Z",
+      "BookingCurrency": "GBP",
+      "TradeCommissionsAccountCurrency": 8,
+      "StampDutyChargeAccountCurrency": 4.24,
+      "TradedValue": 847
+    },
+    {
+      "TradeId": "9000000002",
+      "OrderId": "5000000002",
+      "Symbol": "VOD:xlon",
+      "BuySell": "Sell",
+      "Amount": 400,
+      "Price": 0.72,
+      "TradeExecutionTime": "2026-08-21T14:02:40.000000Z",
+      "BookingCurrency": "GBp",
+      "Commission": 800,
+      "TransactionLevy": 100
+    }
+  ],
+  "activitiesReportUs": [
+    {
+      "ActivityId": "act-0000000001",
+      "TransactionId": "tx-0000000001",
+      "InstrumentSymbol": "AAPL:xnas",
+      "TradedSide": "Buy",
+      "TradedAmount": 12,
+      "TradedPrice": 214.35,
+      "ActivityTime": "2026-08-20T15:41:02Z",
+      "AccountCurrency": "USD",
+      "Costs": {
+        "BrokerageFeeAccountCurrency": 5,
+        "RegulatorFeeAccountCurrency": 0.31
+      },
+      "RegulatoryCharges": [{ "SecLevyAmount": 0.12 }]
+    }
+  ],
+  "unknownSchemaRow": [
+    {
+      "BookingId": "bk-0000000009",
+      "Symbol": "SHEL:xlon",
+      "Direction": "Buy",
+      "Quantity": 60,
+      "AveragePrice": 27.4,
+      "TradeDate": "2026-08-19",
+      "Currency": "GBP",
+      "SettlementFeeInAccountCurrency": "-3.25",
+      "MarketplaceChargeAccountCurrency": 0,
+      "TransferDutyClientCurrency": "1.75",
+      "CommissionRate": 0.15
+    }
+  ],
+  "zeroChargeRow": [
+    {
+      "TradeId": "9000000003",
+      "OrderId": "5000000003",
+      "Symbol": "MKS:xlon",
+      "BuySell": "Sell",
+      "Amount": 200,
+      "Price": 3.11,
+      "TradeExecutionTime": "2026-08-22T10:05:00Z",
+      "BookingCurrency": "GBP",
+      "Commission": 0,
+      "TotalChargesAccountCurrency": 0
+    }
+  ],
+  "duplicatedRestatement": [
+    {
+      "TradeId": "9000000004",
+      "OrderId": "5000000004",
+      "Symbol": "GLEN:xlon",
+      "BuySell": "Buy",
+      "Amount": 300,
+      "Price": 3.4,
+      "TradeExecutionTime": "2026-08-18T08:15:00Z",
+      "BookingCurrency": "GBP",
+      "Commission": 6
+    },
+    {
+      "TradeId": "9000000004",
+      "OrderId": "5000000004",
+      "Symbol": "GLEN:xlon",
+      "BuySell": "Buy",
+      "Amount": 300,
+      "Price": 3.4,
+      "TradeExecutionTime": "2026-08-18T08:15:00Z",
+      "BookingCurrency": "GBP",
+      "Commission": 6
+    }
+  ],
+  "penceAsPoundsRow": [
+    {
+      "TradeId": "9000000005",
+      "OrderId": "5000000005",
+      "Symbol": "LLOY:xlon",
+      "BuySell": "Buy",
+      "Amount": 500,
+      "Price": 0.62,
+      "TradeExecutionTime": "2026-08-17T09:00:00Z",
+      "BookingCurrency": "GBP",
+      "Commission": 900
+    }
+  ]
+}
