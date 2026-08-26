@@ -241,6 +241,82 @@ describe("saxo charge report fixtures — ingestion end to end", () => {
   });
 });
 
+describe("LSE pence and mixed-currency fixtures", () => {
+  it("reads GBX charge columns as pence, not pounds", async () => {
+    const fills = [
+      fill({
+        id: "f-tsco",
+        symbol: "TSCO.L",
+        quantity: 1200,
+        fillPrice: 3.85,
+        brokerFillId: "5000000006",
+        filledAt: "2026-08-24T08:45:00Z",
+      }),
+    ];
+    const [o] = await ingest(fills, report["gbxPenceCharges"]!);
+    expect(o).toMatchObject({ feeSource: "broker", feeSyncStatus: "invoiced" });
+    // 650p commission + 2310p stamp = £29.60, not £2,960.
+    expect(o!.fee).toBeCloseTo(29.6, 6);
+    expect(o!.legs!.commission).toBeCloseTo(6.5, 6);
+    expect(o!.legs!.tax).toBeCloseTo(23.1, 6);
+  });
+
+  it("honours a published pence total over the sum of its pence legs", async () => {
+    const fills = [
+      fill({
+        id: "f-aal",
+        symbol: "AAL.L",
+        side: "sell",
+        quantity: 900,
+        fillPrice: 20.15,
+        brokerFillId: "5000000007",
+        filledAt: "2026-08-24T13:10:00Z",
+      }),
+    ];
+    const [o] = await ingest(fills, report["penceQuotedTinyPrice"]!);
+    expect(o!.fee).toBeCloseTo(10, 6);
+    expect(o!.legs!.commission).toBeCloseTo(7.95, 6);
+    expect(o!.legs!.tax).toBeCloseTo(1.05, 6);
+  });
+
+  it("bills each leg of a EUR/USD/GBP report in its own currency", async () => {
+    const fills = [
+      fill({ id: "f-asml", symbol: "ASML:xams", quantity: 8, fillPrice: 705.4, currency: "EUR", brokerFillId: "5000000008", filledAt: "2026-08-23T09:05:00Z" }),
+      fill({ id: "f-msft", symbol: "MSFT:xnas", quantity: 15, fillPrice: 402.1, currency: "USD", brokerFillId: "5000000009", filledAt: "2026-08-23T15:20:00Z" }),
+      fill({ id: "f-rio", symbol: "RIO.L", side: "sell", quantity: 40, fillPrice: 48.9, brokerFillId: "5000000010", filledAt: "2026-08-23T10:30:00Z" }),
+    ];
+    const outcomes = await ingest(fills, report["mixedCurrencyReport"]!);
+    const byId = Object.fromEntries(outcomes.map((o) => [o.fillId, o]));
+    expect(outcomes.every((o) => o.feeSource === "broker")).toBe(true);
+    expect(byId["f-asml"]!.fee).toBeCloseTo(13.3, 6);
+    expect(byId["f-msft"]!.fee).toBeCloseTo(7.5, 6);
+    expect(byId["f-rio"]!.fee).toBeCloseTo(8.49, 6);
+    // No leg picked up another row's money.
+    expect(brokerCoverage(outcomes.map((o) => ({ feeSource: o.feeSource })))).toBe(1);
+  });
+
+  it("converts a foreign-currency charge onto a sterling fill", async () => {
+    const fills = [
+      fill({
+        id: "f-shel-usd",
+        symbol: "SHEL.L",
+        quantity: 120,
+        fillPrice: 27.5,
+        brokerFillId: "5000000011",
+        filledAt: "2026-08-22T09:15:00Z",
+      }),
+    ];
+    const charges = mapSaxoChargeRows(report["foreignChargeOnSterlingFill"]!);
+    const { updates } = matchChargesToFills({ fills, charges });
+    const legs = await convertChargeLegs(updates[0]!, "GBP", async (amount, from, to) => {
+      expect([from, to]).toEqual(["USD", "GBP"]);
+      return amount * 0.78;
+    });
+    expect(legs.total).toBeCloseTo(7.8, 6);
+    expect(legs.commission).toBeCloseTo(7.8, 6);
+  });
+});
+
 /**
  * Generic guard rails. The suite above pins what each known fixture should do;
  * this one runs *every* fixture array in the JSON — including ones added
