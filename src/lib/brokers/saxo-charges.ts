@@ -14,6 +14,18 @@
  */
 
 import type { BrokerTradeCharge } from "./adapter";
+import { classifyCurrencyUnit } from "../valuation/unit-validation";
+
+/**
+ * Upper-casing a currency label is lossy: `GBp` is pence and `GBP` is pounds,
+ * and Saxo books LSE charges in both. Downstream rescaling keys off the case,
+ * so a minor-unit label is kept verbatim and everything else normalised.
+ */
+function preserveUnitCase(raw: string): string {
+  const text = String(raw ?? "").trim();
+  return classifyCurrencyUnit(text).minor ? text : text.toUpperCase();
+}
+
 
 /** Case-insensitive lookup across a row and one level of nested objects. */
 function pick(row: Record<string, unknown>, keys: readonly string[]): unknown {
@@ -236,10 +248,11 @@ export function mapSaxoChargeRow(
     ...(quantityRaw !== 0 ? { quantity: Math.abs(quantityRaw) } : {}),
     ...(price > 0 ? { price } : {}),
     ...(parseTradedAt(row) !== undefined ? { tradedAt: parseTradedAt(row)! } : {}),
-    currency: (
+    currency: preserveUnitCase(
       text(row, ["BookingCurrency", "TradeCurrency", "Currency", "AccountCurrency", "AmountCurrency"]) ??
-      fallbackCurrency
-    ).toUpperCase(),
+        fallbackCurrency,
+    ),
+
     commission,
     exchangeFee,
     tax,
