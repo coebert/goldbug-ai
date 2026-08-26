@@ -236,10 +236,11 @@ export function mapSaxoChargeRow(
     ...(quantityRaw !== 0 ? { quantity: Math.abs(quantityRaw) } : {}),
     ...(price > 0 ? { price } : {}),
     ...(parseTradedAt(row) !== undefined ? { tradedAt: parseTradedAt(row)! } : {}),
-    currency: (
+    currency: preserveUnitCase(
       text(row, ["BookingCurrency", "TradeCurrency", "Currency", "AccountCurrency", "AmountCurrency"]) ??
-      fallbackCurrency
-    ).toUpperCase(),
+        fallbackCurrency,
+    ),
+
     commission,
     exchangeFee,
     tax,
