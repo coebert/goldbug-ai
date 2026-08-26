@@ -110,5 +110,85 @@
       "BookingCurrency": "GBP",
       "Commission": 900
     }
+  ],
+  "gbxPenceCharges": [
+    {
+      "TradeId": "9000000006",
+      "OrderId": "5000000006",
+      "Symbol": "TSCO:xlon",
+      "BuySell": "Buy",
+      "Amount": 1200,
+      "Price": 3.85,
+      "TradeExecutionTime": "2026-08-24T08:45:00Z",
+      "BookingCurrency": "GBX",
+      "Commission": 650,
+      "StampDuty": 2310
+    }
+  ],
+  "penceQuotedTinyPrice": [
+    {
+      "TradeId": "9000000007",
+      "OrderId": "5000000007",
+      "Symbol": "AAL:xlon",
+      "BuySell": "Sell",
+      "Amount": 900,
+      "Price": 20.15,
+      "TradeExecutionTime": "2026-08-24T13:10:00Z",
+      "BookingCurrency": "GBp",
+      "Commission": 795,
+      "TransactionLevy": 105,
+      "TotalChargesAccountCurrency": 1000
+    }
+  ],
+  "mixedCurrencyReport": [
+    {
+      "TradeId": "9000000008",
+      "OrderId": "5000000008",
+      "Symbol": "ASML:xams",
+      "BuySell": "Buy",
+      "Amount": 8,
+      "Price": 705.4,
+      "TradeExecutionTime": "2026-08-23T09:05:00Z",
+      "BookingCurrency": "EUR",
+      "Commission": 12.5,
+      "ExchangeFee": 0.8
+    },
+    {
+      "TradeId": "9000000009",
+      "OrderId": "5000000009",
+      "Symbol": "MSFT:xnas",
+      "BuySell": "Buy",
+      "Amount": 15,
+      "Price": 402.1,
+      "TradeExecutionTime": "2026-08-23T15:20:00Z",
+      "BookingCurrency": "USD",
+      "Costs": { "BrokerageFeeAccountCurrency": 6.4 },
+      "ConversionFeeAccountCurrency": 1.1
+    },
+    {
+      "TradeId": "9000000010",
+      "OrderId": "5000000010",
+      "Symbol": "RIO:xlon",
+      "BuySell": "Sell",
+      "Amount": 40,
+      "Price": 48.9,
+      "TradeExecutionTime": "2026-08-23T10:30:00Z",
+      "BookingCurrency": "GBP",
+      "Commission": 8,
+      "TransactionLevy": 0.49
+    }
+  ],
+  "foreignChargeOnSterlingFill": [
+    {
+      "TradeId": "9000000011",
+      "OrderId": "5000000011",
+      "Symbol": "SHEL:xlon",
+      "BuySell": "Buy",
+      "Amount": 120,
+      "Price": 27.5,
+      "TradeExecutionTime": "2026-08-22T09:15:00Z",
+      "BookingCurrency": "USD",
+      "Commission": 10
+    }
   ]
 }
