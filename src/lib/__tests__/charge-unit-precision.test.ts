@@ -37,7 +37,7 @@ describe("minor-unit rescaling precision", () => {
     [333, 3.33],
     [1_234_567, 12_345.67],
     [0.5, 0.005],
-  ])("rescales %d GBp to £%s exactly", async (pence, pounds) => {
+  ])("rescales %d GBp to £%s exactly", async (pence: number, pounds: number) => {
     const legs = await convertChargeLegs(
       { currency: "GBp", commission: pence, exchangeFee: 0, tax: 0, other: 0, total: pence },
       "GBP",
@@ -47,6 +47,7 @@ describe("minor-unit rescaling precision", () => {
     expectMoney(legs.total, pounds);
 
     const check = checkChargeUnits({
+      symbol: "MKS.L",
       chargeCurrency: "GBp",
       chargeTotal: pence,
       fillCurrency: "GBP",
@@ -100,7 +101,7 @@ describe("rate-based conversion precision", () => {
     [12.34, 1.1735, 14.481_79],
     [3.5, 0.85, 2.975],
     [0.03, 0.7912, 0.023_736],
-  ])("converts %s at %s to %s", async (amount, r, expected) => {
+  ])("converts %s at %s to %s", async (amount: number, r: number, expected: number) => {
     const legs = await convertChargeLegs(
       { currency: "USD", commission: amount, exchangeFee: 0, tax: 0, other: 0, total: amount },
       "GBP",
