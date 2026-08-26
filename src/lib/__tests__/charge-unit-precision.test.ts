@@ -98,7 +98,7 @@ describe("minor-unit rescaling precision", () => {
 describe("rate-based conversion precision", () => {
   it.each([
     [100, 0.7912, 79.12],
-    [12.34, 1.1735, 14.481_79],
+    [12.34, 1.1735, 14.480_99],
     [3.5, 0.85, 2.975],
     [0.03, 0.7912, 0.023_736],
   ])("converts %s at %s to %s", async (amount: number, r: number, expected: number) => {
