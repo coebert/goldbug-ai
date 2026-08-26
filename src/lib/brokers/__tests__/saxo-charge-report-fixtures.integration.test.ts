@@ -240,3 +240,86 @@ describe("saxo charge report fixtures — ingestion end to end", () => {
     ).toBeCloseTo(0.25, 6);
   });
 });
+
+/**
+ * Generic guard rails. The suite above pins what each known fixture should do;
+ * this one runs *every* fixture array in the JSON — including ones added
+ * later — through the same mapper → matcher → unit gate → leg conversion chain
+ * and asserts the invariants `fee_source` has to satisfy no matter the schema.
+ * Add a fixture and it is covered automatically; the last case fails if a
+ * fixture is added that the pipeline cannot key at all.
+ */
+describe("fee_source invariants hold for every fixture", () => {
+  const fixtureKeys = Object.entries(report)
+    .filter(([, v]) => Array.isArray(v))
+    .map(([k]) => k);
+
+  /** Build a fill from the mapped charge itself, so any schema is exercised. */
+  const fillsFor = (rows: unknown[]): IngestFill[] =>
+    mapSaxoChargeRows(rows).map((c, i) =>
+      fill({
+        id: `gen-${i}`,
+        symbol: c.symbol ?? "UNKNOWN.L",
+        side: c.side ?? "buy",
+        quantity: c.quantity ?? 1,
+        fillPrice: c.price ?? 1,
+        // Fills are always stored in the major unit; charges may not be.
+        currency: (c.currency ?? "GBP").toUpperCase(),
+        filledAt: c.tradedAt ?? "2026-08-20T12:00:00Z",
+        brokerFillId: c.brokerOrderId ?? null,
+      }),
+    );
+
+  it.each(fixtureKeys)("%s: source, status and amount never disagree", async (key) => {
+    const rows = report[key]!;
+    const fills = fillsFor(rows);
+    const charges = mapSaxoChargeRows(rows);
+    const outcomes = await ingest(fills, rows);
+
+    // One decision per fill, and no fill invented or dropped along the way.
+    expect(outcomes.map((o) => o.fillId).sort()).toEqual(fills.map((f) => f.id).sort());
+    expect(new Set(outcomes.map((o) => o.fillId)).size).toBe(outcomes.length);
+
+    for (const o of outcomes) {
+      // The three fields are one fact expressed three ways.
+      expect(o.feeSource === "broker").toBe(o.fee > 0);
+      expect(o.feeSource === "broker").toBe(o.feeSyncStatus === "invoiced");
+      expect(o.fee).toBeGreaterThanOrEqual(0);
+
+      // Nothing but an invoiced charge may leave modelled costs in place.
+      if (o.feeSyncStatus !== "invoiced") {
+        expect(o.feeSource).not.toBe("broker");
+        expect(o.fee).toBe(0);
+        expect(o.legs).toBeUndefined();
+        continue;
+      }
+
+      const legs = o.legs!;
+      for (const v of [legs.commission, legs.exchangeFee, legs.tax, legs.other]) {
+        expect(v).toBeGreaterThanOrEqual(0);
+      }
+      expect(legs.commission + legs.exchangeFee + legs.tax + legs.other).toBeCloseTo(legs.total, 9);
+      expect(legs.total).toBeCloseTo(o.fee, 9);
+
+      // Conversion may rescale a charge down (GBp → GBP) but must never
+      // manufacture money the report did not state — the double-count guard.
+      const mapped = charges.find(
+        (c) => (c.symbol ?? "UNKNOWN.L") === fills.find((f) => f.id === o.fillId)!.symbol,
+      );
+      if (mapped) expect(o.fee).toBeLessThanOrEqual(mapped.total + 1e-9);
+    }
+
+    // Coverage is exactly the invoiced share, so the KPI cannot drift from the tape.
+    const invoiced = outcomes.filter((o) => o.feeSyncStatus === "invoiced").length;
+    expect(brokerCoverage(outcomes.map((o) => ({ feeSource: o.feeSource })))).toBeCloseTo(
+      outcomes.length ? invoiced / outcomes.length : 0,
+      9,
+    );
+  });
+
+  it("every fixture carries at least one keyable row", () => {
+    for (const key of fixtureKeys) {
+      expect.soft(mapSaxoChargeRows(report[key]!).length, `fixture ${key}`).toBeGreaterThan(0);
+    }
+  });
+});
