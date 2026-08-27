@@ -20,6 +20,7 @@ import {
   roundMoney,
 } from "@/lib/format-money";
 import { holdingAvgCostBase } from "@/lib/market-price-units";
+import { holdingNativeValue, isFxLegHolding } from "@/lib/fx-leg-value";
 import { quoteUnitsResolved } from "@/lib/valuation/kernel";
 import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
@@ -254,7 +255,7 @@ export function LiveHoldingsCard({
   );
   // Largest-remainder split of Invested across positions — guarantees
   // Σ(row.value) === authoritativeInvested at 2dp.
-  const sortedByValueDesc = rawRows
+  const sortedByValueDesc = positionRows
     .map((r, i) => ({ r, i }))
     .sort((a, b) => b.r.rawValue - a.r.rawValue);
   const allocated = allocateRoundedShares(
