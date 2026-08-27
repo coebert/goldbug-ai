@@ -1,9 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { DailyReport, DailyReportItem, DailyReportPortfolio } from "./daily-report.server";
+import type {
+  DailyReport,
+  DailyReportFxLeg,
+  DailyReportItem,
+  DailyReportPortfolio,
+} from "./daily-report.server";
 
-export type { DailyReport, DailyReportItem, DailyReportPortfolio };
+export type { DailyReport, DailyReportFxLeg, DailyReportItem, DailyReportPortfolio };
 
 export const getDailyAiReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
