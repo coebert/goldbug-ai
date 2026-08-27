@@ -31,6 +31,7 @@ import { reconcilePortfolio } from "@/lib/live.functions";
 import { toast } from "sonner";
 import { qk } from "@/lib/query-keys";
 import { ValuationFreshnessBadge } from "@/components/valuation-freshness-badge";
+import { checkPositionsConsistency } from "@/lib/positions-consistency";
 
 
 
@@ -264,6 +265,20 @@ export function LiveHoldingsCard({
   );
   const rows = sortedByValueDesc.map(({ r }, idx) => ({ ...r, value: allocated[idx] }));
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
+
+  // Reconcile what the engine holds against what this card actually paints:
+  // every non-FX position rendered exactly once, quantities equal, and the
+  // per-row values summing to the Invested tile. FX funding legs are counted
+  // separately because they render in their own section by design.
+  const consistency = checkPositionsConsistency({
+    enginePositions: holdings.map((h) => ({
+      symbol: h.symbol,
+      quantity: Number(h.quantity),
+      isFxLeg: isFxLegHolding({ asset_class: h.asset_class ?? null }),
+    })),
+    renderedPositions: rows.map((r) => ({ symbol: r.symbol, quantity: r.qty, value: r.value })),
+    investedTotal: authoritativeInvested,
+  });
 
   const holdingsValue = authoritativeInvested;
   const denom = totalDisplay > 0 ? totalDisplay : holdingsValue + cashDisplay;
