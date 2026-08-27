@@ -492,7 +492,54 @@ export function LiveHoldingsCard({
 
 
 
-        {rows.length === 0 ? (
+        {fxLegRows.length > 0 && (
+          <div className="mb-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                FX legs (funding)
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                notional sits in cash · P&amp;L only
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {fxLegRows.map((r) => {
+                const short = r.qty < 0;
+                const quoteCcy = String(r.instrument_ccy || r.symbol.slice(3, 6) || baseCcy).toUpperCase();
+                const gain = r.pnl >= 0;
+                return (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <SymbolTicker symbol={r.symbol} className="font-semibold tracking-tight" />
+                        <Badge variant="secondary" className="uppercase text-[9px] px-1.5 py-0">
+                          {short ? "short" : "long"} fx
+                        </Badge>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                        {r.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} @ {r.avg.toFixed(4)} entry
+                        {Number.isFinite(r.mark) && ` · ${r.mark.toFixed(4)} now`}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div
+                        className={`text-sm font-semibold tabular-nums ${gain ? "text-emerald-500" : "text-rose-400"}`}
+                      >
+                        {formatMoneySigned(r.pnl, quoteCcy)}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums">
+                        {formatMoneyAmount(r.notional)} {quoteCcy} notional
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {rows.length === 0 && fxLegRows.length === 0 ? (
+
           <p className="text-sm text-muted-foreground">
             {isLive
               ? "No positions held at your broker right now. The AI will open positions on the next run when opportunities fit your budget."
