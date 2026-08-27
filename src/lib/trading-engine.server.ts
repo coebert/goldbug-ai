@@ -1601,6 +1601,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // checked against env=live (or vice versa) misses every row and blocks the
   // buy for a symbol that is perfectly routable.
   const validationEnv = portfolio.mode === "live_prod" ? "live" : "sim";
+  // Paper/backtest books never send an order to Saxo, so broker routability
+  // must not gate them (they also have no instrument resolver, which made the
+  // cache-miss block permanent and left the crypto sim never trading).
+  const brokerRouted = portfolio.mode === "live_prod" || portfolio.mode === "live_sim";
   // Lazily-built adapter used only when a cache row is missing or stale, so a
   // clean run never pays a broker round-trip.
   let instrumentResolver: ((symbol: string) => Promise<{ assetType: string } | null>) | undefined;
@@ -1634,6 +1638,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     supabaseAdmin,
     env: validationEnv,
     resolveInstrument: instrumentResolver,
+    brokerRouted,
   });
   // Same shape for the crypto ETP sleeve — confirms Saxo-routability of
   // physically-backed ETPs before a buy is sized. Spot pairs (BTC-USD) are
@@ -1643,6 +1648,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     supabaseAdmin,
     env: validationEnv,
     resolveInstrument: instrumentResolver,
+    brokerRouted,
   });
 
 
