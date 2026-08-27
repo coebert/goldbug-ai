@@ -54,7 +54,11 @@ describe("minor-unit rescaling precision", () => {
       fillPrice: 1000,
       quantity: 1000,
     });
-    expectMoney(check.normalised.fee ?? Number.NaN, pounds);
+    const normalisedFee = check.normalised.fee;
+    if (normalisedFee === undefined) {
+      throw new Error("Expected normalised fee to be defined");
+    }
+    expectMoney(normalisedFee, pounds);
   });
 
   it("never double-scales a pence charge against a pence-quoted fill", async () => {
