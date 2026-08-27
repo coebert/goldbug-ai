@@ -507,6 +507,25 @@ export function LiveHoldingsCard({
 
 
 
+        {holdings.length > 0 && (
+          <div
+            data-testid="positions-consistency"
+            data-ok={consistency.ok ? "true" : "false"}
+            className={`mb-3 rounded-md border px-3 py-2 text-[11px] leading-relaxed ${
+              consistency.ok
+                ? "border-border/50 bg-muted/20 text-muted-foreground"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            }`}
+          >
+            {consistency.summary}
+            {consistency.ok && (
+              <span className="tabular-nums">
+                {" "}· rows total {fmt(consistency.renderedTotal)} = invested {fmt(consistency.investedTotal)}
+              </span>
+            )}
+          </div>
+        )}
+
         {fxLegRows.length > 0 && (
           <div className="mb-3 rounded-lg border border-border/60 bg-muted/20 p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
