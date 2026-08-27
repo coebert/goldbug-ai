@@ -94,8 +94,17 @@ export function makeCommodityValidator(args: {
    * and let the broker precheck decide).
    */
   resolveInstrument?: (symbol: string) => Promise<{ assetType: string } | null>;
+  /**
+   * Whether orders from this portfolio actually route to Saxo. Paper and
+   * backtest portfolios never touch the broker, so Saxo instrument-cache
+   * verification is meaningless for them — and because they also have no
+   * instrument resolver, every first buy was blocked forever ("instrument
+   * cache row missing for env=sim"). Defaults to true (broker-routed).
+   */
+  brokerRouted?: boolean;
 }): CommodityValidator {
   const { supabaseAdmin, env, resolveInstrument } = args;
+  const brokerRouted = args.brokerRouted !== false;
   const cacheHits = new Map<string, CommodityValidationOutcome>();
 
   // Shared verdict for an asset type coming from either the cache or a live
@@ -148,6 +157,8 @@ export function makeCommodityValidator(args: {
     const { needsValidation, meta, failFast } = classifyCommodityProposal(input);
     if (!needsValidation || !meta) return { ok: true, meta: meta ?? undefined };
     if (failFast) return { ok: false, reason: failFast, meta };
+    // Simulated books do not route to Saxo: skip broker routability entirely.
+    if (!brokerRouted) return { ok: true, meta };
 
     const cacheKey = `${meta.symbol}::${env}`;
     const cached = cacheHits.get(cacheKey);
