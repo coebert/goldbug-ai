@@ -246,7 +246,7 @@ export async function buildDailyReport(params: {
   }
   const ids = portfolios.map((p) => p.id as string);
 
-  const [auditRes, cfRes, decRes] = await Promise.all([
+  const [auditRes, cfRes, decRes, fxRes] = await Promise.all([
     db
       .from("ai_decision_audit")
       .select(
@@ -270,9 +270,58 @@ export async function buildDailyReport(params: {
       .eq("run_date", date)
       .order("created_at", { ascending: false })
       .limit(100),
+    db
+      .from("holdings")
+      .select("portfolio_id, symbol, quantity, avg_cost, asset_class, instrument_ccy")
+      .in("portfolio_id", ids)
+      .limit(500),
   ]);
   if (auditRes.error) throw new Error(auditRes.error.message);
   if (cfRes.error) throw new Error(cfRes.error.message);
+
+  // Open FX funding legs, valued at the live rate. Grouped per portfolio so a
+  // report can state direction, entry vs current rate and unrealised P&L.
+  const fxByP = new Map<string, DailyReportFxLeg[]>();
+  {
+    const fxRows = (fxRes.data ?? []).filter((h) =>
+      isFxLegHolding({ asset_class: (h as { asset_class?: string | null }).asset_class ?? null }),
+    );
+    const rateCache = new Map<string, number | null>();
+    const { getFxRate } = await import("./fx.server");
+    for (const h of fxRows) {
+      const symbol = String((h as { symbol: string }).symbol).toUpperCase();
+      const qty = num((h as { quantity: unknown }).quantity) ?? 0;
+      const entry = num((h as { avg_cost: unknown }).avg_cost) ?? 0;
+      if (!qty || !(entry > 0)) continue;
+      const baseCcy = symbol.slice(0, 3);
+      const quoteCcy =
+        String((h as { instrument_ccy?: string | null }).instrument_ccy || symbol.slice(3, 6) || "USD").toUpperCase();
+      if (!rateCache.has(symbol)) {
+        try {
+          const r = await getFxRate(baseCcy, quoteCcy);
+          rateCache.set(symbol, Number.isFinite(r.rate) && r.rate > 0 ? r.rate : null);
+        } catch {
+          rateCache.set(symbol, null);
+        }
+      }
+      const rate = rateCache.get(symbol) ?? null;
+      const leg: DailyReportFxLeg = {
+        symbol,
+        direction: qty < 0 ? "short" : "long",
+        quantity: qty,
+        entryRate: entry,
+        currentRate: rate,
+        quoteCcy,
+        unrealisedPnl:
+          rate == null
+            ? null
+            : holdingNativeValue({ assetClass: "fx", quantity: qty, price: rate, avgCost: entry }),
+        notional: Math.abs(qty) * (rate ?? entry),
+      };
+      const pid = String((h as { portfolio_id: string }).portfolio_id);
+      fxByP.set(pid, [...(fxByP.get(pid) ?? []), leg]);
+    }
+  }
 
   const runNoteByP = new Map<string, string>();
   for (const d of decRes.data ?? []) {
@@ -367,6 +416,7 @@ export async function buildDailyReport(params: {
       held,
       passed,
       passReasonCounts,
+      fxLegs: fxByP.get(pid) ?? [],
     };
     entry.narrative = buildDeterministicNarrative(entry);
     out.push(entry);
