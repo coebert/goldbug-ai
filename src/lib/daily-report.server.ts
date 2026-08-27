@@ -10,6 +10,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { labelBlock } from "./decision-summary.helpers";
+import { holdingNativeValue, isFxLegHolding } from "./fx-leg-value";
 
 export type DailyReportItem = {
   symbol: string;
@@ -23,6 +24,24 @@ export type DailyReportItem = {
   price: number | null;
   conviction: number | null;
   decidedAt: string | null;
+};
+
+/**
+ * An open FX spot funding leg (e.g. a short GBPUSD the engine opened to fund a
+ * USD buy). Its notional already sits in the cash wallet, so only the
+ * unrealised P&L is economically live — the report says so explicitly.
+ */
+export type DailyReportFxLeg = {
+  symbol: string;
+  direction: "long" | "short";
+  quantity: number;
+  entryRate: number;
+  currentRate: number | null;
+  quoteCcy: string;
+  /** quantity x (current − entry), in the quote currency. Null without a rate. */
+  unrealisedPnl: number | null;
+  /** |quantity| x rate — shown for context only; it is not extra equity. */
+  notional: number | null;
 };
 
 export type DailyReportPortfolio = {
@@ -39,6 +58,7 @@ export type DailyReportPortfolio = {
   held: DailyReportItem[];
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
+  fxLegs: DailyReportFxLeg[];
 };
 
 export type DailyReport = {
@@ -77,6 +97,7 @@ export function buildDeterministicNarrative(p: {
   held: DailyReportItem[];
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
+  fxLegs?: DailyReportFxLeg[];
 }): string {
   if (p.considered === 0) {
     return `No AI decisions were recorded for ${p.name} on this date — the engine either did not run or found nothing in its universe to assess.`;
@@ -109,6 +130,17 @@ export function buildDeterministicNarrative(p: {
       .join(", ");
     bits.push(
       `It passed on ${p.passed.length} candidate${p.passed.length === 1 ? "" : "s"}${top ? ` — mostly ${top}` : ""}.`,
+    );
+  }
+  for (const leg of p.fxLegs ?? []) {
+    const pnl =
+      leg.unrealisedPnl == null
+        ? "no current rate available"
+        : `${leg.unrealisedPnl >= 0 ? "up" : "down"} ${money(Math.abs(leg.unrealisedPnl), leg.quoteCcy)}`;
+    bits.push(
+      `It still holds a ${leg.direction} ${leg.symbol} currency funding leg entered at ${leg.entryRate.toFixed(4)}${
+        leg.currentRate != null ? ` (now ${leg.currentRate.toFixed(4)})` : ""
+      }, ${pnl}; its cash is already counted, so only that profit or loss moves the account.`,
     );
   }
   return bits.join(" ");
@@ -148,6 +180,15 @@ async function narrate(
       conviction: i.conviction,
     })),
     pass_reason_counts: p.passReasonCounts.slice(0, 6),
+    fx_funding_legs: p.fxLegs.map((l) => ({
+      pair: l.symbol,
+      direction: l.direction,
+      entry_rate: l.entryRate,
+      current_rate: l.currentRate,
+      unrealised_pnl: l.unrealisedPnl,
+      quote_currency: l.quoteCcy,
+      note: "notional already sits in cash; only the unrealised P&L changes the account value",
+    })),
     engine_run_note: p.runExplanation?.slice(0, 400) ?? null,
   };
 
@@ -158,8 +199,9 @@ Write 3-5 short sentences of plain English. No markdown, no bullet points, no he
 Cover, in this order:
 1. What the AI considered today, in scale terms.
 2. Each buy and sell it made and the actual reason given.
-3. The most notable things it deliberately passed on and why (guardrails, costs, weak signal, broker refusal).
-4. One sentence on what that means for the money sitting in the account.
+3. Any open currency (FX) funding leg: its direction, the rate it was entered at versus now, and whether it is currently up or down. Say plainly that its cash is already counted so only that profit or loss matters.
+4. The most notable things it deliberately passed on and why (guardrails, costs, weak signal, broker refusal).
+5. One sentence on what that means for the money sitting in the account.
 
 Only use the facts below. If a reason is missing, say the reason was not recorded rather than inventing one.
 
