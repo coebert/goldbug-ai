@@ -206,7 +206,27 @@ export function LiveHoldingsCard({
       return { ...h, qty, avg, mark, rawValue, costBasis, series: s, unitsUnknown, pricedAtCost: !hasLive && !unitsUnknown };
     });
 
-  const rawSum = rawRows.reduce((s, r) => s + r.rawValue, 0);
+  // FX spot legs (e.g. a short GBPUSD funding leg the engine opened to buy a
+  // USD instrument) are NOT ordinary positions: their notional already lives
+  // in the cash wallet, so qty x price would double-count it. Previously they
+  // fell through the shared allocation path, which clamps negative raw values
+  // to zero — the leg rendered as a £0.00 / 0.0% row and looked invisible.
+  // They now get their own section showing notional and unrealised P&L.
+  const isFxRow = (r: { asset_class?: string | null }) => isFxLegHolding({ asset_class: r.asset_class ?? null });
+  const fxLegRows = rawRows.filter(isFxRow).map((r) => ({
+    ...r,
+    notional: Math.abs(r.qty) * (Number.isFinite(r.mark) ? r.mark : r.avg),
+    pnl: holdingNativeValue({
+      assetClass: r.asset_class ?? null,
+      quantity: r.qty,
+      price: r.mark,
+      avgCost: r.avg,
+    }),
+  }));
+  const positionRows = rawRows.filter((r) => !isFxRow(r));
+
+  const rawSum = positionRows.reduce((s, r) => s + r.rawValue, 0);
+
   // Authoritative invested value: prefer the parent-supplied number (from
   // `derivePortfolioMetrics`, which reads the server-side equity snapshot),
   // otherwise derive from `totalValue - cash`. Raw qty × price is in native
