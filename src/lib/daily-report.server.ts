@@ -337,5 +337,15 @@ export async function buildDailyReport(params: {
     }),
   );
 
-  return { date, generatedAt: new Date().toISOString(), portfolios: narrated };
+  // Real-cash portfolio first — that is the one the owner reads first every
+  // morning; sims follow in creation order.
+  const modeRank = (m: string | null) =>
+    m === "live_prod" ? 0 : m === "live_sim" ? 1 : 2;
+  const ordered = narrated
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => modeRank(a.p.mode) - modeRank(b.p.mode) || a.i - b.i)
+    .map(({ p }) => p);
+
+  return { date, generatedAt: new Date().toISOString(), portfolios: ordered };
+
 }
