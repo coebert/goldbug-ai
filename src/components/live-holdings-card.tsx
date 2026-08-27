@@ -31,6 +31,7 @@ import { reconcilePortfolio } from "@/lib/live.functions";
 import { toast } from "sonner";
 import { qk } from "@/lib/query-keys";
 import { ValuationFreshnessBadge } from "@/components/valuation-freshness-badge";
+import { checkPositionsConsistency } from "@/lib/positions-consistency";
 
 
 
@@ -265,6 +266,20 @@ export function LiveHoldingsCard({
   const rows = sortedByValueDesc.map(({ r }, idx) => ({ ...r, value: allocated[idx] }));
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
+  // Reconcile what the engine holds against what this card actually paints:
+  // every non-FX position rendered exactly once, quantities equal, and the
+  // per-row values summing to the Invested tile. FX funding legs are counted
+  // separately because they render in their own section by design.
+  const consistency = checkPositionsConsistency({
+    enginePositions: holdings.map((h) => ({
+      symbol: h.symbol,
+      quantity: Number(h.quantity),
+      isFxLeg: isFxLegHolding({ asset_class: h.asset_class ?? null }),
+    })),
+    renderedPositions: rows.map((r) => ({ symbol: r.symbol, quantity: r.qty, value: r.value })),
+    investedTotal: authoritativeInvested,
+  });
+
   const holdingsValue = authoritativeInvested;
   const denom = totalDisplay > 0 ? totalDisplay : holdingsValue + cashDisplay;
   const cashPct = denom > 0 ? (cashDisplay / denom) * 100 : 0;
@@ -491,6 +506,25 @@ export function LiveHoldingsCard({
         )}
 
 
+
+        {holdings.length > 0 && (
+          <div
+            data-testid="positions-consistency"
+            data-ok={consistency.ok ? "true" : "false"}
+            className={`mb-3 rounded-md border px-3 py-2 text-[11px] leading-relaxed ${
+              consistency.ok
+                ? "border-border/50 bg-muted/20 text-muted-foreground"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            }`}
+          >
+            {consistency.summary}
+            {consistency.ok && (
+              <span className="tabular-nums">
+                {" "}· rows total {fmt(consistency.renderedTotal)} = invested {fmt(consistency.investedTotal)}
+              </span>
+            )}
+          </div>
+        )}
 
         {fxLegRows.length > 0 && (
           <div className="mb-3 rounded-lg border border-border/60 bg-muted/20 p-3">

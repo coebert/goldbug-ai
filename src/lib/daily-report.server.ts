@@ -10,6 +10,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { labelBlock } from "./decision-summary.helpers";
+import { holdingNativeValue, isFxLegHolding } from "./fx-leg-value";
 
 export type DailyReportItem = {
   symbol: string;
@@ -23,6 +24,24 @@ export type DailyReportItem = {
   price: number | null;
   conviction: number | null;
   decidedAt: string | null;
+};
+
+/**
+ * An open FX spot funding leg (e.g. a short GBPUSD the engine opened to fund a
+ * USD buy). Its notional already sits in the cash wallet, so only the
+ * unrealised P&L is economically live — the report says so explicitly.
+ */
+export type DailyReportFxLeg = {
+  symbol: string;
+  direction: "long" | "short";
+  quantity: number;
+  entryRate: number;
+  currentRate: number | null;
+  quoteCcy: string;
+  /** quantity x (current − entry), in the quote currency. Null without a rate. */
+  unrealisedPnl: number | null;
+  /** |quantity| x rate — shown for context only; it is not extra equity. */
+  notional: number | null;
 };
 
 export type DailyReportPortfolio = {
@@ -39,6 +58,7 @@ export type DailyReportPortfolio = {
   held: DailyReportItem[];
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
+  fxLegs: DailyReportFxLeg[];
 };
 
 export type DailyReport = {
@@ -77,6 +97,7 @@ export function buildDeterministicNarrative(p: {
   held: DailyReportItem[];
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
+  fxLegs?: DailyReportFxLeg[];
 }): string {
   if (p.considered === 0) {
     return `No AI decisions were recorded for ${p.name} on this date — the engine either did not run or found nothing in its universe to assess.`;
@@ -109,6 +130,17 @@ export function buildDeterministicNarrative(p: {
       .join(", ");
     bits.push(
       `It passed on ${p.passed.length} candidate${p.passed.length === 1 ? "" : "s"}${top ? ` — mostly ${top}` : ""}.`,
+    );
+  }
+  for (const leg of p.fxLegs ?? []) {
+    const pnl =
+      leg.unrealisedPnl == null
+        ? "no current rate available"
+        : `${leg.unrealisedPnl >= 0 ? "up" : "down"} ${money(Math.abs(leg.unrealisedPnl), leg.quoteCcy)}`;
+    bits.push(
+      `It still holds a ${leg.direction} ${leg.symbol} currency funding leg entered at ${leg.entryRate.toFixed(4)}${
+        leg.currentRate != null ? ` (now ${leg.currentRate.toFixed(4)})` : ""
+      }, ${pnl}; its cash is already counted, so only that profit or loss moves the account.`,
     );
   }
   return bits.join(" ");
@@ -148,6 +180,15 @@ async function narrate(
       conviction: i.conviction,
     })),
     pass_reason_counts: p.passReasonCounts.slice(0, 6),
+    fx_funding_legs: p.fxLegs.map((l) => ({
+      pair: l.symbol,
+      direction: l.direction,
+      entry_rate: l.entryRate,
+      current_rate: l.currentRate,
+      unrealised_pnl: l.unrealisedPnl,
+      quote_currency: l.quoteCcy,
+      note: "notional already sits in cash; only the unrealised P&L changes the account value",
+    })),
     engine_run_note: p.runExplanation?.slice(0, 400) ?? null,
   };
 
@@ -158,8 +199,9 @@ Write 3-5 short sentences of plain English. No markdown, no bullet points, no he
 Cover, in this order:
 1. What the AI considered today, in scale terms.
 2. Each buy and sell it made and the actual reason given.
-3. The most notable things it deliberately passed on and why (guardrails, costs, weak signal, broker refusal).
-4. One sentence on what that means for the money sitting in the account.
+3. Any open currency (FX) funding leg: its direction, the rate it was entered at versus now, and whether it is currently up or down. Say plainly that its cash is already counted so only that profit or loss matters.
+4. The most notable things it deliberately passed on and why (guardrails, costs, weak signal, broker refusal).
+5. One sentence on what that means for the money sitting in the account.
 
 Only use the facts below. If a reason is missing, say the reason was not recorded rather than inventing one.
 
@@ -204,7 +246,7 @@ export async function buildDailyReport(params: {
   }
   const ids = portfolios.map((p) => p.id as string);
 
-  const [auditRes, cfRes, decRes] = await Promise.all([
+  const [auditRes, cfRes, decRes, fxRes] = await Promise.all([
     db
       .from("ai_decision_audit")
       .select(
@@ -228,9 +270,58 @@ export async function buildDailyReport(params: {
       .eq("run_date", date)
       .order("created_at", { ascending: false })
       .limit(100),
+    db
+      .from("holdings")
+      .select("portfolio_id, symbol, quantity, avg_cost, asset_class, instrument_ccy")
+      .in("portfolio_id", ids)
+      .limit(500),
   ]);
   if (auditRes.error) throw new Error(auditRes.error.message);
   if (cfRes.error) throw new Error(cfRes.error.message);
+
+  // Open FX funding legs, valued at the live rate. Grouped per portfolio so a
+  // report can state direction, entry vs current rate and unrealised P&L.
+  const fxByP = new Map<string, DailyReportFxLeg[]>();
+  {
+    const fxRows = (fxRes.data ?? []).filter((h) =>
+      isFxLegHolding({ asset_class: (h as { asset_class?: string | null }).asset_class ?? null }),
+    );
+    const rateCache = new Map<string, number | null>();
+    const { getFxRate } = await import("./fx.server");
+    for (const h of fxRows) {
+      const symbol = String((h as { symbol: string }).symbol).toUpperCase();
+      const qty = num((h as { quantity: unknown }).quantity) ?? 0;
+      const entry = num((h as { avg_cost: unknown }).avg_cost) ?? 0;
+      if (!qty || !(entry > 0)) continue;
+      const baseCcy = symbol.slice(0, 3);
+      const quoteCcy =
+        String((h as { instrument_ccy?: string | null }).instrument_ccy || symbol.slice(3, 6) || "USD").toUpperCase();
+      if (!rateCache.has(symbol)) {
+        try {
+          const r = await getFxRate(baseCcy, quoteCcy);
+          rateCache.set(symbol, Number.isFinite(r.rate) && r.rate > 0 ? r.rate : null);
+        } catch {
+          rateCache.set(symbol, null);
+        }
+      }
+      const rate = rateCache.get(symbol) ?? null;
+      const leg: DailyReportFxLeg = {
+        symbol,
+        direction: qty < 0 ? "short" : "long",
+        quantity: qty,
+        entryRate: entry,
+        currentRate: rate,
+        quoteCcy,
+        unrealisedPnl:
+          rate == null
+            ? null
+            : holdingNativeValue({ assetClass: "fx", quantity: qty, price: rate, avgCost: entry }),
+        notional: Math.abs(qty) * (rate ?? entry),
+      };
+      const pid = String((h as { portfolio_id: string }).portfolio_id);
+      fxByP.set(pid, [...(fxByP.get(pid) ?? []), leg]);
+    }
+  }
 
   const runNoteByP = new Map<string, string>();
   for (const d of decRes.data ?? []) {
@@ -325,6 +416,7 @@ export async function buildDailyReport(params: {
       held,
       passed,
       passReasonCounts,
+      fxLegs: fxByP.get(pid) ?? [],
     };
     entry.narrative = buildDeterministicNarrative(entry);
     out.push(entry);

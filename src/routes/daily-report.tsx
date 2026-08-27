@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,10 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, ChevronRight, ListTree, RefreshCw, Sparkles } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  ListTree,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { TradeRationalePanel } from "@/components/trade-rationale-panel";
 import { formatUkDate } from "@/lib/uk-time";
-import { getDailyAiReport, type DailyReportItem } from "@/lib/daily-report.functions";
+import {
+  getDailyAiReport,
+  type DailyReportFxLeg,
+  type DailyReportItem,
+} from "@/lib/daily-report.functions";
 import { cn } from "@/lib/utils";
 
 const TITLE = "Daily AI report — Aegis";
@@ -52,6 +63,77 @@ function money(n: number | null, ccy: string): string {
   } catch {
     return `${Math.round(n)} ${ccy}`;
   }
+}
+
+/**
+ * FX funding legs are not ordinary positions: the currency they bought already
+ * sits in the cash wallet, so only the unrealised P&L is live equity. The
+ * report says that in words and links straight to the holdings card.
+ */
+function FxLegSection({ legs, portfolioId }: { legs: DailyReportFxLeg[]; portfolioId: string }) {
+  if (legs.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Currency (FX) funding legs
+        </h3>
+        <Link
+          to="/portfolio/$id"
+          params={{ id: portfolioId }}
+          hash="holdings"
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          View in holdings
+          <ArrowUpRight className="h-3 w-3" />
+        </Link>
+      </div>
+      <ul className="space-y-2">
+        {legs.map((leg) => {
+          const gain = (leg.unrealisedPnl ?? 0) >= 0;
+          return (
+            <li key={leg.symbol} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{leg.symbol}</span>
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {leg.direction}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground tabular-nums">
+                  entry {leg.entryRate.toFixed(4)}
+                  {leg.currentRate != null
+                    ? ` · now ${leg.currentRate.toFixed(4)}`
+                    : " · current rate unavailable"}
+                </div>
+              </div>
+              <div className="text-right">
+                <div
+                  className={cn(
+                    "text-sm font-semibold tabular-nums",
+                    leg.unrealisedPnl == null
+                      ? "text-muted-foreground"
+                      : gain
+                        ? "text-emerald-500"
+                        : "text-rose-400",
+                  )}
+                >
+                  {leg.unrealisedPnl == null
+                    ? "—"
+                    : `${gain ? "+" : "−"}${money(Math.abs(leg.unrealisedPnl), leg.quoteCcy)}`}
+                </div>
+                <div className="text-[11px] text-muted-foreground">unrealised P&L</div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        The cash these legs raised is already counted in the account balance, so only the profit or
+        loss above changes your equity.
+      </p>
+    </div>
+  );
 }
 
 function ItemRow({
@@ -257,6 +339,8 @@ function DailyReportPage() {
                   ))}
                 </div>
               )}
+
+              <FxLegSection legs={p.fxLegs} portfolioId={p.portfolioId} />
 
               {p.considered > 0 && <Separator />}
 
