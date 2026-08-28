@@ -279,15 +279,18 @@ export async function buildDailyReport(params: {
   if (auditRes.error) throw new Error(auditRes.error.message);
   if (cfRes.error) throw new Error(cfRes.error.message);
 
-  // Open FX funding legs, valued at the live rate. Grouped per portfolio so a
-  // report can state direction, entry vs current rate and unrealised P&L.
+  // Open FX funding legs, valued at the live rate. These are a snapshot of
+  // positions held RIGHT NOW, and we have no historical as-of store for them,
+  // so they may only be reported on today's report — a back-dated report must
+  // not claim a leg (or a rate/P&L) that did not exist on that date.
   const fxByP = new Map<string, DailyReportFxLeg[]>();
-  {
+  if (date === ukDayKey(new Date())) {
     const fxRows = (fxRes.data ?? []).filter((h) =>
       isFxLegHolding({ asset_class: (h as { asset_class?: string | null }).asset_class ?? null }),
     );
     const rateCache = new Map<string, number | null>();
     const { getFxRate } = await import("./fx.server");
+
     for (const h of fxRows) {
       const symbol = String((h as { symbol: string }).symbol).toUpperCase();
       const qty = num((h as { quantity: unknown }).quantity) ?? 0;
