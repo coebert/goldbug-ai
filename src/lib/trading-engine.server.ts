@@ -1006,6 +1006,36 @@ export async function runDailyTick(
   // If the circuit breaker is tripped, or every candidate venue is closed,
   // skip the AI call entirely.
 
+  // Materiality gate: on a quiet tick (no meaningful price move, no change in
+  // holdings/regime/cash, no new headlines) a fresh LLM opinion just re-buys
+  // the previous "hold". Deterministic guardrails below still run in full.
+  const decisionHeadlines = scoredNews.slice(0, 15).map((n) => n.headline);
+  const materiality = await (async () => {
+    if (breakerTripped || allVenuesClosed) return null;
+    try {
+      const { shouldCallDecisionAi } = await import("./ai-materiality.server");
+      return await shouldCallDecisionAi({
+        portfolioId,
+        force: opts?.forceAi === true,
+        headlines: decisionHeadlines,
+        inputs: {
+          regime: effectiveRegime?.regime ?? null,
+          prices: Object.fromEntries(features.map((f) => [f.symbol, Number(f.price) || 0])),
+          heldSymbols: (holdings ?? []).map((h) => h.symbol),
+          cash,
+          totalValue,
+        },
+      });
+    } catch (e) {
+      srvLog.warn("materiality gate failed — calling AI as usual", e);
+      return null;
+    }
+  })();
+  const skipAiForQuietTick = materiality != null && !materiality.callAi;
+  if (skipAiForQuietTick) {
+    srvLog.info(`[trading-engine] AI decision skipped — ${materiality!.reason}`);
+  }
+
   const decision: DecisionOutput = breakerTripped
     ? {
         briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
