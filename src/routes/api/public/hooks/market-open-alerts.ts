@@ -2,7 +2,9 @@
 // browser notification the first time it flips from closed → open on a given
 // UK day. Dedupe is enforced by a unique row in public.market_open_alerts_sent
 // so re-running the cron (or drift between scheduled ticks) can never
-// double-notify. Called every ~2 minutes via pg_cron.
+// double-notify. Called every 10 minutes via pg_cron — safe because
+// `detectRecentOpenings` looks back 15 minutes, so no opening falls through
+// the gap even if a tick is skipped.
 
 import { createFileRoute } from "@tanstack/react-router";
 
