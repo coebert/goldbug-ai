@@ -1050,6 +1050,13 @@ export async function runDailyTick(
           "Markets shut — automated exits (stop-loss, take-profit, trailing stops) stay armed and the next open will get a full review.",
         orders: [],
       }
+    : skipAiForQuietTick
+    ? {
+        briefing: `No material change since the last review (${materiality!.reason}). Skipped a fresh AI opinion to save cost; stops, trailing exits and thesis-break rules stayed armed.`,
+        rationale:
+          "Prices, holdings, cash and the news reel are effectively unchanged, so the previous stance still stands. A full review runs as soon as anything moves, or within six hours at the latest.",
+        orders: [],
+      }
     : await callAiForDecision({
 
         portfolio,
