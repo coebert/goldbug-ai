@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/public/hooks/daily-run")({
         // Run sequentially to be gentle on rate limits & the AI gateway
         for (const p of due) {
           try {
-            const r = await runDailyTick(p.id, today);
+            const r = await runDailyTick(p.id, today, { forceAi: true });
             results.push({ id: p.id, ok: true, value: r.totalValue });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
