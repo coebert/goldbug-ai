@@ -61,7 +61,7 @@ export const runBacktest = createServerFn({ method: "POST" })
     let lastTotal = 0;
     for (const d of dates) {
       try {
-        const r = await runDailyTick(data.portfolio_id, d, { skipNews: true });
+        const r = await runDailyTick(data.portfolio_id, d, { skipNews: true, forceAi: true });
         lastTotal = r.totalValue;
       } catch (err) {
         console.error(`backtest ${d} failed`, err);
@@ -160,7 +160,7 @@ export const runBacktestMany = createServerFn({ method: "POST" })
         .eq("id", id);
       for (const d of dates) {
         try {
-          await runDailyTick(id, d, { skipNews: true });
+          await runDailyTick(id, d, { skipNews: true, forceAi: true });
         } catch (err) {
           console.error(`backtest ${id} ${d} failed`, err);
           await snapshotPortfolio(id, d).catch(() => {});

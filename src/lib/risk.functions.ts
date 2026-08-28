@@ -165,7 +165,7 @@ export const runOneDay = createServerFn({ method: "POST" })
     if (!owned) throw new Error("Portfolio not found");
     const { runDailyTick } = await import("./trading-engine.server");
     const asOf = data.as_of ?? new Date().toISOString().slice(0, 10);
-    const result = await runDailyTick(data.portfolio_id, asOf);
+    const result = await runDailyTick(data.portfolio_id, asOf, { forceAi: true });
     return {
       briefing: result.decision.briefing,
       rationale: result.decision.rationale,

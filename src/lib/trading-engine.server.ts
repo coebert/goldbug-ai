@@ -227,7 +227,11 @@ import { createConsoleLogger } from "@/lib/_server/log";
 const srvLog = createConsoleLogger("trading-engine");
 
 
-export async function runDailyTick(portfolioId: string, asOf: string, opts?: { skipNews?: boolean }) {
+export async function runDailyTick(
+  portfolioId: string,
+  asOf: string,
+  opts?: { skipNews?: boolean; forceAi?: boolean },
+) {
   // For live portfolios, pick up external Saxo deposits/withdrawals before we
   // read current_cash. Cron path: no authenticated session, so resolve the
   // owning user first and hand syncLiveCashFromBroker an admin-mode
@@ -1002,6 +1006,36 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // If the circuit breaker is tripped, or every candidate venue is closed,
   // skip the AI call entirely.
 
+  // Materiality gate: on a quiet tick (no meaningful price move, no change in
+  // holdings/regime/cash, no new headlines) a fresh LLM opinion just re-buys
+  // the previous "hold". Deterministic guardrails below still run in full.
+  const decisionHeadlines = scoredNews.slice(0, 15).map((n) => n.headline);
+  const materiality = await (async () => {
+    if (breakerTripped || allVenuesClosed) return null;
+    try {
+      const { shouldCallDecisionAi } = await import("./ai-materiality.server");
+      return await shouldCallDecisionAi({
+        portfolioId,
+        force: opts?.forceAi === true,
+        headlines: decisionHeadlines,
+        inputs: {
+          regime: effectiveRegime?.regime ?? null,
+          prices: Object.fromEntries(features.map((f) => [f.symbol, Number(f.price) || 0])),
+          heldSymbols: (holdings ?? []).map((h) => h.symbol),
+          cash,
+          totalValue,
+        },
+      });
+    } catch (e) {
+      srvLog.warn("materiality gate failed — calling AI as usual", e);
+      return null;
+    }
+  })();
+  const skipAiForQuietTick = materiality != null && !materiality.callAi;
+  if (skipAiForQuietTick) {
+    srvLog.info(`[trading-engine] AI decision skipped — ${materiality!.reason}`);
+  }
+
   const decision: DecisionOutput = breakerTripped
     ? {
         briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
@@ -1014,6 +1048,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           "All candidate venues are closed right now, so no new orders were considered this run.",
         rationale:
           "Markets shut — automated exits (stop-loss, take-profit, trailing stops) stay armed and the next open will get a full review.",
+        orders: [],
+      }
+    : skipAiForQuietTick
+    ? {
+        briefing: `No material change since the last review (${materiality!.reason}). Skipped a fresh AI opinion to save cost; stops, trailing exits and thesis-break rules stayed armed.`,
+        rationale:
+          "Prices, holdings, cash and the news reel are effectively unchanged, so the previous stance still stands. A full review runs as soon as anything moves, or within six hours at the latest.",
         orders: [],
       }
     : await callAiForDecision({
@@ -3142,6 +3183,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       })),
       signals: features,
       policy_regime: policyRegime,
+      materiality: materiality
+        ? {
+            fingerprint: materiality.fingerprint,
+            news_digest: materiality.newsDigest,
+            ai_called: !skipAiForQuietTick,
+            reason: materiality.reason,
+            // Only advance the clock when we actually paid for an opinion, so
+            // the six-hour freshness ceiling stays honest.
+            last_ai_call_at: skipAiForQuietTick
+              ? (materiality.previousCallAt ?? new Date().toISOString())
+              : new Date().toISOString(),
+          }
+        : null,
       news: scoredNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
