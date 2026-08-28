@@ -11,6 +11,8 @@ import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { labelBlock } from "./decision-summary.helpers";
 import { holdingNativeValue, isFxLegHolding } from "./fx-leg-value";
+import { ukDayKey } from "./uk-time";
+
 
 export type DailyReportItem = {
   symbol: string;
