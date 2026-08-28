@@ -3183,6 +3183,19 @@ export async function runDailyTick(
       })),
       signals: features,
       policy_regime: policyRegime,
+      materiality: materiality
+        ? {
+            fingerprint: materiality.fingerprint,
+            news_digest: materiality.newsDigest,
+            ai_called: !skipAiForQuietTick,
+            reason: materiality.reason,
+            // Only advance the clock when we actually paid for an opinion, so
+            // the six-hour freshness ceiling stays honest.
+            last_ai_call_at: skipAiForQuietTick
+              ? (materiality.previousCallAt ?? new Date().toISOString())
+              : new Date().toISOString(),
+          }
+        : null,
       news: scoredNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
