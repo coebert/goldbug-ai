@@ -227,7 +227,11 @@ import { createConsoleLogger } from "@/lib/_server/log";
 const srvLog = createConsoleLogger("trading-engine");
 
 
-export async function runDailyTick(portfolioId: string, asOf: string, opts?: { skipNews?: boolean }) {
+export async function runDailyTick(
+  portfolioId: string,
+  asOf: string,
+  opts?: { skipNews?: boolean; forceAi?: boolean },
+) {
   // For live portfolios, pick up external Saxo deposits/withdrawals before we
   // read current_cash. Cron path: no authenticated session, so resolve the
   // owning user first and hand syncLiveCashFromBroker an admin-mode
