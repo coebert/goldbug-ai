@@ -1870,6 +1870,7 @@ function PortfolioPage() {
                   <div className="mt-6 space-y-4">
                     <FxAuditCard portfolioId={id} active={tab === "overview"} />
                     <FxLegHistoryCard portfolioId={id} active={tab === "overview"} />
+                    <FxStressReportCard portfolioId={id} active={tab === "overview"} />
                     <FxPlaybookBacktestCard />
                     <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
 
