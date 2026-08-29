@@ -315,7 +315,19 @@ FX CONVERSION COSTS (mid → effective, bps deducted per leg):
 ${costRows || "- (base only)"}
 
 FX pair signals (vs ${baseCcy}):
-${signalsRows || "- (unavailable)"}`;
+${signalsRows || "- (unavailable)"}
+
+OPEN FX FUNDING LEGS (marked to the current rate this tick):
+${
+  openLegs.length
+    ? openLegs
+        .map(
+          (l) =>
+            `- ${l.symbol} ${l.quantity.toLocaleString("en-GB", { maximumFractionDigits: 2 })} ${l.base} @ ${l.entryRate.toFixed(4)} entry, now ${l.rate == null ? "unavailable" : l.rate.toFixed(4)}${l.stale ? " [STALE]" : ""} → close-now P&L ${l.pnlBase >= 0 ? "+" : ""}${l.pnlBase.toFixed(2)} ${baseCcy} (${l.pnlPct >= 0 ? "+" : ""}${l.pnlPct.toFixed(2)}% of a ${l.notionalBase.toFixed(0)} ${baseCcy} notional)`,
+        )
+        .join("\n")
+    : "- (none)"
+}`;
 
 
   // Rewritten playbook: concrete, rule-based, references the fields the
