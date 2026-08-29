@@ -56,3 +56,41 @@ export function valueFxLeg(input: FxLegValuationInput): FxLegValuation {
     notionalBase: notionalQuote * mult,
   };
 }
+
+export type FxLegCloseCost = {
+  /** Exit fee in the pair's quote currency (spread + any markup, min fee). */
+  exitFeeQuote: number;
+  /** Cost rate applied, in basis points of notional. */
+  exitCostBps: number;
+  /** Gross unrealised P&L minus the exit fee, in the quote currency. */
+  pnlQuoteNet: number;
+};
+
+/**
+ * Net "close now" P&L: gross unrealised P&L minus the one-way cost of
+ * converting out of the leg (half-spread + wallet markup where applicable,
+ * floored at the broker's minimum ticket fee). FX spot conversions carry no
+ * stamp duty or transaction tax, so fees are the only friction to deduct.
+ */
+export function netClosePnl(input: {
+  pnlQuote: number;
+  notionalQuote: number;
+  exitCostBps: number;
+  minFeeQuote: number;
+}): FxLegCloseCost {
+  const pnl = Number(input.pnlQuote);
+  const notional = Number(input.notionalQuote);
+  const bps = Number(input.exitCostBps);
+  const proportional =
+    Number.isFinite(notional) && notional > 0 && Number.isFinite(bps) && bps > 0
+      ? (notional * bps) / 10_000
+      : 0;
+  const minFee = Number.isFinite(input.minFeeQuote) && input.minFeeQuote > 0 ? input.minFeeQuote : 0;
+  const fee = notional > 0 ? Math.max(minFee, proportional) : 0;
+  const exitFeeQuote = Math.round(fee * 100) / 100;
+  return {
+    exitFeeQuote,
+    exitCostBps: bps,
+    pnlQuoteNet: Math.round(((Number.isFinite(pnl) ? pnl : 0) - exitFeeQuote) * 100) / 100,
+  };
+}

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { parseFxPair, valueFxLeg } from "@/lib/fx-leg-quotes";
+import { parseFxPair, valueFxLeg, netClosePnl } from "@/lib/fx-leg-quotes";
 
 export type FxLegQuote = {
   symbol: string;
@@ -15,6 +15,13 @@ export type FxLegQuote = {
   pnlBase: number;
   notionalQuote: number;
   notionalBase: number;
+  /** Estimated one-way exit fee (spread + markup, min ticket) in quote ccy. */
+  exitFeeQuote: number;
+  exitFeeBase: number;
+  exitCostBps: number;
+  /** Close-now P&L after the exit fee, in quote ccy and portfolio base ccy. */
+  pnlQuoteNet: number;
+  pnlBaseNet: number;
   /** Rate observation time (ISO) and provider. */
   observedAt: string | null;
   source: string;
@@ -40,6 +47,7 @@ export const getFxLegQuotes = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<FxLegQuotesResult> => {
     const { getFxRateAudited } = await import("@/lib/fx.server");
+    const { feeInFromCcy } = await import("@/lib/fx-cost-model");
 
     const [{ data: portfolio }, { data: holdings }] = await Promise.all([
       context.supabase
@@ -95,6 +103,20 @@ export const getFxLegQuotes = createServerFn({ method: "GET" })
           rate: rate ?? avgCost,
           quoteToBase,
         });
+        // Closing the leg means converting out of the quote currency at spot;
+        // deduct the one-way exit cost (spread floored at the min ticket).
+        const { fee, quote: costQuote } = feeInFromCcy(
+          v.notionalQuote,
+          quoteCcy,
+          pairBase,
+          "spot",
+        );
+        const net = netClosePnl({
+          pnlQuote: v.pnlQuote,
+          notionalQuote: v.notionalQuote,
+          exitCostBps: costQuote.totalBps,
+          minFeeQuote: v.notionalQuote > 0 ? Math.min(fee, costQuote.minFeeFrom) : 0,
+        });
         return {
           symbol: String(h.symbol),
           quantity: qty,
@@ -103,6 +125,11 @@ export const getFxLegQuotes = createServerFn({ method: "GET" })
           pairBase,
           quoteCcy,
           ...v,
+          exitFeeQuote: net.exitFeeQuote,
+          exitFeeBase: net.exitFeeQuote * (Number.isFinite(quoteToBase) && quoteToBase > 0 ? quoteToBase : 1),
+          exitCostBps: net.exitCostBps,
+          pnlQuoteNet: net.pnlQuoteNet,
+          pnlBaseNet: net.pnlQuoteNet * (Number.isFinite(quoteToBase) && quoteToBase > 0 ? quoteToBase : 1),
           observedAt,
           source,
           stale,

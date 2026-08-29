@@ -578,7 +578,10 @@ export function LiveHoldingsCard({
                 ).toUpperCase();
                 const gain = r.pnl >= 0;
                 const closeCcy = q ? fxQuotesQuery.data?.baseCcy ?? baseCcy : quoteCcy;
-                const closeValue = q ? q.pnlBase : r.pnl;
+                // Close-now is NET of the exit conversion fee (spread + min
+                // ticket) — the gross mark overstates what you'd pocket.
+                const closeValue = q ? q.pnlBaseNet : r.pnl;
+                const closeGain = closeValue >= 0;
                 return (
                   <li
                     key={r.id}
@@ -607,10 +610,15 @@ export function LiveHoldingsCard({
                       </div>
                       <div className="mt-0.5 text-[11px] text-muted-foreground">
                         Close now:{" "}
-                        <span className={gain ? "text-emerald-500" : "text-rose-400"}>
-                          {gain ? "you'd gain " : "you'd lose "}
+                        <span className={closeGain ? "text-emerald-500" : "text-rose-400"}>
+                          {closeGain ? "you'd gain " : "you'd lose "}
                           {formatMoneyAmount(Math.abs(closeValue))} {closeCcy}
                         </span>
+                        {q != null && q.exitFeeBase > 0 && (
+                          <span>
+                            {" "}after ~{formatMoneyAmount(q.exitFeeBase)} {closeCcy} fees
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
