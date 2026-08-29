@@ -99,7 +99,12 @@ export async function buildFxContext(args: {
     cash_by_ccy?: unknown;
     fx_enabled?: boolean | null;
   };
-  holdings: Array<{ symbol: string; quantity: number | string }>;
+  holdings: Array<{
+    symbol: string;
+    quantity: number | string;
+    avg_cost?: number | string | null;
+    asset_class?: string | null;
+  }>;
   priceMap: Map<string, number>;
   candidateSymbols: string[];
 }): Promise<FxContext> {
