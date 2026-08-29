@@ -563,25 +563,54 @@ export function LiveHoldingsCard({
               </div>
               <span className="text-[10px] text-muted-foreground">
                 notional sits in cash · P&amp;L only
+                {fxQuotesQuery.data?.asOf &&
+                  ` · rates ${formatUk(fxQuotesQuery.data.asOf, { timeStyle: "short" })}`}
+                {fxQuotesQuery.isFetching && " · updating…"}
               </span>
             </div>
-            <ul className="space-y-1.5">
+            <ul className="space-y-1.5" data-testid="fx-legs-list">
               {fxLegRows.map((r) => {
                 const short = r.qty < 0;
-                const quoteCcy = String(r.instrument_ccy || r.symbol.slice(3, 6) || baseCcy).toUpperCase();
+                const q = r.quote;
+                const quoteCcy = (
+                  q?.quoteCcy ||
+                  String(r.instrument_ccy || r.symbol.slice(3, 6) || baseCcy)
+                ).toUpperCase();
                 const gain = r.pnl >= 0;
+                const closeCcy = q ? fxQuotesQuery.data?.baseCcy ?? baseCcy : quoteCcy;
+                const closeValue = q ? q.pnlBase : r.pnl;
                 return (
-                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                    data-testid={`fx-leg-${r.symbol}`}
+                  >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <SymbolTicker symbol={r.symbol} className="font-semibold tracking-tight" />
                         <Badge variant="secondary" className="uppercase text-[9px] px-1.5 py-0">
                           {short ? "short" : "long"} fx
                         </Badge>
+                        {q?.stale && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                            rate stale
+                          </Badge>
+                        )}
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} @ {r.avg.toFixed(4)} entry
-                        {Number.isFinite(r.mark) && ` · ${r.mark.toFixed(4)} now`}
+                        {r.liveRate != null
+                          ? ` · ${r.liveRate.toFixed(4)} now`
+                          : Number.isFinite(r.mark)
+                            ? ` · ${r.mark.toFixed(4)} now`
+                            : ""}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        Close now:{" "}
+                        <span className={gain ? "text-emerald-500" : "text-rose-400"}>
+                          {gain ? "you'd gain " : "you'd lose "}
+                          {formatMoneyAmount(Math.abs(closeValue))} {closeCcy}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right">
