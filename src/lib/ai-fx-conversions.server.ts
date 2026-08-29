@@ -68,7 +68,23 @@ export interface FxContext {
   exposureByCcy: Record<string, number>; // in base ccy
   block: string;                // system-prompt block (playbook + status)
   contextBlock: string;         // user-prompt block (numbers)
+  /** Open FX spot funding legs marked to the CURRENT rate. */
+  openLegs: FxOpenLeg[];
 }
+
+export type FxOpenLeg = {
+  symbol: string;
+  quantity: number;      // signed units of the pair's base ccy
+  entryRate: number;
+  rate: number | null;   // live mark, null when the pair is unavailable
+  stale: boolean;
+  pnlQuote: number;
+  pnlBase: number;
+  pnlPct: number;        // P&L as % of the leg's notional
+  notionalBase: number;
+  base: string;
+  quote: string;
+};
 
 /**
  * Build the FX context block for the AI prompt. Safe to call even when
