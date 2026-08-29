@@ -362,6 +362,7 @@ SAFETY:
 Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
 
   return {
+    openLegs,
     active: true,
     circuitOpen,
     circuitReason,
