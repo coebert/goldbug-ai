@@ -51,7 +51,7 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
     z
       .object({
         portfolioId: z.string().uuid(),
-        days: z.number().int().min(7).max(365).default(90),
+        days: z.number().int().min(7).max(7300).default(90),
       })
       .parse(i),
   )
