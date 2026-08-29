@@ -175,8 +175,39 @@ export async function buildFxContext(args: {
     // treat unknown as closed — the executor's own guards remain in force
   }
 
+  // Open FX spot funding legs, marked to the CURRENT rate. Without this the
+  // model could see live rates but not the position those rates move, so it
+  // never reacted to a funding leg drifting against the account.
+  const openLegs: FxOpenLeg[] = [];
+  for (const h of args.holdings) {
+    if (String(h.asset_class ?? "").toLowerCase() !== "fx") continue;
+    const qty = Number(h.quantity);
+    const entry = Number(h.avg_cost);
+    const pair = parseFxPair(String(h.symbol));
+    if (!pair || !Number.isFinite(qty) || qty === 0 || !Number.isFinite(entry) || entry <= 0) continue;
+    const q = matrix.get(`${pair.base}${pair.quote}`);
+    const rate = q && Number.isFinite(q.rate) && q.rate > 0 ? q.rate : null;
+    const quoteToBase =
+      pair.quote === baseCcy ? 1 : (matrix.get(`${pair.quote}${baseCcy}`)?.rate ?? 1);
+    const v = valueFxLeg({ quantity: qty, avgCost: entry, rate: rate ?? entry, quoteToBase });
+    openLegs.push({
+      symbol: String(h.symbol).toUpperCase(),
+      quantity: qty,
+      entryRate: entry,
+      rate,
+      stale: rate == null || q?.stale === true,
+      pnlQuote: v.pnlQuote,
+      pnlBase: v.pnlBase,
+      pnlPct: rate ? ((rate - entry) / entry) * 100 * (qty < 0 ? -1 : 1) : 0,
+      notionalBase: v.notionalBase,
+      base: pair.base,
+      quote: pair.quote,
+    });
+  }
+
   if (!active) {
     return {
+      openLegs,
       active: false,
       circuitOpen,
       circuitReason,
