@@ -169,7 +169,8 @@ export function stressFxLeg(
     }
   }
 
-  for (const [days, name] of [[1, "1-day"], [5, "1-week"], [20, "1-month"]] as const) {
+  // "Worst in history" is only meaningful with a real sample of tape.
+  for (const [days, name] of bars.length >= 60 ? ([[1, "1-day"], [5, "1-week"], [20, "1-month"]] as const) : []) {
     const w = worstAdverseMove(bars, days, side);
     if (!w) continue;
     const adverseSign = side === "short" ? 1 : -1;
