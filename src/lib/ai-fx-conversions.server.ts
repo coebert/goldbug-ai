@@ -18,6 +18,7 @@ import { getFxMatrix, getFxRate } from "./fx.server";
 import { planFxConversion } from "./fx-convert-plan";
 import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./portfolio-wallet";
 import { getFxCircuitState } from "./fx-circuit.server";
+import { parseFxPair, valueFxLeg } from "./fx-leg-quotes";
 import { asJson } from "./_server/db-json";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
