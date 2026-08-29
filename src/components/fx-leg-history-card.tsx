@@ -144,7 +144,7 @@ export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
                 {leg.points.length > 1 ? (
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={leg.points} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
+                      <ComposedChart data={leg.points} margin={{ top: 18, right: 8, left: 8, bottom: 4 }}>
                         <CartesianGrid {...GRID_PROPS} vertical={false} />
                         <XAxis
                           dataKey="date"
