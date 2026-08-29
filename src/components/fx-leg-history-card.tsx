@@ -18,6 +18,22 @@ import { Button } from "@/components/ui/button";
 import { getFxLegHistory } from "@/lib/fx-leg-history.functions";
 import type { FxLegAction } from "@/lib/fx-leg-playbook";
 import { POLL } from "@/lib/query-keys";
+import {
+  AXIS_LABEL,
+  AXIS_PROPS,
+  GRID_PROPS,
+  OKABE_ITO,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
+
+// Sky-blue rate line and orange P&L area: both high-chroma Okabe–Ito hues
+// that stay legible on dark plot surfaces where the theme tokens washed out.
+const RATE_COLOR = OKABE_ITO.skyBlue;
+const PNL_COLOR = OKABE_ITO.orange;
 
 interface Props {
   portfolioId: string;
@@ -126,67 +142,79 @@ export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
                 </div>
 
                 {leg.points.length > 1 ? (
-                  <div className="h-56 w-full">
+                  <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={leg.points} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                      <ComposedChart data={leg.points} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
+                        <CartesianGrid {...GRID_PROPS} vertical={false} />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 10 }}
+                          {...AXIS_PROPS}
                           minTickGap={28}
                           tickFormatter={(d: string) => d.slice(5)}
+                          label={{ value: "Date", position: "insideBottom", offset: -2, style: AXIS_LABEL }}
                         />
                         <YAxis
                           yAxisId="rate"
                           domain={["auto", "auto"]}
-                          tick={{ fontSize: 10 }}
-                          width={54}
+                          {...AXIS_PROPS}
+                          width={64}
                           tickFormatter={(v: number) => v.toFixed(4)}
+                          label={{
+                            value: `${leg.pairBase}${leg.quoteCcy} rate`,
+                            angle: -90,
+                            position: "insideLeft",
+                            offset: -2,
+                            style: { ...AXIS_LABEL, fill: RATE_COLOR },
+                          }}
                         />
                         <YAxis
                           yAxisId="pnl"
                           orientation="right"
-                          tick={{ fontSize: 10 }}
-                          width={54}
+                          {...AXIS_PROPS}
+                          width={64}
                           tickFormatter={(v: number) => v.toFixed(0)}
+                          label={{
+                            value: `Unrealised P&L (${leg.quoteCcy})`,
+                            angle: 90,
+                            position: "insideRight",
+                            offset: -2,
+                            style: { ...AXIS_LABEL, fill: PNL_COLOR },
+                          }}
                         />
                         <Tooltip
-                          contentStyle={{
-                            background: "hsl(var(--popover))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: 8,
-                            fontSize: 12,
-                          }}
+                          contentStyle={TOOLTIP_CONTENT_STYLE}
+                          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                          labelStyle={TOOLTIP_LABEL_STYLE}
+                          itemStyle={TOOLTIP_ITEM_STYLE}
                           formatter={(value: number, name: string) =>
                             name === "rate"
-                              ? [value.toFixed(5), `${leg.pairBase}${leg.quoteCcy}`]
+                              ? [value.toFixed(5), `${leg.pairBase}${leg.quoteCcy} rate`]
                               : [money(value, leg.quoteCcy), "Unrealised P&L"]
                           }
                         />
                         <ReferenceLine
                           yAxisId="rate"
                           y={leg.avgCost}
-                          strokeDasharray="4 4"
-                          className="stroke-muted-foreground"
-                          label={{ value: "entry", fontSize: 10, position: "insideTopLeft" }}
+                          {...REFERENCE_LINE}
+                          label={{ value: `entry ${leg.avgCost.toFixed(4)}`, fontSize: 11, fill: "var(--foreground)", position: "insideTopLeft" }}
                         />
-                        <ReferenceLine yAxisId="pnl" y={0} className="stroke-border" />
+                        <ReferenceLine yAxisId="pnl" y={0} {...REFERENCE_LINE} />
                         <Area
                           yAxisId="pnl"
                           type="monotone"
                           dataKey="pnlQuote"
-                          fill="hsl(var(--primary))"
-                          stroke="hsl(var(--primary))"
-                          fillOpacity={0.15}
-                          strokeOpacity={0.5}
+                          fill={PNL_COLOR}
+                          stroke={PNL_COLOR}
+                          fillOpacity={0.35}
+                          strokeWidth={1.5}
                         />
                         <Line
                           yAxisId="rate"
                           type="monotone"
                           dataKey="rate"
                           dot={false}
-                          strokeWidth={2}
-                          stroke="hsl(var(--chart-1, var(--primary)))"
+                          strokeWidth={2.5}
+                          stroke={RATE_COLOR}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
