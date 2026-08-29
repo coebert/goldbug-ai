@@ -125,6 +125,24 @@ export function LiveHoldingsCard({
   // tile to catch up immediately after they know a trade filled.
   const qc = useQueryClient();
   const reconcileFn = useServerFn(reconcilePortfolio);
+
+  // FX funding legs are not in `price_cache` (no GBPUSD rows) and carry a
+  // negative quantity, so the holdings price-series query skips them and the
+  // leg used to render frozen at its entry rate with 0.00 P&L. Mark them to
+  // the live FX feed on a 60s poll instead.
+  const hasFxLeg = holdings.some((h) => isFxLegHolding({ asset_class: h.asset_class ?? null }));
+  const fxQuotesFn = useServerFn(getFxLegQuotes);
+  const fxQuotesQuery = useQuery({
+    queryKey: ["fx-leg-quotes", portfolioId],
+    enabled: Boolean(portfolioId) && hasFxLeg,
+    queryFn: () => fxQuotesFn({ data: { portfolioId: portfolioId as string } }),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+  });
+  const fxQuoteBySymbol = new Map<string, FxLegQuote>(
+    (fxQuotesQuery.data?.legs ?? []).map((l) => [l.symbol.toUpperCase(), l]),
+  );
   const syncMut = useMutation({
     mutationFn: () => {
       if (!portfolioId) throw new Error("portfolioId required");
