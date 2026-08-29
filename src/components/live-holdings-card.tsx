@@ -578,7 +578,10 @@ export function LiveHoldingsCard({
                 ).toUpperCase();
                 const gain = r.pnl >= 0;
                 const closeCcy = q ? fxQuotesQuery.data?.baseCcy ?? baseCcy : quoteCcy;
-                const closeValue = q ? q.pnlBase : r.pnl;
+                // Close-now is NET of the exit conversion fee (spread + min
+                // ticket) — the gross mark overstates what you'd pocket.
+                const closeValue = q ? q.pnlBaseNet : r.pnl;
+                const closeGain = closeValue >= 0;
                 return (
                   <li
                     key={r.id}
