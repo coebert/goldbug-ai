@@ -211,6 +211,7 @@ import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-ban
 import { FxAuditCard } from "@/components/fx-audit-card";
 import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
 import { FxPlaybookBacktestCard } from "@/components/fx-playbook-backtest-card";
+import { FxStressReportCard } from "@/components/fx-stress-report-card";
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
