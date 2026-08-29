@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { parseFxPair, valueFxLeg } from "@/lib/fx-leg-quotes";
+import { parseFxPair, valueFxLeg, netClosePnl } from "@/lib/fx-leg-quotes";
 
 export type FxLegQuote = {
   symbol: string;
@@ -15,6 +15,13 @@ export type FxLegQuote = {
   pnlBase: number;
   notionalQuote: number;
   notionalBase: number;
+  /** Estimated one-way exit fee (spread + markup, min ticket) in quote ccy. */
+  exitFeeQuote: number;
+  exitFeeBase: number;
+  exitCostBps: number;
+  /** Close-now P&L after the exit fee, in quote ccy and portfolio base ccy. */
+  pnlQuoteNet: number;
+  pnlBaseNet: number;
   /** Rate observation time (ISO) and provider. */
   observedAt: string | null;
   source: string;
