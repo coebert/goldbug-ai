@@ -102,6 +102,20 @@ export const getFxLegQuotes = createServerFn({ method: "GET" })
           rate: rate ?? avgCost,
           quoteToBase,
         });
+        // Closing the leg means converting out of the quote currency at spot;
+        // deduct the one-way exit cost (spread floored at the min ticket).
+        const { fee, quote: costQuote } = feeInFromCcy(
+          v.notionalQuote,
+          quoteCcy,
+          pairBase,
+          "spot",
+        );
+        const net = netClosePnl({
+          pnlQuote: v.pnlQuote,
+          notionalQuote: v.notionalQuote,
+          exitCostBps: costQuote.totalBps,
+          minFeeQuote: v.notionalQuote > 0 ? Math.min(fee, costQuote.minFeeFrom) : 0,
+        });
         return {
           symbol: String(h.symbol),
           quantity: qty,
@@ -110,6 +124,11 @@ export const getFxLegQuotes = createServerFn({ method: "GET" })
           pairBase,
           quoteCcy,
           ...v,
+          exitFeeQuote: net.exitFeeQuote,
+          exitFeeBase: net.exitFeeQuote * (Number.isFinite(quoteToBase) && quoteToBase > 0 ? quoteToBase : 1),
+          exitCostBps: net.exitCostBps,
+          pnlQuoteNet: net.pnlQuoteNet,
+          pnlBaseNet: net.pnlQuoteNet * (Number.isFinite(quoteToBase) && quoteToBase > 0 ? quoteToBase : 1),
           observedAt,
           source,
           stale,
