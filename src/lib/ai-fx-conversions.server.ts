@@ -362,6 +362,16 @@ Decision rules — evaluate in order, stop at the first that fires:
    If a prior hedge was opened and the trigger (exposure or vol) has cleared,
    unwind it — allowed even inside STAND DOWN if pair quality is acceptable.
 
+7. MANAGE OPEN FUNDING LEGS
+   OPEN FX FUNDING LEGS above is re-marked to the live rate every tick. For each leg:
+   • if the instrument it funded is no longer held, unwind the leg back to ${baseCcy}
+     this tick — an orphaned leg is naked FX risk, not funding;
+   • if close-now P&L is worse than −1.5% of the leg's notional, unwind it unless the
+     funded position is still open AND you are keeping that position;
+   • if close-now P&L is better than +2.0%, take it: convert back to ${baseCcy};
+   • a leg flagged STALE or with an unavailable rate must not be added to.
+   Cite the leg symbol and its close-now P&L in the reason.
+
 SAFETY:
 - Never convert more than 40% of any single currency's balance in a single tick.
 - Every leg pays the pair-specific spread shown in FX CONVERSION COSTS above.
