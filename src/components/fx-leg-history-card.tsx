@@ -40,7 +40,12 @@ interface Props {
   active?: boolean;
 }
 
-const RANGES = [30, 90, 180, 365] as const;
+const RANGES = [
+  { label: "1M", days: 30 },
+  { label: "6M", days: 182 },
+  { label: "1Y", days: 365 },
+  { label: "All", days: 7300 },
+] as const;
 
 const ACTION_TONE: Record<FxLegAction, string> = {
   keep: "bg-muted text-muted-foreground",
@@ -73,7 +78,7 @@ function money(n: number, ccy: string) {
  * and every signal that produced it.
  */
 export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
-  const [days, setDays] = useState<number>(90);
+  const [days, setDays] = useState<number>(182);
   const fetchHistory = useServerFn(getFxLegHistory);
 
   const query = useQuery({
@@ -91,16 +96,16 @@ export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-base">FX rate history &amp; decision log</CardTitle>
-          <div className="flex gap-1">
+          <div className="flex gap-1" role="group" aria-label="Chart time range">
             {RANGES.map((r) => (
               <Button
-                key={r}
+                key={r.label}
                 size="sm"
-                variant={days === r ? "secondary" : "ghost"}
-                className="h-7 px-2 text-xs"
-                onClick={() => setDays(r)}
+                variant={days === r.days ? "secondary" : "ghost"}
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setDays(r.days)}
               >
-                {r}d
+                {r.label}
               </Button>
             ))}
           </div>
@@ -144,18 +149,19 @@ export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
                 {leg.points.length > 1 ? (
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={leg.points} margin={{ top: 18, right: 8, left: 8, bottom: 4 }}>
+                      <ComposedChart data={leg.points} margin={{ top: 28, right: 16, left: 10, bottom: 8 }}>
                         <CartesianGrid {...GRID_PROPS} vertical={false} />
                         <XAxis
                           dataKey="date"
                           {...AXIS_PROPS}
                           minTickGap={28}
-                          tickFormatter={(d: string) => d.slice(5)}
+                          tickFormatter={(d: string) => (days > 400 ? d.slice(0, 7) : d.slice(5))}
                           label={{ value: "Date", position: "insideBottom", offset: -2, style: AXIS_LABEL }}
                         />
                         <YAxis
                           yAxisId="rate"
                           domain={["auto", "auto"]}
+                          padding={{ top: 16, bottom: 4 }}
                           {...AXIS_PROPS}
                           width={64}
                           tickFormatter={(v: number) => v.toFixed(4)}
@@ -163,21 +169,22 @@ export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
                             value: `${leg.pairBase}${leg.quoteCcy} rate`,
                             angle: -90,
                             position: "insideLeft",
-                            offset: -2,
+                            offset: 0,
                             style: { ...AXIS_LABEL, fill: RATE_COLOR },
                           }}
                         />
                         <YAxis
                           yAxisId="pnl"
                           orientation="right"
+                          padding={{ top: 16, bottom: 4 }}
                           {...AXIS_PROPS}
-                          width={64}
+                          width={84}
                           tickFormatter={(v: number) => v.toFixed(0)}
                           label={{
                             value: `Unrealised P&L (${leg.quoteCcy})`,
                             angle: 90,
                             position: "insideRight",
-                            offset: -2,
+                            offset: 6,
                             style: { ...AXIS_LABEL, fill: PNL_COLOR },
                           }}
                         />
