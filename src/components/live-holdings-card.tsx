@@ -234,16 +234,26 @@ export function LiveHoldingsCard({
   // to zero — the leg rendered as a £0.00 / 0.0% row and looked invisible.
   // They now get their own section showing notional and unrealised P&L.
   const isFxRow = (r: { asset_class?: string | null }) => isFxLegHolding({ asset_class: r.asset_class ?? null });
-  const fxLegRows = rawRows.filter(isFxRow).map((r) => ({
-    ...r,
-    notional: Math.abs(r.qty) * (Number.isFinite(r.mark) ? r.mark : r.avg),
-    pnl: holdingNativeValue({
-      assetClass: r.asset_class ?? null,
-      quantity: r.qty,
-      price: r.mark,
-      avgCost: r.avg,
-    }),
-  }));
+  const fxLegRows = rawRows.filter(isFxRow).map((r) => {
+    const q = fxQuoteBySymbol.get(String(r.symbol).toUpperCase());
+    const liveRate = q?.rate != null && Number.isFinite(q.rate) && q.rate > 0 ? q.rate : null;
+    const mark = liveRate ?? (Number.isFinite(r.mark) ? r.mark : r.avg);
+    return {
+      ...r,
+      mark,
+      liveRate,
+      quote: q ?? null,
+      notional: q?.notionalQuote ?? Math.abs(r.qty) * mark,
+      pnl:
+        q?.pnlQuote ??
+        holdingNativeValue({
+          assetClass: r.asset_class ?? null,
+          quantity: r.qty,
+          price: mark,
+          avgCost: r.avg,
+        }),
+    };
+  });
   const positionRows = rawRows.filter((r) => !isFxRow(r));
 
   const rawSum = positionRows.reduce((s, r) => s + r.rawValue, 0);
