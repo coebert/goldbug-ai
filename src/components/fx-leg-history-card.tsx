@@ -78,7 +78,7 @@ function money(n: number, ccy: string) {
  * and every signal that produced it.
  */
 export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
-  const [days, setDays] = useState<number>(90);
+  const [days, setDays] = useState<number>(182);
   const fetchHistory = useServerFn(getFxLegHistory);
 
   const query = useQuery({
