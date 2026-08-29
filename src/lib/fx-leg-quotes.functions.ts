@@ -47,6 +47,7 @@ export const getFxLegQuotes = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<FxLegQuotesResult> => {
     const { getFxRateAudited } = await import("@/lib/fx.server");
+    const { feeInFromCcy } = await import("@/lib/fx-cost-model");
 
     const [{ data: portfolio }, { data: holdings }] = await Promise.all([
       context.supabase
