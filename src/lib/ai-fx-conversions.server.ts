@@ -18,6 +18,7 @@ import { getFxMatrix, getFxRate } from "./fx.server";
 import { planFxConversion } from "./fx-convert-plan";
 import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./portfolio-wallet";
 import { getFxCircuitState } from "./fx-circuit.server";
+import { parseFxPair, valueFxLeg } from "./fx-leg-quotes";
 import { asJson } from "./_server/db-json";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -68,7 +69,23 @@ export interface FxContext {
   exposureByCcy: Record<string, number>; // in base ccy
   block: string;                // system-prompt block (playbook + status)
   contextBlock: string;         // user-prompt block (numbers)
+  /** Open FX spot funding legs marked to the CURRENT rate. */
+  openLegs: FxOpenLeg[];
 }
+
+export type FxOpenLeg = {
+  symbol: string;
+  quantity: number;      // signed units of the pair's base ccy
+  entryRate: number;
+  rate: number | null;   // live mark, null when the pair is unavailable
+  stale: boolean;
+  pnlQuote: number;
+  pnlBase: number;
+  pnlPct: number;        // P&L as % of the leg's notional
+  notionalBase: number;
+  base: string;
+  quote: string;
+};
 
 /**
  * Build the FX context block for the AI prompt. Safe to call even when
@@ -83,7 +100,12 @@ export async function buildFxContext(args: {
     cash_by_ccy?: unknown;
     fx_enabled?: boolean | null;
   };
-  holdings: Array<{ symbol: string; quantity: number | string }>;
+  holdings: Array<{
+    symbol: string;
+    quantity: number | string;
+    avg_cost?: number | string | null;
+    asset_class?: string | null;
+  }>;
   priceMap: Map<string, number>;
   candidateSymbols: string[];
 }): Promise<FxContext> {
@@ -154,8 +176,39 @@ export async function buildFxContext(args: {
     // treat unknown as closed — the executor's own guards remain in force
   }
 
+  // Open FX spot funding legs, marked to the CURRENT rate. Without this the
+  // model could see live rates but not the position those rates move, so it
+  // never reacted to a funding leg drifting against the account.
+  const openLegs: FxOpenLeg[] = [];
+  for (const h of args.holdings) {
+    if (String(h.asset_class ?? "").toLowerCase() !== "fx") continue;
+    const qty = Number(h.quantity);
+    const entry = Number(h.avg_cost);
+    const pair = parseFxPair(String(h.symbol));
+    if (!pair || !Number.isFinite(qty) || qty === 0 || !Number.isFinite(entry) || entry <= 0) continue;
+    const q = matrix.get(`${pair.base}${pair.quote}`);
+    const rate = q && Number.isFinite(q.rate) && q.rate > 0 ? q.rate : null;
+    const quoteToBase =
+      pair.quote === baseCcy ? 1 : (matrix.get(`${pair.quote}${baseCcy}`)?.rate ?? 1);
+    const v = valueFxLeg({ quantity: qty, avgCost: entry, rate: rate ?? entry, quoteToBase });
+    openLegs.push({
+      symbol: String(h.symbol).toUpperCase(),
+      quantity: qty,
+      entryRate: entry,
+      rate,
+      stale: rate == null || q?.stale === true,
+      pnlQuote: v.pnlQuote,
+      pnlBase: v.pnlBase,
+      pnlPct: rate ? ((rate - entry) / entry) * 100 * (qty < 0 ? -1 : 1) : 0,
+      notionalBase: v.notionalBase,
+      base: pair.base,
+      quote: pair.quote,
+    });
+  }
+
   if (!active) {
     return {
+      openLegs,
       active: false,
       circuitOpen,
       circuitReason,
@@ -262,7 +315,19 @@ FX CONVERSION COSTS (mid → effective, bps deducted per leg):
 ${costRows || "- (base only)"}
 
 FX pair signals (vs ${baseCcy}):
-${signalsRows || "- (unavailable)"}`;
+${signalsRows || "- (unavailable)"}
+
+OPEN FX FUNDING LEGS (marked to the current rate this tick):
+${
+  openLegs.length
+    ? openLegs
+        .map(
+          (l) =>
+            `- ${l.symbol} ${l.quantity.toLocaleString("en-GB", { maximumFractionDigits: 2 })} ${l.base} @ ${l.entryRate.toFixed(4)} entry, now ${l.rate == null ? "unavailable" : l.rate.toFixed(4)}${l.stale ? " [STALE]" : ""} → close-now P&L ${l.pnlBase >= 0 ? "+" : ""}${l.pnlBase.toFixed(2)} ${baseCcy} (${l.pnlPct >= 0 ? "+" : ""}${l.pnlPct.toFixed(2)}% of a ${l.notionalBase.toFixed(0)} ${baseCcy} notional)`,
+        )
+        .join("\n")
+    : "- (none)"
+}`;
 
 
   // Rewritten playbook: concrete, rule-based, references the fields the
@@ -297,6 +362,16 @@ Decision rules — evaluate in order, stop at the first that fires:
    If a prior hedge was opened and the trigger (exposure or vol) has cleared,
    unwind it — allowed even inside STAND DOWN if pair quality is acceptable.
 
+7. MANAGE OPEN FUNDING LEGS
+   OPEN FX FUNDING LEGS above is re-marked to the live rate every tick. For each leg:
+   • if the instrument it funded is no longer held, unwind the leg back to ${baseCcy}
+     this tick — an orphaned leg is naked FX risk, not funding;
+   • if close-now P&L is worse than −1.5% of the leg's notional, unwind it unless the
+     funded position is still open AND you are keeping that position;
+   • if close-now P&L is better than +2.0%, take it: convert back to ${baseCcy};
+   • a leg flagged STALE or with an unavailable rate must not be added to.
+   Cite the leg symbol and its close-now P&L in the reason.
+
 SAFETY:
 - Never convert more than 40% of any single currency's balance in a single tick.
 - Every leg pays the pair-specific spread shown in FX CONVERSION COSTS above.
@@ -309,6 +384,7 @@ SAFETY:
 Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
 
   return {
+    openLegs,
     active: true,
     circuitOpen,
     circuitReason,

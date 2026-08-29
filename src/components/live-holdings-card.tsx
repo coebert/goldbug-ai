@@ -25,9 +25,10 @@ import { quoteUnitsResolved } from "@/lib/valuation/kernel";
 import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
 import { HoldingSellDialog } from "@/components/holding-sell-dialog";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePortfolio } from "@/lib/live.functions";
+import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { toast } from "sonner";
 import { qk } from "@/lib/query-keys";
 import { ValuationFreshnessBadge } from "@/components/valuation-freshness-badge";
@@ -124,6 +125,24 @@ export function LiveHoldingsCard({
   // tile to catch up immediately after they know a trade filled.
   const qc = useQueryClient();
   const reconcileFn = useServerFn(reconcilePortfolio);
+
+  // FX funding legs are not in `price_cache` (no GBPUSD rows) and carry a
+  // negative quantity, so the holdings price-series query skips them and the
+  // leg used to render frozen at its entry rate with 0.00 P&L. Mark them to
+  // the live FX feed on a 60s poll instead.
+  const hasFxLeg = holdings.some((h) => isFxLegHolding({ asset_class: h.asset_class ?? null }));
+  const fxQuotesFn = useServerFn(getFxLegQuotes);
+  const fxQuotesQuery = useQuery({
+    queryKey: ["fx-leg-quotes", portfolioId],
+    enabled: Boolean(portfolioId) && hasFxLeg,
+    queryFn: () => fxQuotesFn({ data: { portfolioId: portfolioId as string } }),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+  });
+  const fxQuoteBySymbol = new Map<string, FxLegQuote>(
+    (fxQuotesQuery.data?.legs ?? []).map((l) => [l.symbol.toUpperCase(), l]),
+  );
   const syncMut = useMutation({
     mutationFn: () => {
       if (!portfolioId) throw new Error("portfolioId required");
@@ -215,16 +234,26 @@ export function LiveHoldingsCard({
   // to zero — the leg rendered as a £0.00 / 0.0% row and looked invisible.
   // They now get their own section showing notional and unrealised P&L.
   const isFxRow = (r: { asset_class?: string | null }) => isFxLegHolding({ asset_class: r.asset_class ?? null });
-  const fxLegRows = rawRows.filter(isFxRow).map((r) => ({
-    ...r,
-    notional: Math.abs(r.qty) * (Number.isFinite(r.mark) ? r.mark : r.avg),
-    pnl: holdingNativeValue({
-      assetClass: r.asset_class ?? null,
-      quantity: r.qty,
-      price: r.mark,
-      avgCost: r.avg,
-    }),
-  }));
+  const fxLegRows = rawRows.filter(isFxRow).map((r) => {
+    const q = fxQuoteBySymbol.get(String(r.symbol).toUpperCase());
+    const liveRate = q?.rate != null && Number.isFinite(q.rate) && q.rate > 0 ? q.rate : null;
+    const mark = liveRate ?? (Number.isFinite(r.mark) ? r.mark : r.avg);
+    return {
+      ...r,
+      mark,
+      liveRate,
+      quote: q ?? null,
+      notional: q?.notionalQuote ?? Math.abs(r.qty) * mark,
+      pnl:
+        q?.pnlQuote ??
+        holdingNativeValue({
+          assetClass: r.asset_class ?? null,
+          quantity: r.qty,
+          price: mark,
+          avgCost: r.avg,
+        }),
+    };
+  });
   const positionRows = rawRows.filter((r) => !isFxRow(r));
 
   const rawSum = positionRows.reduce((s, r) => s + r.rawValue, 0);
@@ -534,25 +563,54 @@ export function LiveHoldingsCard({
               </div>
               <span className="text-[10px] text-muted-foreground">
                 notional sits in cash · P&amp;L only
+                {fxQuotesQuery.data?.asOf &&
+                  ` · rates ${formatUk(fxQuotesQuery.data.asOf, { timeStyle: "short" })}`}
+                {fxQuotesQuery.isFetching && " · updating…"}
               </span>
             </div>
-            <ul className="space-y-1.5">
+            <ul className="space-y-1.5" data-testid="fx-legs-list">
               {fxLegRows.map((r) => {
                 const short = r.qty < 0;
-                const quoteCcy = String(r.instrument_ccy || r.symbol.slice(3, 6) || baseCcy).toUpperCase();
+                const q = r.quote;
+                const quoteCcy = (
+                  q?.quoteCcy ||
+                  String(r.instrument_ccy || r.symbol.slice(3, 6) || baseCcy)
+                ).toUpperCase();
                 const gain = r.pnl >= 0;
+                const closeCcy = q ? fxQuotesQuery.data?.baseCcy ?? baseCcy : quoteCcy;
+                const closeValue = q ? q.pnlBase : r.pnl;
                 return (
-                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                    data-testid={`fx-leg-${r.symbol}`}
+                  >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <SymbolTicker symbol={r.symbol} className="font-semibold tracking-tight" />
                         <Badge variant="secondary" className="uppercase text-[9px] px-1.5 py-0">
                           {short ? "short" : "long"} fx
                         </Badge>
+                        {q?.stale && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                            rate stale
+                          </Badge>
+                        )}
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} @ {r.avg.toFixed(4)} entry
-                        {Number.isFinite(r.mark) && ` · ${r.mark.toFixed(4)} now`}
+                        {r.liveRate != null
+                          ? ` · ${r.liveRate.toFixed(4)} now`
+                          : Number.isFinite(r.mark)
+                            ? ` · ${r.mark.toFixed(4)} now`
+                            : ""}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        Close now:{" "}
+                        <span className={gain ? "text-emerald-500" : "text-rose-400"}>
+                          {gain ? "you'd gain " : "you'd lose "}
+                          {formatMoneyAmount(Math.abs(closeValue))} {closeCcy}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right">
