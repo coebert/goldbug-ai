@@ -610,10 +610,15 @@ export function LiveHoldingsCard({
                       </div>
                       <div className="mt-0.5 text-[11px] text-muted-foreground">
                         Close now:{" "}
-                        <span className={gain ? "text-emerald-500" : "text-rose-400"}>
-                          {gain ? "you'd gain " : "you'd lose "}
+                        <span className={closeGain ? "text-emerald-500" : "text-rose-400"}>
+                          {closeGain ? "you'd gain " : "you'd lose "}
                           {formatMoneyAmount(Math.abs(closeValue))} {closeCcy}
                         </span>
+                        {q != null && q.exitFeeBase > 0 && (
+                          <span>
+                            {" "}after ~{formatMoneyAmount(q.exitFeeBase)} {closeCcy} fees
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
