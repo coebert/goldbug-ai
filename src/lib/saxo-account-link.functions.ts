@@ -4,6 +4,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "@/lib/_server/require-aal2";
 import type { AccountDiscovery, AccountKeyAuditEntry } from "@/lib/saxo-account-link.server";
 
 export type { AccountDiscovery, AccountKeyAuditEntry, DiscoveredAccount } from "@/lib/saxo-account-link.server";
