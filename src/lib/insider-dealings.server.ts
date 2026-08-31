@@ -18,7 +18,7 @@ import { collectRnsDealings } from "./rns/investegate.server";
 type Sb = { from: (table: string) => any };
 
 /** Bounded fan-out: the Worker keeps only a few outbound sockets alive. */
-const CONCURRENCY = 4;
+const CONCURRENCY = 6;
 const FEED_TIMEOUT_MS = 8_000;
 const MAX_TARGETS = 20;
 
