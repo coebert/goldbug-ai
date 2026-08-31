@@ -191,8 +191,9 @@ export function insiderFeedQueries(company: string, windowDays = 7): string[] {
   const when = `when:${Math.max(1, Math.min(60, Math.round(windowDays)))}d`;
   return [
     `${when} "${name}" director shares`,
+    // Two queries, not three: each extra query is another RSS round trip per
+    // held name, and the third variant historically added no unique filings.
     `${when} "${name}" directors deals`,
-    `${when} "${name}" chief executive sells shares`,
   ];
 }
 

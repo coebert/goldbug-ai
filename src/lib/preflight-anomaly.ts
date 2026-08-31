@@ -91,7 +91,7 @@ const PHASE_HINT: Record<RunPhase, string> = {
   saxo_refresh:
     "Check the Saxo OAuth token age and 429 retry counts — a refresh that is retrying against rate limits blocks the whole run.",
   news:
-    "Check feed fetch errors and per-feed latency; disable or backfill the slowest feeds rather than blocking the run on them.",
+    "This step covers the news cache read AND the director/PDMR (insider) sweep, which fans out to Google News RSS and Investegate per held name — check that sweep's throttle first, then per-feed latency.",
   regime:
     "Regime computation is CPU/query bound — check for a missing index on the price history query or an unusually wide lookback.",
   symbols:
