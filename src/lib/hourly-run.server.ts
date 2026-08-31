@@ -299,17 +299,42 @@ async function runHourlyCycleInner(
       }
       // Director / PDMR dealings for held names never reach the general wires,
       // so they get their own bounded pass alongside the news step.
+      //
+      // COST: this is a 60-way Google News RSS fan-out plus Investegate RNS
+      // scraping — measured at ~40s, which alone blew the pre-flight budget and
+      // put portfolio ticks at risk of being skipped. A dedicated cron
+      // (`insider-ai-scan-4h`) already runs the same ingest with AI review, so
+      // the hourly pass is throttled to at most once every 2 hours via the
+      // shared token bucket instead of running on every tick.
       let insiderNote = "";
       try {
-        const { ingestInsiderDealings } = await import("@/lib/insider-dealings.server");
-        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 7 });
-        insiderNote = `, insider ${res.stored}/${res.detected} across ${res.targets} names${
-          res.alerted ? `, ${res.alerted} disposal alert(s)` : ""
-        }`;
+        let mayRun = true;
+        try {
+          const { data } = await supabaseAdmin.rpc("consume_rate_limit", {
+            _key: "hourly-run:insider-ingest",
+            _capacity: 1,
+            _refill_per_sec: 1 / 7200,
+            _cost: 1,
+          });
+          const row = Array.isArray(data) ? data[0] : data;
+          mayRun = row?.allowed !== false;
+        } catch {
+          /* bucket unavailable — fall through and run */
+        }
+        if (!mayRun) {
+          insiderNote = ", insider skipped (4h cron owns it)";
+        } else {
+          const { ingestInsiderDealings } = await import("@/lib/insider-dealings.server");
+          const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 7 });
+          insiderNote = `, insider ${res.stored}/${res.detected} across ${res.targets} names${
+            res.alerted ? `, ${res.alerted} disposal alert(s)` : ""
+          }`;
+        }
       } catch (e) {
         srvLog.error("hourly-run: insider dealings ingest failed", e);
       }
       tel.recordPhase("news", Date.now() - newsT0, false, `${newsCount} headlines${insiderNote}`);
+
     } else {
       tel.recordPhase("news", 0, true, "preflight disabled for bounded run");
     }
