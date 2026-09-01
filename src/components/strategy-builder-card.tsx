@@ -24,6 +24,7 @@ import {
   listStrategies,
   saveStrategy,
   deleteStrategy,
+  setConcentrationCap,
   setDrawdownBudget,
   runStrategies,
 } from "@/lib/strategy.functions";
@@ -61,12 +62,16 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
   const save = useServerFn(saveStrategy);
   const del = useServerFn(deleteStrategy);
   const setBudget = useServerFn(setDrawdownBudget);
+  const setCap = useServerFn(setConcentrationCap);
   const run = useServerFn(runStrategies);
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [budgetPct, setBudgetPct] = useState<string>("");
   const [autoClose, setAutoClose] = useState(false);
   const [touchedBudget, setTouchedBudget] = useState(false);
+  const [capPct, setCapPct] = useState<string>("");
+  const [autoTrim, setAutoTrim] = useState(false);
+  const [touchedCap, setTouchedCap] = useState(false);
 
   const q = useQuery({
     queryKey: ["strategies", portfolioId],
@@ -75,6 +80,10 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
       if (!touchedBudget) {
         setBudgetPct(r.ddBudgetPct != null ? String(r.ddBudgetPct) : "");
         setAutoClose(r.ddAutoClose);
+      }
+      if (!touchedCap) {
+        setCapPct(r.concentrationCapPct != null ? String(r.concentrationCapPct) : "");
+        setAutoTrim(r.concentrationAutoTrim);
       }
       return r;
     },
@@ -126,6 +135,22 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
           ? `${acted.length} order(s) placed: ${acted.map((a) => `${a.symbol} ${a.action}`).join(", ")}`
           : "No rules triggered",
       );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const capM = useMutation({
+    mutationFn: () =>
+      setCap({
+        data: {
+          portfolioId,
+          capPct: num(capPct),
+          autoTrim: autoTrim && num(capPct) != null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Concentration cap saved");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -352,6 +377,48 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
           <p className="mt-2 text-xs text-muted-foreground">
             Any equity, ETF, commodity or crypto holding whose unrealised loss breaches the budget
             is closed in full on the next run — the same protection FX legs already have.
+          </p>
+        </div>
+
+        <div className="rounded-md border p-3">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="sb-cap" className="text-xs">
+                Max single-position weight (%)
+              </Label>
+              <Input
+                id="sb-cap"
+                className="w-32"
+                inputMode="decimal"
+                value={capPct}
+                placeholder="e.g. 25"
+                onChange={(e) => {
+                  setTouchedCap(true);
+                  setCapPct(e.target.value);
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <Switch
+                id="sb-autotrim"
+                checked={autoTrim}
+                onCheckedChange={(v) => {
+                  setTouchedCap(true);
+                  setAutoTrim(v);
+                }}
+              />
+              <Label htmlFor="sb-autotrim" className="text-xs">
+                Auto-trim over-concentrated positions
+              </Label>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => capM.mutate()} disabled={capM.isPending}>
+              Save cap
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Weight is measured against gross book value (positions + cash). Any holding above the
+            cap is sold back down to it on the next run — this fires on winners too, so a single
+            name can never quietly take over the portfolio.
           </p>
         </div>
       </CardContent>
