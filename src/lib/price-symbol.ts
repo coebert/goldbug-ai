@@ -12,16 +12,32 @@ const MIC_TO_YAHOO: Record<string, string> = {
   xnas: "", xnys: "", arcx: "", bats: "",
 };
 
+/**
+ * Retired listings that still sit in holdings, watches and older config.
+ * Yahoo 404s on them forever, which silently pins the whole symbol to a stale
+ * cached close, so map them onto the live successor ETP before any fetch.
+ */
+const RETIRED_SYMBOL_ALIASES: Record<string, string> = {
+  "ETHE.DE": "ZETH.DE", // ETC Group Physical Ethereum relisted as ZETH.DE
+  "VBTC.L": "BTCW.L",   // WisdomTree Physical Bitcoin LSE line is BTCW.L
+};
+
+/** Live replacement for a retired ticker, or the symbol unchanged. */
+export function resolveRetiredSymbol(symbol: string): string {
+  const s = String(symbol ?? "").trim().toUpperCase();
+  return RETIRED_SYMBOL_ALIASES[s] ?? String(symbol ?? "").trim();
+}
+
 /** "MKS:xlon" → "MKS.L", "AAPL:xnas" → "AAPL", others unchanged. */
 export function resolvePriceSymbol(symbol: string): string {
-  const sym = String(symbol ?? "").trim();
+  const sym = resolveRetiredSymbol(symbol);
   const colon = sym.lastIndexOf(":");
   if (colon < 0) return sym;
   const base = sym.slice(0, colon);
   const mic = sym.slice(colon + 1).toLowerCase();
   const yahoo = MIC_TO_YAHOO[mic];
   if (yahoo == null) return sym;
-  return yahoo ? `${base}.${yahoo}` : base;
+  return resolveRetiredSymbol(yahoo ? `${base}.${yahoo}` : base);
 }
 
 /**
