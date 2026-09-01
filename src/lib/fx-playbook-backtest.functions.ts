@@ -99,7 +99,10 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
         }
         return {
           ...result,
-          money: sizeFxBacktest(result, { capital, leverage: data.leverage }),
+          // Cash is shared across the pairs in the run: each leg gets an equal
+          // slice, so summing the per-pair money columns never implies more
+          // capital than the portfolio actually has.
+          money: sizeFxBacktest(result, { capital: perPairCapital, leverage: data.leverage }),
         };
       }),
     );
