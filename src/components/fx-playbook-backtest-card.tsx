@@ -117,9 +117,22 @@ export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
           Replays the live rules — cut at −1.5%, take at +2.0%, force-close after 30 days, 6bps
-          round-trip cost — on daily ECB closes. Drawdown is the worst peak-to-trough of
-          compounding one leg at a time.
+          round-trip cost — on daily ECB closes.{" "}
+          {sized ? (
+            <>
+              Each leg is sized at{" "}
+              <span className="font-medium text-foreground">
+                {money(capital * leverage, ccy, false)}
+              </span>{" "}
+              of notional ({money(capital, ccy, false)} {CAPITAL_LABEL[mutation.data?.capitalSource ?? "none"]} ×{" "}
+              {leverage}×) and compounds, so the money columns are the cash you would actually have
+              gained or lost.
+            </>
+          ) : (
+            <>Drawdown is the worst peak-to-trough of compounding one leg at a time.</>
+          )}
         </p>
+
 
         {mutation.isError && (
           <p className="text-sm text-destructive">
