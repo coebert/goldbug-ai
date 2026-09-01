@@ -1,12 +1,18 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+import { FxLegRowsCard } from "@/components/fx-leg-rows-card";
 import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
 import { FxStressReportCard } from "@/components/fx-stress-report-card";
 import { FxPlaybookBacktestCard } from "@/components/fx-playbook-backtest-card";
+import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
+
 
 const TITLE = "FX Risk Dashboard — Aegis";
 const DESC =
