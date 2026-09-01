@@ -18,3 +18,5 @@
 - [x] Leverage ladder sized on one pair per run at full capital (real leverage, not three pairs sharing cash)
 - [x] Drawdown budget on the leverage ladder: each pair stops trading when its backtest drawdown crosses the budget
 - [x] Order status card rebuilt on real broker fills (status, fees, execution time per order)
+- [ ] Trading dashboard page: open positions, pending orders, real broker fills, P&L / drawdown / risk charts, trade actions
+- [ ] Retired crypto tickers (ETHE.DE, VBTC.L) must quote live; surface a warning when a symbol is unavailable/stale
