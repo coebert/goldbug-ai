@@ -28,6 +28,13 @@ const GBP_QUOTED_LSE_TICKERS = new Set([
   "VAGP", "VGOV", "VERX", "VDPX", "VWRP", "VUAG",
 ]);
 
+/**
+ * LSE listings quoted in a **foreign currency** (USD/EUR), not pence. The
+ * crypto ETP range on the LSE prices in USD, so the GBX rule deflated
+ * BTCW.L 18.59 USD to 0.186 and every order fell below the minimum ticket.
+ */
+const NON_GBX_LSE_TICKERS = new Set(["BTCW", "BTCE", "ETHW", "VBTC", "ZETH"]);
+
 function lseRoot(symbol: string): string {
   const s = symbol.trim().toUpperCase();
   if (s.endsWith(":XLON")) return s.slice(0, -5);
@@ -46,7 +53,9 @@ export function isLseGbxDisplayQuoted(
   _assetClass?: string | null,
 ): boolean {
   if (!isLsePenceQuoted(symbol)) return false;
-  return !GBP_QUOTED_LSE_TICKERS.has(lseRoot(symbol));
+  const root = lseRoot(symbol);
+  if (NON_GBX_LSE_TICKERS.has(root)) return false;
+  return !GBP_QUOTED_LSE_TICKERS.has(root);
 }
 
 export function marketQuoteCurrency(symbol: string): "GBX" | null {
