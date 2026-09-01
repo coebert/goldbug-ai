@@ -99,6 +99,9 @@ export const getFxStressReport = createServerFn({ method: "GET" })
         actual: false,
       });
     }
+
+    const legs = await Promise.all(
+      legsIn.map(async (l): Promise<FxStressLegReport> => {
         const pair = parseFxPair(l.symbol, l.quoteCcy);
         const pairBase = pair?.base ?? baseCcy;
         const pairKey = `${pairBase}${l.quoteCcy}`;
