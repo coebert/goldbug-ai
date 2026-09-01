@@ -209,9 +209,8 @@ import { ValuationConsistencyAlert } from "@/components/valuation-consistency-al
 import { InstrumentCcyAlert } from "@/components/instrument-ccy-alert";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
 import { FxAuditCard } from "@/components/fx-audit-card";
-import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
-import { FxPlaybookBacktestCard } from "@/components/fx-playbook-backtest-card";
-import { FxStressReportCard } from "@/components/fx-stress-report-card";
+import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
