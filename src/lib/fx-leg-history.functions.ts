@@ -155,8 +155,8 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
         const pair = parseFxPair(String(h.symbol), h.instrument_ccy ?? null);
         const pairBase = (pair?.base ?? baseCcy).toUpperCase();
         const quoteCcy = (pair?.quote ?? String(h.instrument_ccy ?? baseCcy)).toUpperCase();
-        const qty = Number(h.quantity);
-        const avgCost = Number(h.avg_cost);
+        let qty = Number(h.quantity);
+        let avgCost = Number(h.avg_cost);
 
         let rate: number | null = null;
         let observedAt: string | null = null;
@@ -178,6 +178,15 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
         let error: string | null = null;
         try {
           const bars = await fetchFxHistory(pairBase, quoteCcy, from);
+          if (!h.actual) {
+            // Size the reference leg at the window's opening rate: short base,
+            // funded by the reference notional in the quote currency.
+            const opening = bars[0]?.rate ?? rate ?? 0;
+            if (opening > 0) {
+              avgCost = opening;
+              qty = -data.referenceNotional / opening;
+            }
+          }
           points = bars.map((b) => {
             const pnlQuote = Number.isFinite(avgCost) && avgCost > 0 ? qty * (b.rate - avgCost) : 0;
             const notional = Math.abs(qty) * b.rate;
