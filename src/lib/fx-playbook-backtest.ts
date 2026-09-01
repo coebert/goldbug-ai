@@ -164,3 +164,73 @@ export function runFxPlaybookBacktest(
     equityCurve,
   };
 }
+
+export type FxBacktestMoney = {
+  /** Cash the sizing is based on, in the portfolio's base currency. */
+  capital: number;
+  /** Notional multiplier applied to that cash on each leg. */
+  leverage: number;
+  /** Notional of the first leg (capital x leverage) — later legs compound. */
+  startingNotional: number;
+  finalEquity: number;
+  totalPnl: number;
+  avgLegPnl: number;
+  bestLegPnl: number;
+  worstLegPnl: number;
+  /** Mean money loss of the worst 5% of legs. */
+  cvar5Pnl: number;
+  /** Deepest peak-to-trough fall of the cash balance. */
+  maxDrawdown: number;
+  /** Cash curve (starts at `capital`) sampled at each leg close. */
+  cashCurve: Array<{ date: string; cash: number }>;
+};
+
+/**
+ * Restates a percentage backtest in real money: each leg is sized at
+ * `equity x leverage` of notional, so the P&L, drawdown and tail figures are
+ * the actual pounds the portfolio would have gained or lost — not abstract
+ * per-unit percentages.
+ */
+export function sizeFxBacktest(
+  result: Pick<FxBacktestResult, "trades">,
+  opts: { capital: number; leverage?: number },
+): FxBacktestMoney {
+  const capital = Number.isFinite(opts.capital) && opts.capital > 0 ? opts.capital : 0;
+  const leverage = Number.isFinite(opts.leverage) && (opts.leverage ?? 0) > 0 ? opts.leverage! : 1;
+
+  let equity = capital;
+  let peak = capital;
+  let maxDd = 0;
+  const legPnls: number[] = [];
+  const cashCurve: Array<{ date: string; cash: number }> = [];
+
+  for (const t of result.trades) {
+    // Notional scales with the surviving balance, so gains compound and a
+    // drawdown automatically shrinks the next ticket.
+    const notional = Math.max(0, equity) * leverage;
+    const pnl = notional * t.pnlPct;
+    equity += pnl;
+    legPnls.push(pnl);
+    peak = Math.max(peak, equity);
+    maxDd = Math.max(maxDd, peak - equity);
+    cashCurve.push({ date: t.exitDate, cash: equity });
+  }
+
+  const sorted = [...legPnls].sort((a, b) => a - b);
+  const tailN = Math.max(1, Math.ceil(sorted.length * 0.05));
+  const cvar5 = sorted.length ? sorted.slice(0, tailN).reduce((s, v) => s + v, 0) / tailN : 0;
+
+  return {
+    capital,
+    leverage,
+    startingNotional: capital * leverage,
+    finalEquity: equity,
+    totalPnl: equity - capital,
+    avgLegPnl: legPnls.length ? legPnls.reduce((s, v) => s + v, 0) / legPnls.length : 0,
+    bestLegPnl: sorted.length ? sorted[sorted.length - 1]! : 0,
+    worstLegPnl: sorted[0] ?? 0,
+    cvar5Pnl: cvar5,
+    maxDrawdown: maxDd,
+    cashCurve,
+  };
+}
