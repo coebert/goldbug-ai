@@ -7,6 +7,7 @@ import { Link } from "@tanstack/react-router";
  */
 const TABS = [
   { to: "/portfolio/$id", label: "Overview", exact: true },
+  { to: "/portfolio/$id/summary", label: "Summary" },
   { to: "/portfolio/$id/attribution", label: "Attribution" },
   { to: "/portfolio/$id/analytics", label: "Analytics" },
   { to: "/portfolio/$id/optimizer", label: "Optimizer" },
