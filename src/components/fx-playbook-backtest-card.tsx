@@ -188,7 +188,29 @@ export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }
                       −{(r.maxDrawdownPct * 100).toFixed(1)}%
                     </td>
                     <td className="py-1 pr-2 text-right tabular-nums">{pct(r.cvar5Pct)}</td>
+                    {sized && (
+                      <td
+                        className={`py-1 pr-2 text-right tabular-nums ${
+                          r.money.totalPnl >= 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {money(r.money.totalPnl, ccy)}
+                      </td>
+                    )}
+                    {sized && (
+                      <td className="py-1 pr-2 text-right tabular-nums text-destructive">
+                        {money(r.money.worstLegPnl, ccy)}
+                      </td>
+                    )}
+                    {sized && (
+                      <td className="py-1 pr-2 text-right tabular-nums text-destructive">
+                        −{money(r.money.maxDrawdown, ccy, false)}
+                      </td>
+                    )}
                     <td className="py-1 pr-2 text-right tabular-nums">
+
                       {r.hitTakeProfit}/{r.hitStopLoss}/{r.timedOut}
                     </td>
                   </tr>
