@@ -44,6 +44,8 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
         leverage: z.number().min(0.1).max(10).default(1),
         /** Explicit capital, overriding the portfolio balance. */
         capitalOverride: z.number().positive().optional(),
+        /** Stop a pair for good once its cash curve falls this far below peak. */
+        drawdownBudgetPct: z.number().min(0).max(1).default(0),
       })
       .parse(i),
   )
@@ -106,7 +108,11 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
           // Cash is shared across the pairs in the run: each leg gets an equal
           // slice, so summing the per-pair money columns never implies more
           // capital than the portfolio actually has.
-          money: sizeFxBacktest(result, { capital: perPairCapital, leverage: data.leverage }),
+          money: sizeFxBacktest(result, {
+            capital: perPairCapital,
+            leverage: data.leverage,
+            drawdownBudgetPct: data.drawdownBudgetPct,
+          }),
         };
       }),
     );
