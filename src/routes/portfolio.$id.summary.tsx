@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { Metric } from "@/components/portfolio-detail/metric";
 import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
 import { FxRiskAlertCard } from "@/components/fx-risk-alert-card";
 
 import { FxLegRowsCard } from "@/components/fx-leg-rows-card";
@@ -261,6 +262,7 @@ function SummaryPage() {
 
         <FxCashAtRiskCard portfolioId={id} />
         <FxLegRowsCard portfolioId={id} selectedPair={pair} onSelectPair={setPair} />
+        <FxLegHistoryCard portfolioId={id} pairFilter={pair ?? undefined} />
         <FxLeverageLadderCard portfolioId={id} pairs={pair ? [pair] : undefined} />
 
         <Link
