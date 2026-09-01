@@ -166,6 +166,9 @@ function SummaryPage() {
           </p>
         </div>
 
+        <FxRiskAlertCard portfolioId={id} cashBase={metrics.cash} />
+
+
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <Metric label="Total value" value={fmt(metrics.totalValue)} hint={metrics.source === "snapshot" ? "from latest snapshot" : "no snapshot yet"} />
           <Metric label="Cash" value={fmt(metrics.cash)} hint={`${legs.length} open position${legs.length === 1 ? "" : "s"}`} />
