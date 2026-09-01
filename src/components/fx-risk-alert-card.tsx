@@ -123,6 +123,13 @@ export function FxRiskAlertCard({
               </li>
             ))}
           </ul>
+          {report.level === "critical" && (
+            <p className="font-medium">
+              {autoClosed.length > 0
+                ? `Auto-closed: ${autoClosed.join(", ")} — the close is logged in the order status card.`
+                : "Over-budget legs are being closed automatically at the live rate."}
+            </p>
+          )}
           <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
             <Link to="/portfolio/$id/fx-risk" params={{ id: portfolioId }}>
               Review and close legs
