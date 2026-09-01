@@ -78,6 +78,8 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
       }
     }
 
+    const perPairCapital = capital / Math.max(1, data.pairs.length);
+
     const results = await Promise.all(
       data.pairs.map(async (p) => {
         const pair = p.toUpperCase();
