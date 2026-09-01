@@ -12,6 +12,7 @@ import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { Metric } from "@/components/portfolio-detail/metric";
 import { StalePriceWarning } from "@/components/stale-price-warning";
 import { TradingPnlCharts } from "@/components/trading-pnl-charts";
+import { HoldingPriceCharts } from "@/components/holding-price-charts";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { StrategyBuilderCard } from "@/components/strategy-builder-card";
 import { getPortfolio } from "@/lib/portfolios.functions";
@@ -69,6 +70,7 @@ function TradePage() {
     queryKey: ["holdings-history", id],
     queryFn: () => getHistory({ data: { portfolioId: id } }),
     staleTime: 60_000,
+    refetchInterval: 60_000,
   });
   const ordersQ = useQuery({
     queryKey: ["order-fills", id],
@@ -251,6 +253,21 @@ function TradePage() {
           baseline={Number(p?.starting_cash ?? 0)}
           currency={ccy}
           positions={positions.map((l) => ({ symbol: l.symbol, value: l.value, pnl: l.pnl }))}
+        />
+
+        <HoldingPriceCharts
+          series={(historyQ.data ?? []).map((s) => ({
+            symbol: s.symbol,
+            avg_cost: Number(s.avg_cost),
+            quantity: Number(s.quantity),
+            closes: s.closes ?? [],
+            hourly: s.hourly ?? [],
+            hourlyAt: s.hourlyAt ?? [],
+            currentPrice: s.currentPrice,
+            hourlyStale: Boolean(s.hourlyStale),
+          }))}
+          isLoading={historyQ.isLoading}
+          updatedAt={historyQ.dataUpdatedAt}
         />
 
         <Card>

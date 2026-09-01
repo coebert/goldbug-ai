@@ -2672,6 +2672,8 @@ export type Database = {
           broker_account_id: string | null
           cash_by_ccy: Json
           circuit_breaker: Json
+          concentration_autotrim: boolean
+          concentration_cap_pct: number | null
           created_at: string
           currency: string
           current_cash: number
@@ -2700,6 +2702,8 @@ export type Database = {
           broker_account_id?: string | null
           cash_by_ccy?: Json
           circuit_breaker?: Json
+          concentration_autotrim?: boolean
+          concentration_cap_pct?: number | null
           created_at?: string
           currency?: string
           current_cash?: number
@@ -2728,6 +2732,8 @@ export type Database = {
           broker_account_id?: string | null
           cash_by_ccy?: Json
           circuit_breaker?: Json
+          concentration_autotrim?: boolean
+          concentration_cap_pct?: number | null
           created_at?: string
           currency?: string
           current_cash?: number

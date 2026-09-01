@@ -23,3 +23,6 @@
 - [x] Trade tab strategy builder: per-symbol entry / stop-loss / take-profit rules that place orders automatically
 - [x] Test trades on ZETH.DE / BTCW.L via Trade tab and verify broker-fills table matches broker
 - [x] Drawdown budget for equity/crypto holdings with auto-close, mirroring FX legs
+- [x] Dashboard holdings show average cost, book value, unrealised P&L and today's move (not just backtest numbers)
+- [x] Live per-holding price charts on the Trade tab (hourly/daily, avg-cost reference line)
+- [x] Risk-concentration cap with auto-trim of over-weight holdings, alongside the drawdown budget

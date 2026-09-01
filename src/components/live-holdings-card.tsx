@@ -292,7 +292,24 @@ export function LiveHoldingsCard({
     sortedByValueDesc.map(({ r }) => Math.max(0, r.rawValue)),
     authoritativeInvested,
   );
-  const rows = sortedByValueDesc.map(({ r }, idx) => ({ ...r, value: allocated[idx] }));
+  const rows = sortedByValueDesc.map(({ r }, idx) => {
+    const value = allocated[idx];
+    // Scale the native cost basis by the same factor the largest-remainder
+    // allocation applied to the market value, so per-row unrealised P&L is
+    // expressed in the portfolio's base currency and still sums to Invested.
+    const scale = r.rawValue > 0 ? value / r.rawValue : 0;
+    const costBase = r.unitsUnknown ? 0 : r.costBasis * scale;
+    const unrealised = r.unitsUnknown ? null : value - costBase;
+    const unrealisedPct = costBase > 0 && unrealised != null ? unrealised / costBase : null;
+    // Daily move: last two daily closes of this holding's own price series.
+    const cl = r.series?.closes ?? [];
+    const prev = cl.length >= 2 ? Number(cl[cl.length - 2]) : null;
+    const last = cl.length >= 2 ? Number(cl[cl.length - 1]) : null;
+    const dayPct =
+      prev != null && last != null && prev > 0 && Number.isFinite(last) ? last / prev - 1 : null;
+    const dayValue = dayPct != null && !r.unitsUnknown ? value - value / (1 + dayPct) : null;
+    return { ...r, value, costBase, unrealised, unrealisedPct, dayPct, dayValue };
+  });
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
   // Reconcile what the engine holds against what this card actually paints:
@@ -785,7 +802,12 @@ export function LiveHoldingsCard({
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground tabular-nums break-words">
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {currency}{" "}
-                        {r.avg.toFixed(2)} cost
+                        {r.avg.toFixed(2)} avg cost
+                        {!r.unitsUnknown && (
+                          <span className="ml-1 text-muted-foreground/70">
+                            · book {fmt(r.costBase)}
+                          </span>
+                        )}
                         {openedLabel && (
                           <span className="ml-1 text-muted-foreground/70">
                             · since {openedLabel}
@@ -800,6 +822,27 @@ export function LiveHoldingsCard({
                       <div className="text-[11px] text-muted-foreground tabular-nums">
                         {r.unitsUnknown ? "units unresolved" : `${pct.toFixed(1)}% of portfolio`}
                       </div>
+                      {r.unrealised != null && (
+                        <div
+                          className={`text-[11px] font-medium tabular-nums ${
+                            r.unrealised >= 0 ? "text-emerald-500" : "text-rose-400"
+                          }`}
+                          data-testid={`holding-unrealised-${r.symbol}`}
+                        >
+                          {fmtSigned(r.unrealised)}
+                          {r.unrealisedPct != null && ` (${fmtPct(r.unrealisedPct)})`} unrealised
+                        </div>
+                      )}
+                      {r.dayValue != null && r.dayPct != null && (
+                        <div
+                          className={`text-[11px] tabular-nums ${
+                            r.dayValue >= 0 ? "text-emerald-500/80" : "text-rose-400/80"
+                          }`}
+                          data-testid={`holding-today-${r.symbol}`}
+                        >
+                          {fmtSigned(r.dayValue)} ({fmtPct(r.dayPct)}) today
+                        </div>
+                      )}
                     </div>
                   </div>
 

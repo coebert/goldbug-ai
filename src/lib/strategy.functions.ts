@@ -22,13 +22,18 @@ export const listStrategies = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const { data: p } = await context.supabase
       .from("portfolios")
-      .select("holding_dd_budget_pct, holding_dd_autoclose")
+      .select(
+        "holding_dd_budget_pct, holding_dd_autoclose, concentration_cap_pct, concentration_autotrim",
+      )
       .eq("id", data.portfolioId)
       .maybeSingle();
     return {
       strategies: rows ?? [],
       ddBudgetPct: p?.holding_dd_budget_pct != null ? Number(p.holding_dd_budget_pct) : null,
       ddAutoClose: Boolean(p?.holding_dd_autoclose),
+      concentrationCapPct:
+        p?.concentration_cap_pct != null ? Number(p.concentration_cap_pct) : null,
+      concentrationAutoTrim: Boolean(p?.concentration_autotrim),
     };
   });
 
@@ -110,6 +115,29 @@ export const setDrawdownBudget = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const setConcentrationCap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        portfolioId: z.string().uuid(),
+        capPct: z.number().min(1).max(99).nullable(),
+        autoTrim: z.boolean(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("portfolios")
+      .update({
+        concentration_cap_pct: data.capPct,
+        concentration_autotrim: data.autoTrim,
+      })
+      .eq("id", data.portfolioId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
 /** Evaluates all strategies + the drawdown budget and places any triggered orders. */
 export const runStrategies = createServerFn({ method: "POST" })
   .middleware([requireAal2])
@@ -119,7 +147,7 @@ export const runStrategies = createServerFn({ method: "POST" })
     const { data: p, error: pErr } = await supabase
       .from("portfolios")
       .select(
-        "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose",
+        "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose, concentration_cap_pct, concentration_autotrim",
       )
       .eq("id", data.portfolioId)
       .maybeSingle();
@@ -130,7 +158,7 @@ export const runStrategies = createServerFn({ method: "POST" })
       .select("*")
       .eq("portfolio_id", data.portfolioId);
 
-    const { evaluateStrategies, evaluateHoldingDrawdownBudget } = await import(
+    const { evaluateStrategies, evaluateHoldingDrawdownBudget, evaluateConcentrationCap } = await import(
       "@/lib/strategy-engine.server"
     );
     const portfolio = {
@@ -144,6 +172,9 @@ export const runStrategies = createServerFn({ method: "POST" })
       holding_dd_budget_pct:
         p.holding_dd_budget_pct != null ? Number(p.holding_dd_budget_pct) : null,
       holding_dd_autoclose: Boolean(p.holding_dd_autoclose),
+      concentration_cap_pct:
+        p.concentration_cap_pct != null ? Number(p.concentration_cap_pct) : null,
+      concentration_autotrim: Boolean(p.concentration_autotrim),
     };
 
     const strategyActions = await evaluateStrategies({
@@ -167,5 +198,6 @@ export const runStrategies = createServerFn({ method: "POST" })
     });
 
     const ddActions = await evaluateHoldingDrawdownBudget({ supabase, userId, portfolio });
-    return { actions: [...strategyActions, ...ddActions] };
+    const concActions = await evaluateConcentrationCap({ supabase, userId, portfolio });
+    return { actions: [...strategyActions, ...ddActions, ...concActions] };
   });
