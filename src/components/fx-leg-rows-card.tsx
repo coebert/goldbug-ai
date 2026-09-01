@@ -1,10 +1,24 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
+import { closeFxLeg } from "@/lib/fx-leg-close.functions";
+
 
 function money(n: number, ccy: string, signed = true) {
   return new Intl.NumberFormat("en-GB", {
@@ -31,6 +45,9 @@ export function FxLegRowsCard({
 }) {
   const quotesFn = useServerFn(getFxLegQuotes);
   const stressFn = useServerFn(getFxStressReport);
+  const closeFn = useServerFn(closeFxLeg);
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState<FxLegQuote | null>(null);
 
   const quotes = useQuery({
     queryKey: ["fx-leg-quotes", portfolioId],
@@ -41,6 +58,25 @@ export function FxLegRowsCard({
     queryKey: ["fx-stress-report", portfolioId],
     queryFn: () => stressFn({ data: { portfolioId, years: 20 } }),
     staleTime: 30 * 60_000,
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: (symbol: string) => closeFn({ data: { portfolioId, symbol } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("Could not close the leg", { description: res.detail });
+        return;
+      }
+      toast.success(`Closed ${res.pair} at ${res.rate.toFixed(4)}`, {
+        description: `${res.direction === "short" ? "Bought back" : "Sold"} ${res.amountFrom.toLocaleString()} ${res.fromCcy} → ${res.amountTo.toLocaleString()} ${res.toCcy}. Fee ${res.feeQuote.toFixed(2)} ${res.toCcy === res.fromCcy ? "" : ""}, net P&L ${res.pnlQuoteNet.toFixed(2)}.`,
+      });
+      // Refresh every surface that reads holdings/cash — Summary tab included.
+      void queryClient.invalidateQueries();
+    },
+    onError: (e: unknown) =>
+      toast.error("Could not close the leg", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      }),
   });
 
   const baseCcy = quotes.data?.baseCcy ?? "GBP";
@@ -58,6 +94,7 @@ export function FxLegRowsCard({
             <Button
               size="sm"
               variant="ghost"
+
               className="h-7 px-2 text-xs"
               onClick={() => onSelectPair?.(undefined)}
             >
@@ -83,6 +120,8 @@ export function FxLegRowsCard({
                   <th className="py-1 pr-2 text-right font-medium">Notional ({baseCcy})</th>
                   <th className="py-1 pr-2 text-right font-medium">Close now (net)</th>
                   <th className="py-1 pr-2 text-right font-medium">Stress worst</th>
+                  <th className="py-1 text-right font-medium">Close</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -131,17 +170,74 @@ export function FxLegRowsCard({
                       <td className="py-1.5 pr-2 text-right tabular-nums text-destructive">
                         {st ? money(st.report.worstCaseBase, baseCcy) : "—"}
                       </td>
+                      <td className="py-1.5 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          disabled={l.rate == null || l.stale || closeMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPending(l);
+                          }}
+                        >
+                          {closeMutation.isPending && closeMutation.variables === l.symbol
+                            ? "Closing…"
+                            : "Close"}
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
+
               </tbody>
             </table>
           </div>
         )}
         <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-          Click a row to run the rate history, backtest and stress test for that pair alone.
+          Click a row to run the rate history, backtest and stress test for that pair alone. "Close"
+          flattens the leg at the live rate — the estimated exit fee is already deducted from the
+          net figure shown, and the Summary tab refreshes as soon as the close settles.
         </p>
       </CardContent>
+
+      <AlertDialog open={pending != null} onOpenChange={(o) => !o && setPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Close {pending ? `${pending.pairBase}${pending.quoteCcy}` : ""} at the live rate?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-xs">
+                <p>
+                  {pending?.quantity != null && pending.quantity < 0 ? "Buying back" : "Selling"}{" "}
+                  {Math.abs(pending?.quantity ?? 0).toLocaleString()} {pending?.pairBase} at{" "}
+                  {pending?.rate?.toFixed(4) ?? "—"}.
+                </p>
+                <p>
+                  Estimated exit fee {(pending?.exitFeeQuote ?? 0).toFixed(2)} {pending?.quoteCcy} (
+                  {(pending?.exitCostBps ?? 0).toFixed(1)}bps).
+                </p>
+                <p>
+                  Net realised P&amp;L {money(pending?.pnlBaseNet ?? 0, baseCcy)} in {baseCcy}.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep the leg</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pending) closeMutation.mutate(pending.symbol);
+                setPending(null);
+              }}
+            >
+              Close at live rate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
+
   );
 }

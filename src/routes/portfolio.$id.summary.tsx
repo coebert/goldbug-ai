@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { Metric } from "@/components/portfolio-detail/metric";
 import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+import { FxRiskAlertCard } from "@/components/fx-risk-alert-card";
+
 import { FxLegRowsCard } from "@/components/fx-leg-rows-card";
 import { FxLeverageLadderCard } from "@/components/fx-leverage-ladder-card";
 import { getPortfolio } from "@/lib/portfolios.functions";
@@ -165,6 +167,9 @@ function SummaryPage() {
             the same authoritative snapshot the overview page uses.
           </p>
         </div>
+
+        <FxRiskAlertCard portfolioId={id} cashBase={metrics.cash} />
+
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <Metric label="Total value" value={fmt(metrics.totalValue)} hint={metrics.source === "snapshot" ? "from latest snapshot" : "no snapshot yet"} />

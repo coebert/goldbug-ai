@@ -440,7 +440,112 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       }
     }
 
+    // ---- Sell-side position fallback (hist unsupported) ----
+    // Mirror image of the buy case: a SELL that has left the working list and
+    // whose symbol is no longer in `/port/v1/netpositions/me` has completed —
+    // the broker closed the position. Without this, the row sat at
+    // `submitted` for a full day until the sim presumption rule fired, and
+    // the engine refused to trade that symbol in the meantime.
+    if (!hist && (row.side as string) === "sell") {
+      const qty = Number(row.quantity ?? 0);
+      const positions = await getPositionsByBase();
+      const key = baseTicker(row.symbol as string);
+      const pos = positions?.get(key) ?? null;
+      const positionGone = positions != null && (!pos || Math.abs(Number(pos.quantity ?? 0)) < 1e-6);
+      if (qty > 0 && positionGone) {
+        const priceRow = await supabaseAdmin
+          .from("price_cache")
+          .select("close")
+          .eq("symbol", row.symbol as string)
+          .order("as_of", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const resolved = resolveFillRecord({
+          symbol: row.symbol as string,
+          orderCcy: row.instrument_ccy as string | null,
+          portfolioCurrency,
+          candidates: [
+            { source: "order_limit_price", value: row.limit_price as number | null, raw: false },
+            { source: "price_cache_close", value: priceRow.data?.close ?? null, raw: true },
+          ],
+        });
+        const upd = await supabaseAdmin
+          .from("live_orders")
+          .update({ status: "filled" })
+          .eq("id", row.id as string);
+
+        let fillInsertError: string | null = null;
+        if (resolved) {
+          const ins = await supabaseAdmin.from("live_fills").insert({
+            order_id: row.id as string,
+            portfolio_id: portfolioId,
+            user_id: userId,
+            symbol: row.symbol as string,
+            side: "sell",
+            quantity: qty,
+            fill_price: resolved.fillPrice,
+            fee: modelledFillFee({
+              symbol: row.symbol as string,
+              side: "sell",
+              quantity: qty,
+              price: resolved.fillPrice,
+            }),
+            currency: resolved.currency,
+            broker_fill_id: brokerOrderId,
+            filled_at: new Date().toISOString(),
+          });
+          if (ins.error && ins.error.code !== "23505") {
+            fillInsertError = ins.error.message;
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolioId, user_id: userId, broker: "saxo",
+              env: adapter.env, method: "ORDER_RECON_POSITION_SELL_INSERT_FAILED",
+              path: "live_fills", status: null,
+              request: asJson({ orderId: row.id, brokerOrderId }),
+              error: ins.error.message,
+            });
+          }
+          if (!ins.error || ins.error.code === "23505") {
+            const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+            notifyTradeFilled({
+              userId, portfolioId, orderId: row.id as string,
+              symbol: row.symbol as string, side: "sell",
+              quantity: qty, fillPrice: resolved.fillPrice,
+              currency: resolved.currency,
+              source: "reconciler:position",
+            });
+          }
+        } else {
+          fillInsertError = "fill_price_unavailable";
+        }
+
+        summary.filled++;
+        summary.rows.push({
+          orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
+          outcome: "filled", previousStatus: row.status as string, newStatus: "filled",
+          filledQuantity: qty, avgFillPrice: resolved?.fillPrice ?? null,
+          reason: "position closed at broker (hist unavailable)",
+        });
+        await logReconcileEvent({
+          ...commonEvent,
+          source: `${source}:position_sell`,
+          newStatus: "filled",
+          outcome: "filled",
+          reasonCode: "broker_history_filled",
+          reason: `broker no longer holds ${row.symbol as string}; sell of ${qty} treated as complete (hist endpoint unavailable)`,
+          filledQuantity: qty,
+          avgFillPrice: resolved?.fillPrice ?? null,
+          saxoStatus: "position_absent",
+          saxoReason:
+            (upd.error ? `status update failed: ${upd.error.message}` : null) ??
+            (fillInsertError ? `live_fills: ${fillInsertError}` : null),
+          saxoResponse: { histError, positionsLoadError },
+        });
+        continue;
+      }
+    }
+
     if (!hist) {
+
       // Saxo `/hist/v3/orders` is unavailable (SIM tenants + some LIVE
       // configurations). Delegate to the shared, unit-tested `decideSimFill`
       // rule so the reconciler and the manual backfill agree on when a
