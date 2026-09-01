@@ -54,6 +54,13 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
       .object({
         portfolioId: z.string().uuid(),
         days: z.number().int().min(7).max(7300).default(90),
+        /**
+         * Pairs to include as synthetic reference legs when they are not held,
+         * so the currency picker can chart any pair.
+         */
+        referencePairs: z.array(z.string().length(6)).max(8).default([]),
+        /** Notional (quote ccy) used to size a synthetic reference leg. */
+        referenceNotional: z.number().positive().default(10_000),
       })
       .parse(i),
   )
