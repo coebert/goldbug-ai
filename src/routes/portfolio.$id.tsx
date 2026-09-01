@@ -209,9 +209,8 @@ import { ValuationConsistencyAlert } from "@/components/valuation-consistency-al
 import { InstrumentCcyAlert } from "@/components/instrument-ccy-alert";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
 import { FxAuditCard } from "@/components/fx-audit-card";
-import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
-import { FxPlaybookBacktestCard } from "@/components/fx-playbook-backtest-card";
-import { FxStressReportCard } from "@/components/fx-stress-report-card";
+import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
@@ -1870,14 +1869,20 @@ function PortfolioPage() {
                 {(p.mode === "live_sim" || p.mode === "live_prod") && (
                   <div className="mt-6 space-y-4">
                     <FxAuditCard portfolioId={id} active={tab === "overview"} />
-                    <FxLegHistoryCard portfolioId={id} active={tab === "overview"} />
-                    <FxStressReportCard portfolioId={id} active={tab === "overview"} />
-                    <FxPlaybookBacktestCard />
+                    <FxCashAtRiskCard portfolioId={id} />
+                    <Link
+                      to="/portfolio/$id/fx-risk"
+                      params={{ id }}
+                      className="inline-block text-xs text-primary hover:underline"
+                    >
+                      Open the FX risk dashboard — rate history, decision log, backtest & stress test →
+                    </Link>
                     <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
 
                     <CashReconciliationLogCard portfolioId={id} />
                   </div>
                 )}
+
 
                 <div className="mt-6">
                   <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} equity={totalValue} currency={p.currency} />

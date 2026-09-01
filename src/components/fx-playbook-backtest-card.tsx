@@ -12,21 +12,55 @@ function pct(n: number, digits = 2) {
   return `${n >= 0 ? "+" : "−"}${(Math.abs(n) * 100).toFixed(digits)}%`;
 }
 
+function money(n: number, ccy: string, signed = true) {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: ccy || "GBP",
+    maximumFractionDigits: 0,
+    signDisplay: signed ? "exceptZero" : "auto",
+  }).format(n);
+}
+
+const CAPITAL_LABEL: Record<string, string> = {
+  portfolio_cash: "live portfolio cash",
+  starting_cash: "starting cash (no live balance)",
+  override: "manual capital",
+  none: "no portfolio cash — percentages only",
+};
+
 /**
  * Runs the FX funding-leg playbook (−1.5% cut, +2.0% take, 30-day max hold)
  * over a decade of ECB daily closes so the rules can be judged on realised
  * hit rate, compounded return and worst-case drawdown before live capital.
+ * Sized on the portfolio's real cash balance and the chosen leverage, so the
+ * P&L and drawdown columns are actual money, not per-unit percentages.
  */
-export function FxPlaybookBacktestCard() {
+export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }) {
   const [side, setSide] = useState<"short" | "long">("short");
   const [years, setYears] = useState(10);
+  const [leverage, setLeverage] = useState(1);
   const run = useServerFn(backtestFxPlaybook);
 
   const mutation = useMutation({
-    mutationFn: () => run({ data: { pairs: PAIRS, years, side, costBps: 6, maxHoldDays: 30 } }),
+    mutationFn: () =>
+      run({
+        data: {
+          pairs: PAIRS,
+          years,
+          side,
+          costBps: 6,
+          maxHoldDays: 30,
+          leverage,
+          ...(portfolioId ? { portfolioId } : {}),
+        },
+      }),
   });
 
   const results = mutation.data?.results ?? [];
+  const ccy = mutation.data?.currency ?? "GBP";
+  const capital = mutation.data?.capital ?? 0;
+  const sized = capital > 0;
+
 
   return (
     <Card>
@@ -56,6 +90,19 @@ export function FxPlaybookBacktestCard() {
                 {y}y
               </Button>
             ))}
+            {portfolioId &&
+              [1, 2, 3].map((l) => (
+                <Button
+                  key={l}
+                  size="sm"
+                  variant={leverage === l ? "secondary" : "ghost"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setLeverage(l)}
+                >
+                  {l}× cash
+                </Button>
+              ))}
+
             <Button
               size="sm"
               className="h-7 px-3 text-xs"
@@ -70,9 +117,22 @@ export function FxPlaybookBacktestCard() {
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
           Replays the live rules — cut at −1.5%, take at +2.0%, force-close after 30 days, 6bps
-          round-trip cost — on daily ECB closes. Drawdown is the worst peak-to-trough of
-          compounding one leg at a time.
+          round-trip cost — on daily ECB closes.{" "}
+          {sized ? (
+            <>
+              Each leg is sized at{" "}
+              <span className="font-medium text-foreground">
+                {money(capital * leverage, ccy, false)}
+              </span>{" "}
+              of notional ({money(capital, ccy, false)} {CAPITAL_LABEL[mutation.data?.capitalSource ?? "none"]} ×{" "}
+              {leverage}×) and compounds, so the money columns are the cash you would actually have
+              gained or lost.
+            </>
+          ) : (
+            <>Drawdown is the worst peak-to-trough of compounding one leg at a time.</>
+          )}
         </p>
+
 
         {mutation.isError && (
           <p className="text-sm text-destructive">
@@ -92,7 +152,11 @@ export function FxPlaybookBacktestCard() {
                   <th className="py-1 pr-2 text-right">Total</th>
                   <th className="py-1 pr-2 text-right">Max DD</th>
                   <th className="py-1 pr-2 text-right">CVaR5</th>
+                  {sized && <th className="py-1 pr-2 text-right">P&L ({ccy})</th>}
+                  {sized && <th className="py-1 pr-2 text-right">Worst leg</th>}
+                  {sized && <th className="py-1 pr-2 text-right">Max DD ({ccy})</th>}
                   <th className="py-1 pr-2 text-right">TP/SL/hold</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -124,7 +188,29 @@ export function FxPlaybookBacktestCard() {
                       −{(r.maxDrawdownPct * 100).toFixed(1)}%
                     </td>
                     <td className="py-1 pr-2 text-right tabular-nums">{pct(r.cvar5Pct)}</td>
+                    {sized && (
+                      <td
+                        className={`py-1 pr-2 text-right tabular-nums ${
+                          r.money.totalPnl >= 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {money(r.money.totalPnl, ccy)}
+                      </td>
+                    )}
+                    {sized && (
+                      <td className="py-1 pr-2 text-right tabular-nums text-destructive">
+                        {money(r.money.worstLegPnl, ccy)}
+                      </td>
+                    )}
+                    {sized && (
+                      <td className="py-1 pr-2 text-right tabular-nums text-destructive">
+                        −{money(r.money.maxDrawdown, ccy, false)}
+                      </td>
+                    )}
                     <td className="py-1 pr-2 text-right tabular-nums">
+
                       {r.hitTakeProfit}/{r.hitStopLoss}/{r.timedOut}
                     </td>
                   </tr>
