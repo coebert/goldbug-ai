@@ -152,7 +152,11 @@ export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }
                   <th className="py-1 pr-2 text-right">Total</th>
                   <th className="py-1 pr-2 text-right">Max DD</th>
                   <th className="py-1 pr-2 text-right">CVaR5</th>
+                  {sized && <th className="py-1 pr-2 text-right">P&L ({ccy})</th>}
+                  {sized && <th className="py-1 pr-2 text-right">Worst leg</th>}
+                  {sized && <th className="py-1 pr-2 text-right">Max DD ({ccy})</th>}
                   <th className="py-1 pr-2 text-right">TP/SL/hold</th>
+
                 </tr>
               </thead>
               <tbody>
