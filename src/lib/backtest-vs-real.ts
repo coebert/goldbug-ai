@@ -135,7 +135,7 @@ export function curveStats(values: number[]): CurveStats {
   const ups = rets.filter((r) => r > 0).length;
   return {
     totalReturnPct: first !== 0 ? ((last - first) / Math.abs(first)) * 100 : 0,
-    maxDrawdownPct: dd.maxDrawdownPct,
+    maxDrawdownPct: dd.pct,
     bestDayPct: rets.length ? Math.max(...rets) * 100 : 0,
     worstDayPct: rets.length ? Math.min(...rets) * 100 : 0,
     upDayPct: rets.length ? (ups / rets.length) * 100 : null,
