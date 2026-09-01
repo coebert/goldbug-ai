@@ -61,7 +61,7 @@ function FxRiskPage() {
         <FxCashAtRiskCard portfolioId={id} />
         <FxLegHistoryCard portfolioId={id} />
         <FxStressReportCard portfolioId={id} />
-        <FxPlaybookBacktestCard />
+        <FxPlaybookBacktestCard portfolioId={id} />
       </main>
     </div>
   );
