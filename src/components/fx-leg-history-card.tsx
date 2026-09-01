@@ -80,7 +80,7 @@ function money(n: number, ccy: string) {
  * P&L path, followed by the decision log: the playbook verdict for the leg
  * and every signal that produced it.
  */
-export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
+export function FxLegHistoryCard({ portfolioId, active = true, pairFilter }: Props) {
   const [days, setDays] = useState<number>(182);
   const fetchHistory = useServerFn(getFxLegHistory);
 
@@ -92,7 +92,13 @@ export function FxLegHistoryCard({ portfolioId, active = true }: Props) {
     refetchInterval: POLL.SLOW,
   });
 
-  const legs = useMemo(() => query.data?.legs ?? [], [query.data]);
+  const legs = useMemo(() => {
+    const all = query.data?.legs ?? [];
+    if (!pairFilter) return all;
+    const want = pairFilter.toUpperCase();
+    return all.filter((l) => `${l.pairBase}${l.quoteCcy}`.toUpperCase() === want);
+  }, [query.data, pairFilter]);
+
 
   return (
     <Card>
