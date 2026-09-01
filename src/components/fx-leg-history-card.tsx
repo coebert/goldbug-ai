@@ -38,7 +38,10 @@ const PNL_COLOR = OKABE_ITO.orange;
 interface Props {
   portfolioId: string;
   active?: boolean;
+  /** Show only this pair (e.g. "GBPUSD"); undefined shows every open leg. */
+  pairFilter?: string;
 }
+
 
 const RANGES = [
   { label: "1M", days: 30 },
