@@ -183,6 +183,12 @@ export type FxBacktestMoney = {
   maxDrawdown: number;
   /** Cash curve (starts at `capital`) sampled at each leg close. */
   cashCurve: Array<{ date: string; cash: number }>;
+  /** Drawdown budget applied, as a fraction of capital (0 = no budget). */
+  drawdownBudgetPct: number;
+  /** Exit date of the leg that breached the budget, if the pair was stopped. */
+  stoppedAt: string | null;
+  /** Legs skipped because the pair was already stopped out. */
+  legsSkipped: number;
 };
 
 /**
@@ -193,18 +199,27 @@ export type FxBacktestMoney = {
  */
 export function sizeFxBacktest(
   result: Pick<FxBacktestResult, "trades">,
-  opts: { capital: number; leverage?: number },
+  opts: { capital: number; leverage?: number; drawdownBudgetPct?: number },
 ): FxBacktestMoney {
   const capital = Number.isFinite(opts.capital) && opts.capital > 0 ? opts.capital : 0;
   const leverage = Number.isFinite(opts.leverage) && (opts.leverage ?? 0) > 0 ? opts.leverage! : 1;
+  const budgetPct =
+    Number.isFinite(opts.drawdownBudgetPct) && (opts.drawdownBudgetPct ?? 0) > 0
+      ? opts.drawdownBudgetPct!
+      : 0;
 
   let equity = capital;
   let peak = capital;
   let maxDd = 0;
+  let stoppedAt: string | null = null;
   const legPnls: number[] = [];
   const cashCurve: Array<{ date: string; cash: number }> = [];
 
   for (const t of result.trades) {
+    // Drawdown budget: once the pair's cash curve has fallen further than the
+    // budget below its peak, the pair is closed for good — no new legs are
+    // opened, exactly like a live risk stop on the sleeve.
+    if (stoppedAt) break;
     // Notional scales with the surviving balance, so gains compound and a
     // drawdown automatically shrinks the next ticket.
     const notional = Math.max(0, equity) * leverage;
@@ -214,6 +229,9 @@ export function sizeFxBacktest(
     peak = Math.max(peak, equity);
     maxDd = Math.max(maxDd, peak - equity);
     cashCurve.push({ date: t.exitDate, cash: equity });
+    if (budgetPct > 0 && capital > 0 && peak - equity >= capital * budgetPct) {
+      stoppedAt = t.exitDate;
+    }
   }
 
   const sorted = [...legPnls].sort((a, b) => a - b);
@@ -232,5 +250,8 @@ export function sizeFxBacktest(
     cvar5Pnl: cvar5,
     maxDrawdown: maxDd,
     cashCurve,
+    drawdownBudgetPct: budgetPct,
+    stoppedAt,
+    legsSkipped: stoppedAt ? Math.max(0, result.trades.length - legPnls.length) : 0,
   };
 }

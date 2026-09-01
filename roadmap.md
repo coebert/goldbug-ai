@@ -14,3 +14,7 @@
 - [ ] Project monitoring: leverage ladder 3x overstatement, bare-pair Yahoo 404s, FX pair selector empty cards
 - [ ] FX risk history chart on the Summary tab (per-leg stress + P&L over time, not a single snapshot)
 - [ ] Auto-close FX legs that breach the loss budget (no click) + surface the close in the order status card
+- [x] Bare FX pairs (GBPUSD) and retired crypto tickers (ETHE.DE/VBTC.L) served stale cache — Yahoo symbol normalisation + live ETP swap
+- [x] Leverage ladder sized on one pair per run at full capital (real leverage, not three pairs sharing cash)
+- [x] Drawdown budget on the leverage ladder: each pair stops trading when its backtest drawdown crosses the budget
+- [x] Order status card rebuilt on real broker fills (status, fees, execution time per order)
