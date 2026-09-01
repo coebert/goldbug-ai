@@ -206,6 +206,7 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
             .filter((n) => !n.ccy || n.ccy === quoteCcy || n.ccy === pairBase)
             .slice(0, 5)
             .map(({ at, kind, reason }) => ({ at, kind, reason })),
+          actual: h.actual,
           error,
         };
       }),
