@@ -90,6 +90,19 @@ export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }
                 {y}y
               </Button>
             ))}
+            {portfolioId &&
+              [1, 2, 3].map((l) => (
+                <Button
+                  key={l}
+                  size="sm"
+                  variant={leverage === l ? "secondary" : "ghost"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setLeverage(l)}
+                >
+                  {l}× cash
+                </Button>
+              ))}
+
             <Button
               size="sm"
               className="h-7 px-3 text-xs"
