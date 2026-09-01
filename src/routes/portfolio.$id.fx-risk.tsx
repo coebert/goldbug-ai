@@ -41,8 +41,23 @@ export const Route = createFileRoute("/portfolio/$id/fx-risk")({
   notFoundComponent: () => <div className="p-6">Not found</div>,
 });
 
+const REFERENCE_PAIRS = ["GBPUSD", "GBPEUR", "EURUSD", "GBPJPY"];
+
 function FxRiskPage() {
   const { id } = Route.useParams();
+  const [pair, setPair] = useState<string | undefined>(undefined);
+  const quotesFn = useServerFn(getFxLegQuotes);
+  const quotes = useQuery({
+    queryKey: ["fx-leg-quotes", id],
+    queryFn: () => quotesFn({ data: { portfolioId: id } }),
+    refetchInterval: 60_000,
+  });
+
+  const openPairs = Array.from(
+    new Set((quotes.data?.legs ?? []).map((l) => `${l.pairBase}${l.quoteCcy}`)),
+  );
+  const pairs = Array.from(new Set([...openPairs, ...REFERENCE_PAIRS]));
+
   return (
     <div className="min-h-dvh bg-background">
       <AppHeader />
@@ -64,11 +79,37 @@ function FxRiskPage() {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Currency pair">
+          <span className="mr-1 text-xs text-muted-foreground">Pair:</span>
+          <Button
+            size="sm"
+            variant={pair === undefined ? "secondary" : "ghost"}
+            className="h-7 px-2.5 text-xs"
+            onClick={() => setPair(undefined)}
+          >
+            All
+          </Button>
+          {pairs.map((p) => (
+            <Button
+              key={p}
+              size="sm"
+              variant={pair === p ? "secondary" : "ghost"}
+              className="h-7 px-2.5 text-xs"
+              onClick={() => setPair(p)}
+            >
+              {p}
+              {openPairs.includes(p) ? " •" : ""}
+            </Button>
+          ))}
+        </div>
+
         <FxCashAtRiskCard portfolioId={id} />
-        <FxLegHistoryCard portfolioId={id} />
-        <FxStressReportCard portfolioId={id} />
-        <FxPlaybookBacktestCard portfolioId={id} />
+        <FxLegRowsCard portfolioId={id} selectedPair={pair} onSelectPair={setPair} />
+        <FxLegHistoryCard portfolioId={id} pairFilter={pair} />
+        <FxStressReportCard portfolioId={id} pairFilter={pair} />
+        <FxPlaybookBacktestCard portfolioId={id} pairs={pair ? [pair] : undefined} />
       </main>
     </div>
   );
 }
+
