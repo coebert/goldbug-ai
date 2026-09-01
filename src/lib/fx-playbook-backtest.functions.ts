@@ -15,6 +15,8 @@ export type FxPlaybookBacktestResponse = {
   /** Cash the money columns are sized from, and where it came from. */
   capital: number;
   capitalSource: "portfolio_cash" | "starting_cash" | "override" | "none";
+  /** Cash slice allocated to each pair in the run (capital / pairs). */
+  capitalPerPair: number;
   currency: string;
   leverage: number;
   results: Array<FxBacktestResult & { error?: string; money: FxBacktestMoney }>;
@@ -114,6 +116,7 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
       costBps: data.costBps,
       side: data.side,
       capital,
+      capitalPerPair: perPairCapital,
       capitalSource,
       currency,
       leverage: data.leverage,
