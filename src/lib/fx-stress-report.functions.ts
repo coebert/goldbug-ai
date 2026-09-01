@@ -40,6 +40,12 @@ export const getFxStressReport = createServerFn({ method: "GET" })
         navBase: z.number().positive().optional(),
         /** Notional (quote ccy) for the synthetic reference leg. */
         referenceNotional: z.number().positive().default(10_000),
+        /**
+         * Pairs to synthesise a reference leg for when they are not held, so
+         * the dashboard's currency picker can stress any pair, not just open
+         * exposure.
+         */
+        referencePairs: z.array(z.string().length(6)).max(8).default(["GBPUSD"]),
       })
       .parse(i),
   )
