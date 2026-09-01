@@ -85,8 +85,16 @@ export function FxLegHistoryCard({ portfolioId, active = true, pairFilter }: Pro
   const fetchHistory = useServerFn(getFxLegHistory);
 
   const query = useQuery({
-    queryKey: ["fx-leg-history", portfolioId, days],
-    queryFn: () => fetchHistory({ data: { portfolioId, days } }),
+    queryKey: ["fx-leg-history", portfolioId, days, pairFilter ?? "all"],
+    queryFn: () =>
+      fetchHistory({
+        data: {
+          portfolioId,
+          days,
+          // Chart the picked pair even when nothing is held in it.
+          referencePairs: pairFilter ? [pairFilter.toUpperCase()] : [],
+        },
+      }),
     enabled: active,
     staleTime: 60_000,
     refetchInterval: POLL.SLOW,
