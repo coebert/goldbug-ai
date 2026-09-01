@@ -170,9 +170,26 @@ export function FxLegRowsCard({
                       <td className="py-1.5 pr-2 text-right tabular-nums text-destructive">
                         {st ? money(st.report.worstCaseBase, baseCcy) : "—"}
                       </td>
+                      <td className="py-1.5 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          disabled={l.rate == null || l.stale || closeMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPending(l);
+                          }}
+                        >
+                          {closeMutation.isPending && closeMutation.variables === l.symbol
+                            ? "Closing…"
+                            : "Close"}
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
+
               </tbody>
             </table>
           </div>
