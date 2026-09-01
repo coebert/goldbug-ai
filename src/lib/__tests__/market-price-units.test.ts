@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isLseGbxDisplayQuoted,
   isLsePenceQuoted,
+  normalizeLseDisplayPriceToBase,
   marketQuoteCurrency,
   normalizeMarketPriceForTrading,
 } from "@/lib/market-price-units";
