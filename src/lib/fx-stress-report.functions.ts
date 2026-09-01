@@ -84,20 +84,21 @@ export const getFxStressReport = createServerFn({ method: "GET" })
           actual: true,
         };
       });
-    // Always include a GBPUSD reference leg so the report answers the
-    // "what if I held one" question even with no open FX exposure.
-    if (!legsIn.some((l) => l.symbol.toUpperCase().startsWith("GBPUSD"))) {
+    // Add a synthetic reference leg for every requested pair that is not held,
+    // so the picker can stress any pair and never renders an empty card.
+    for (const raw of data.referencePairs.length > 0 ? data.referencePairs : ["GBPUSD"]) {
+      const ref = raw.toUpperCase();
+      const quote = ref.slice(3, 6);
+      if (legsIn.some((l) => `${parseFxPair(l.symbol, l.quoteCcy)?.base ?? ""}${l.quoteCcy}` === ref)) continue;
+      if (legsIn.some((l) => l.symbol.toUpperCase().startsWith(ref))) continue;
       legsIn.push({
-        symbol: "GBPUSD",
+        symbol: ref,
         quantity: -data.referenceNotional, // short-base reference, sized below
         avgCost: 0, // set to the current rate once fetched
-        quoteCcy: "USD",
+        quoteCcy: quote,
         actual: false,
       });
     }
-
-    const legs = await Promise.all(
-      legsIn.map(async (l): Promise<FxStressLegReport> => {
         const pair = parseFxPair(l.symbol, l.quoteCcy);
         const pairBase = pair?.base ?? baseCcy;
         const pairKey = `${pairBase}${l.quoteCcy}`;
