@@ -19,6 +19,7 @@ import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCir
 import { toast } from "sonner";
 import { Explain } from "@/components/explain";
 import { qk, POLL } from "@/lib/query-keys";
+import { OrderFillsCard } from "@/components/order-fills-card";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const qc = useQueryClient();
