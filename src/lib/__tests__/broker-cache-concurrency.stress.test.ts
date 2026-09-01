@@ -72,9 +72,9 @@ const APPROVED = approvedCryptoEtps();
 const ASSET_TYPE_FOR: Record<string, string> = {
   "BTCE.DE": "Etn",
   "ABTC.SW": "Etp",
-  "VBTC.L":  "Etc",
+  "BTCW.L":  "Etc",
   "ZETH.SW": "Etp",
-  "ETHE.DE": "Etn",
+  "ZETH.DE": "Etn",
   "HODL.SW": "Etp",
 };
 

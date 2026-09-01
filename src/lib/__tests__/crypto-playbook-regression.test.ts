@@ -29,9 +29,9 @@ import type { RegimeLabel } from "../regime-detector.server";
 const APPROVED_ETPS = {
   "BTCE.DE": "BTC",
   "ABTC.SW": "BTC",
-  "VBTC.L":  "BTC",
+  "BTCW.L":  "BTC",
   "ZETH.SW": "ETH",
-  "ETHE.DE": "ETH",
+  "ZETH.DE": "ETH",
   "HODL.SW": "Basket",
 } as const;
 

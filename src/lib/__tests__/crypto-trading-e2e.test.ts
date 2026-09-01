@@ -73,9 +73,9 @@ const MID_SESSION = new Date("2026-01-14T11:00:00Z");
 const APPROVED_ETPS = [
   "BTCE.DE",
   "ABTC.SW",
-  "VBTC.L",
+  "BTCW.L",
   "ZETH.SW",
-  "ETHE.DE",
+  "ZETH.DE",
   "HODL.SW",
 ] as const;
 

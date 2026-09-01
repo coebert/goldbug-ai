@@ -56,7 +56,7 @@ export function classifyCryptoProposal(
     return {
       needsValidation: true,
       meta,
-      failFast: `crypto ${meta.symbol} blocked: spot pair not routable via Saxo (use a physically-backed ETP e.g. BTCE.DE / VBTC.L / ABTC.SW)`,
+      failFast: `crypto ${meta.symbol} blocked: spot pair not routable via Saxo (use a physically-backed ETP e.g. BTCE.DE / BTCW.L / ABTC.SW)`,
     };
   }
   if (!Number.isFinite(input.price ?? NaN) || (input.price ?? 0) <= 0) {
@@ -242,7 +242,7 @@ export const CRYPTO_PRETRADE_CONFIG: CryptoPreTradeConfig = {
   estimated_fee_pct: 0.0010,        // 10 bps
   estimated_fee_min_local: 5,       // per-order floor in the ETP's local ccy
   // Minimum whole-unit lot size for the approved crypto ETPs. All six
-  // (BTCE.DE, ABTC.SW, VBTC.L, ZETH.SW, ETHE.DE, HODL.SW) are cash equities
+  // (BTCE.DE, ABTC.SW, BTCW.L, ZETH.SW, ZETH.DE, HODL.SW) are cash equities
   // that trade in whole shares on their listing venue.
   lot_size: 1,
   // Minimum acceptable order notional expressed in the ETP's local ccy.

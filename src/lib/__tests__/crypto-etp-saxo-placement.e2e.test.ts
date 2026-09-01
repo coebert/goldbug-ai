@@ -35,9 +35,9 @@ import type {
 const APPROVED_ETPS = [
   "BTCE.DE",
   "ABTC.SW",
-  "VBTC.L",
+  "BTCW.L",
   "ZETH.SW",
-  "ETHE.DE",
+  "ZETH.DE",
   "HODL.SW",
 ] as const;
 
@@ -161,11 +161,11 @@ describe("E2E: Saxo order placement for the six crypto ETPs", () => {
     const sleeveCap = equity * sleevePct;
     const perSymbolCap = sleeveCap / APPROVED_ETPS.length;
 
-    // One thin-liquidity ETP (VBTC.L) has an ADV small enough that the
+    // One thin-liquidity ETP (BTCW.L) has an ADV small enough that the
     // 1% participation cap has to trim the order — this is the liquidity
     // gate we want to prove fires end-to-end. ADV chosen so the trimmed
     // notional still clears the fee gate (fee_min / max_fee_pct ≈ £333).
-    const THIN = "VBTC.L";
+    const THIN = "BTCW.L";
     const THIN_ADV = 60_000; // 1% = 600 → below perSymbolCap, above fee floor
     const proposals: Proposal[] = APPROVED_ETPS.map((sym) => ({
       symbol: sym,

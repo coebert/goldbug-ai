@@ -98,9 +98,9 @@ export const UNIVERSE: UniverseSymbol[] = [
   // the group map and `crypto-playbook.server.ts` for entry/exit rules.
   { symbol: "BTCE.DE", name: "BTCetc Physical Bitcoin (XETRA)", asset_class: "crypto" },
   { symbol: "ABTC.SW", name: "21Shares Bitcoin ETP (SIX)", asset_class: "crypto" },
-  { symbol: "VBTC.L",  name: "WisdomTree Physical Bitcoin (LON)", asset_class: "crypto" },
+  { symbol: "BTCW.L",  name: "WisdomTree Physical Bitcoin (LON)", asset_class: "crypto" },
   { symbol: "ZETH.SW", name: "21Shares Ethereum ETP (SIX)", asset_class: "crypto" },
-  { symbol: "ETHE.DE", name: "ETC Group Physical Ethereum (XETRA)", asset_class: "crypto" },
+  { symbol: "ZETH.DE", name: "ETC Group Physical Ethereum (XETRA)", asset_class: "crypto" },
   { symbol: "HODL.SW", name: "21Shares Crypto Basket Index ETP (SIX)", asset_class: "crypto" },
   // Commodities — LSE-listed physically-backed ETCs/ETFs (Saxo-tradable
   // AssetType=Etc/Etf). Futures pseudo-symbols like GC=F/SI=F/CL=F are

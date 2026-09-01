@@ -3,8 +3,8 @@
 // Locks three invariants that must hold together for the crypto sleeve to be
 // coherent, and which have regressed independently in the past:
 //
-//   1. The six Saxo-tradable crypto ETPs (BTCE.DE, ABTC.SW, VBTC.L, ZETH.SW,
-//      ETHE.DE, HODL.SW) are ALWAYS present in the classifier map, the
+//   1. The six Saxo-tradable crypto ETPs (BTCE.DE, ABTC.SW, BTCW.L, ZETH.SW,
+//      ZETH.DE, HODL.SW) are ALWAYS present in the classifier map, the
 //      investable universe, and every sleeve-decision output.
 //   2. Sleeve caps by risk level match the playbook narrative (5/10/15%),
 //      the regime multipliers behave as documented, and the risk_off hard
@@ -63,9 +63,9 @@ import {
 const SAXO_TRADABLE_CRYPTO_ETPS = [
   "BTCE.DE",
   "ABTC.SW",
-  "VBTC.L",
+  "BTCW.L",
   "ZETH.SW",
-  "ETHE.DE",
+  "ZETH.DE",
   "HODL.SW",
 ] as const;
 
@@ -96,9 +96,9 @@ describe("crypto ETP universe wiring", () => {
   it("assigns each ETP to the documented group (BTC/ETH/Basket)", () => {
     expect(classifyCryptoSymbol("BTCE.DE")).toBe("BTC");
     expect(classifyCryptoSymbol("ABTC.SW")).toBe("BTC");
-    expect(classifyCryptoSymbol("VBTC.L")).toBe("BTC");
+    expect(classifyCryptoSymbol("BTCW.L")).toBe("BTC");
     expect(classifyCryptoSymbol("ZETH.SW")).toBe("ETH");
-    expect(classifyCryptoSymbol("ETHE.DE")).toBe("ETH");
+    expect(classifyCryptoSymbol("ZETH.DE")).toBe("ETH");
     expect(classifyCryptoSymbol("HODL.SW")).toBe("Basket");
   });
 
