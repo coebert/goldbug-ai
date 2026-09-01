@@ -175,7 +175,7 @@ describe("curveStats", () => {
     expect(s.totalReturnPct).toBeCloseTo(-1, 6);
     expect(s.maxDrawdownPct).toBeLessThan(0);
     expect(s.maxDrawdownPct).toBeCloseTo(-20, 6);
-    expect(s.bestDayPct).toBeCloseTo(10, 6);
+    expect(s.bestDayPct).toBeCloseTo(12.5, 6); // 88 → 99
     expect(s.worstDayPct).toBeCloseTo(-20, 6);
     expect(s.upDayPct).toBeCloseTo((2 / 3) * 100, 6);
   });
