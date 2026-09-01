@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { Metric } from "@/components/portfolio-detail/metric";
 import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+import { FxRiskAlertCard } from "@/components/fx-risk-alert-card";
+
 import { FxLegRowsCard } from "@/components/fx-leg-rows-card";
 import { FxLeverageLadderCard } from "@/components/fx-leverage-ladder-card";
 import { getPortfolio } from "@/lib/portfolios.functions";
