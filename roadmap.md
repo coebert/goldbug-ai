@@ -21,3 +21,4 @@
 - [x] Trading dashboard page: open positions, pending orders, real broker fills, P&L / drawdown / risk charts, trade actions
 - [x] Retired crypto tickers (ETHE.DE, VBTC.L) must quote live; surface a warning when a symbol is unavailable/stale
 - [ ] Trade tab strategy builder: per-symbol entry / stop-loss / take-profit rules that place orders automatically
+- [ ] Test trades on ZETH.DE / BTCW.L via Trade tab and verify broker-fills table matches broker
