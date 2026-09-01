@@ -82,7 +82,16 @@ function LegTable({ leg, baseCcy }: { leg: FxStressLegReport; baseCcy: string })
  * ~20 years of ECB closes — all valued net of the spot exit fee. Goes beyond
  * the playbook backtest, which only sees realised tape.
  */
-export function FxStressReportCard({ portfolioId, active }: { portfolioId: string; active?: boolean }) {
+export function FxStressReportCard({
+  portfolioId,
+  active,
+  pairFilter,
+}: {
+  portfolioId: string;
+  active?: boolean;
+  /** Show only this pair (e.g. "GBPUSD"); undefined shows every leg. */
+  pairFilter?: string;
+}) {
   const fn = useServerFn(getFxStressReport);
   const q = useQuery({
     queryKey: ["fx-stress-report", portfolioId],
@@ -90,6 +99,10 @@ export function FxStressReportCard({ portfolioId, active }: { portfolioId: strin
     staleTime: 30 * 60_000,
     enabled: active !== false,
   });
+  const shownLegs = (q.data?.legs ?? []).filter(
+    (l) => !pairFilter || l.pair.toUpperCase() === pairFilter.toUpperCase(),
+  );
+
 
   return (
     <Card>
@@ -108,12 +121,14 @@ export function FxStressReportCard({ portfolioId, active }: { portfolioId: strin
         {q.isError && (
           <p className="text-xs text-muted-foreground">Stress report unavailable right now.</p>
         )}
-        {q.data?.legs.map((leg) => (
-          <LegTable key={leg.symbol} leg={leg} baseCcy={q.data.baseCcy} />
-        ))}
-        {q.data && q.data.legs.length === 0 && (
+        {q.data &&
+          shownLegs.map((leg) => (
+            <LegTable key={leg.symbol} leg={leg} baseCcy={q.data.baseCcy} />
+          ))}
+        {q.data && shownLegs.length === 0 && (
           <p className="text-xs text-muted-foreground">No FX legs to stress.</p>
         )}
+
         <p className="text-[11px] leading-snug text-muted-foreground">
           Scenarios apply the move instantly to the current rate and value the leg at close, net of
           the estimated exit fee. Gaps use the historical daily-move distribution; historical-worst

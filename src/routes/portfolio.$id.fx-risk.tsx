@@ -1,12 +1,18 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
+import { FxLegRowsCard } from "@/components/fx-leg-rows-card";
 import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
 import { FxStressReportCard } from "@/components/fx-stress-report-card";
 import { FxPlaybookBacktestCard } from "@/components/fx-playbook-backtest-card";
+import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
+
 
 const TITLE = "FX Risk Dashboard — Aegis";
 const DESC =
@@ -35,8 +41,23 @@ export const Route = createFileRoute("/portfolio/$id/fx-risk")({
   notFoundComponent: () => <div className="p-6">Not found</div>,
 });
 
+const REFERENCE_PAIRS = ["GBPUSD", "GBPEUR", "EURUSD", "GBPJPY"];
+
 function FxRiskPage() {
   const { id } = Route.useParams();
+  const [pair, setPair] = useState<string | undefined>(undefined);
+  const quotesFn = useServerFn(getFxLegQuotes);
+  const quotes = useQuery({
+    queryKey: ["fx-leg-quotes", id],
+    queryFn: () => quotesFn({ data: { portfolioId: id } }),
+    refetchInterval: 60_000,
+  });
+
+  const openPairs = Array.from(
+    new Set((quotes.data?.legs ?? []).map((l) => `${l.pairBase}${l.quoteCcy}`)),
+  );
+  const pairs = Array.from(new Set([...openPairs, ...REFERENCE_PAIRS]));
+
   return (
     <div className="min-h-dvh bg-background">
       <AppHeader />
@@ -58,11 +79,37 @@ function FxRiskPage() {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Currency pair">
+          <span className="mr-1 text-xs text-muted-foreground">Pair:</span>
+          <Button
+            size="sm"
+            variant={pair === undefined ? "secondary" : "ghost"}
+            className="h-7 px-2.5 text-xs"
+            onClick={() => setPair(undefined)}
+          >
+            All
+          </Button>
+          {pairs.map((p) => (
+            <Button
+              key={p}
+              size="sm"
+              variant={pair === p ? "secondary" : "ghost"}
+              className="h-7 px-2.5 text-xs"
+              onClick={() => setPair(p)}
+            >
+              {p}
+              {openPairs.includes(p) ? " •" : ""}
+            </Button>
+          ))}
+        </div>
+
         <FxCashAtRiskCard portfolioId={id} />
-        <FxLegHistoryCard portfolioId={id} />
-        <FxStressReportCard portfolioId={id} />
-        <FxPlaybookBacktestCard portfolioId={id} />
+        <FxLegRowsCard portfolioId={id} selectedPair={pair} onSelectPair={setPair} />
+        <FxLegHistoryCard portfolioId={id} pairFilter={pair} />
+        <FxStressReportCard portfolioId={id} pairFilter={pair} />
+        <FxPlaybookBacktestCard portfolioId={id} pairs={pair ? [pair] : undefined} />
       </main>
     </div>
   );
 }
+

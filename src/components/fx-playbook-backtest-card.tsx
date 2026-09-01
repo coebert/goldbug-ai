@@ -35,17 +35,25 @@ const CAPITAL_LABEL: Record<string, string> = {
  * Sized on the portfolio's real cash balance and the chosen leverage, so the
  * P&L and drawdown columns are actual money, not per-unit percentages.
  */
-export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }) {
+export function FxPlaybookBacktestCard({
+  portfolioId,
+  pairs,
+}: {
+  portfolioId?: string;
+  pairs?: string[];
+}) {
   const [side, setSide] = useState<"short" | "long">("short");
   const [years, setYears] = useState(10);
   const [leverage, setLeverage] = useState(1);
   const run = useServerFn(backtestFxPlaybook);
+  const runPairs = pairs && pairs.length > 0 ? pairs : PAIRS;
 
   const mutation = useMutation({
     mutationFn: () =>
       run({
         data: {
-          pairs: PAIRS,
+          pairs: runPairs,
+
           years,
           side,
           costBps: 6,
