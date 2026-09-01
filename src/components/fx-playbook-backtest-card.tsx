@@ -12,21 +12,55 @@ function pct(n: number, digits = 2) {
   return `${n >= 0 ? "+" : "−"}${(Math.abs(n) * 100).toFixed(digits)}%`;
 }
 
+function money(n: number, ccy: string, signed = true) {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: ccy || "GBP",
+    maximumFractionDigits: 0,
+    signDisplay: signed ? "exceptZero" : "auto",
+  }).format(n);
+}
+
+const CAPITAL_LABEL: Record<string, string> = {
+  portfolio_cash: "live portfolio cash",
+  starting_cash: "starting cash (no live balance)",
+  override: "manual capital",
+  none: "no portfolio cash — percentages only",
+};
+
 /**
  * Runs the FX funding-leg playbook (−1.5% cut, +2.0% take, 30-day max hold)
  * over a decade of ECB daily closes so the rules can be judged on realised
  * hit rate, compounded return and worst-case drawdown before live capital.
+ * Sized on the portfolio's real cash balance and the chosen leverage, so the
+ * P&L and drawdown columns are actual money, not per-unit percentages.
  */
-export function FxPlaybookBacktestCard() {
+export function FxPlaybookBacktestCard({ portfolioId }: { portfolioId?: string }) {
   const [side, setSide] = useState<"short" | "long">("short");
   const [years, setYears] = useState(10);
+  const [leverage, setLeverage] = useState(1);
   const run = useServerFn(backtestFxPlaybook);
 
   const mutation = useMutation({
-    mutationFn: () => run({ data: { pairs: PAIRS, years, side, costBps: 6, maxHoldDays: 30 } }),
+    mutationFn: () =>
+      run({
+        data: {
+          pairs: PAIRS,
+          years,
+          side,
+          costBps: 6,
+          maxHoldDays: 30,
+          leverage,
+          ...(portfolioId ? { portfolioId } : {}),
+        },
+      }),
   });
 
   const results = mutation.data?.results ?? [];
+  const ccy = mutation.data?.currency ?? "GBP";
+  const capital = mutation.data?.capital ?? 0;
+  const sized = capital > 0;
+
 
   return (
     <Card>
