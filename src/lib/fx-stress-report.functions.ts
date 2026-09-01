@@ -40,6 +40,12 @@ export const getFxStressReport = createServerFn({ method: "GET" })
         navBase: z.number().positive().optional(),
         /** Notional (quote ccy) for the synthetic reference leg. */
         referenceNotional: z.number().positive().default(10_000),
+        /**
+         * Pairs to synthesise a reference leg for when they are not held, so
+         * the dashboard's currency picker can stress any pair, not just open
+         * exposure.
+         */
+        referencePairs: z.array(z.string().length(6)).max(8).default(["GBPUSD"]),
       })
       .parse(i),
   )
@@ -78,14 +84,18 @@ export const getFxStressReport = createServerFn({ method: "GET" })
           actual: true,
         };
       });
-    // Always include a GBPUSD reference leg so the report answers the
-    // "what if I held one" question even with no open FX exposure.
-    if (!legsIn.some((l) => l.symbol.toUpperCase().startsWith("GBPUSD"))) {
+    // Add a synthetic reference leg for every requested pair that is not held,
+    // so the picker can stress any pair and never renders an empty card.
+    for (const raw of data.referencePairs.length > 0 ? data.referencePairs : ["GBPUSD"]) {
+      const ref = raw.toUpperCase();
+      const quote = ref.slice(3, 6);
+      if (legsIn.some((l) => `${parseFxPair(l.symbol, l.quoteCcy)?.base ?? ""}${l.quoteCcy}` === ref)) continue;
+      if (legsIn.some((l) => l.symbol.toUpperCase().startsWith(ref))) continue;
       legsIn.push({
-        symbol: "GBPUSD",
+        symbol: ref,
         quantity: -data.referenceNotional, // short-base reference, sized below
         avgCost: 0, // set to the current rate once fetched
-        quoteCcy: "USD",
+        quoteCcy: quote,
         actual: false,
       });
     }

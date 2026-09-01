@@ -14,10 +14,10 @@ export const CRYPTO_SYMBOL_MAP: Record<string, CryptoGroup> = {
   // Bitcoin
   "BTCE.DE": "BTC",   // BTCetc Physical Bitcoin (XETRA)
   "ABTC.SW": "BTC",   // 21Shares Bitcoin ETP (SIX)
-  "VBTC.L":  "BTC",   // WisdomTree Physical Bitcoin (LSE)
+  "BTCW.L":  "BTC",   // WisdomTree Physical Bitcoin (LSE)
   // Ethereum
   "ZETH.SW": "ETH",   // 21Shares Ethereum ETP (SIX)
-  "ETHE.DE": "ETH",   // ETC Group Physical Ethereum (XETRA)
+  "ZETH.DE": "ETH",   // ETC Group Physical Ethereum (XETRA)
   // Diversified basket
   "HODL.SW": "Basket", // 21Shares Crypto Basket Index ETP
 };

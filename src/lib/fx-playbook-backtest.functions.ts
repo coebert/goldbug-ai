@@ -15,6 +15,8 @@ export type FxPlaybookBacktestResponse = {
   /** Cash the money columns are sized from, and where it came from. */
   capital: number;
   capitalSource: "portfolio_cash" | "starting_cash" | "override" | "none";
+  /** Cash slice allocated to each pair in the run (capital / pairs). */
+  capitalPerPair: number;
   currency: string;
   leverage: number;
   results: Array<FxBacktestResult & { error?: string; money: FxBacktestMoney }>;
@@ -78,6 +80,8 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
       }
     }
 
+    const perPairCapital = capital / Math.max(1, data.pairs.length);
+
     const results = await Promise.all(
       data.pairs.map(async (p) => {
         const pair = p.toUpperCase();
@@ -99,7 +103,10 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
         }
         return {
           ...result,
-          money: sizeFxBacktest(result, { capital, leverage: data.leverage }),
+          // Cash is shared across the pairs in the run: each leg gets an equal
+          // slice, so summing the per-pair money columns never implies more
+          // capital than the portfolio actually has.
+          money: sizeFxBacktest(result, { capital: perPairCapital, leverage: data.leverage }),
         };
       }),
     );
@@ -109,6 +116,7 @@ export const backtestFxPlaybook = createServerFn({ method: "POST" })
       costBps: data.costBps,
       side: data.side,
       capital,
+      capitalPerPair: perPairCapital,
       capitalSource,
       currency,
       leverage: data.leverage,

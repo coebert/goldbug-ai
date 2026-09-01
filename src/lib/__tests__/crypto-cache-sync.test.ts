@@ -132,9 +132,9 @@ describe("crypto-cache-sync", () => {
       { symbol: "BTCE.DE", env: "sim", asset_type: "Stock", refreshed_at: FRESH },
       // ABTC.SW stale
       { symbol: "ABTC.SW", env: "sim", asset_type: "Etp", refreshed_at: stale },
-      // VBTC.L fresh + valid
-      freshRow("VBTC.L", "sim"),
-      // ZETH.SW / ETHE.DE / HODL.SW missing entirely
+      // BTCW.L fresh + valid
+      freshRow("BTCW.L", "sim"),
+      // ZETH.SW / ZETH.DE / HODL.SW missing entirely
       // unknown symbol drift
       { symbol: "FOO.XX", env: "sim", asset_type: "Etp", refreshed_at: FRESH },
     ];
@@ -144,6 +144,6 @@ describe("crypto-cache-sync", () => {
     expect(report.summary).toMatch(/wrongAssetType=/);
     expect(report.summary).toMatch(/stale=/);
     expect(report.summary).toMatch(/unknown=/);
-    expect(report.drift.missing).toEqual(["ETHE.DE", "HODL.SW", "ZETH.SW"]);
+    expect(report.drift.missing).toEqual(["HODL.SW", "ZETH.DE", "ZETH.SW"]);
   });
 });

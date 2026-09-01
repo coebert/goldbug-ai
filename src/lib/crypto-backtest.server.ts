@@ -566,9 +566,9 @@ function summariseBenchmarkCurve(
 export const CRYPTO_BACKTEST_SYMBOLS: Array<{ symbol: string; group: CryptoGroup }> = [
   { symbol: "BTCE.DE", group: "BTC" },
   { symbol: "ABTC.SW", group: "BTC" },
-  { symbol: "VBTC.L",  group: "BTC" },
+  { symbol: "BTCW.L",  group: "BTC" },
   { symbol: "ZETH.SW", group: "ETH" },
-  { symbol: "ETHE.DE", group: "ETH" },
+  { symbol: "ZETH.DE", group: "ETH" },
   { symbol: "HODL.SW", group: "Basket" },
 ];
 

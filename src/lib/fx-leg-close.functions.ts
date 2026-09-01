@@ -185,6 +185,28 @@ export const closeFxLeg = createServerFn({ method: "POST" })
     const { error: dErr } = await supabase.from("holdings").delete().eq("id", holding.id);
     if (dErr) return { ok: false, reason: "HOLDING_WRITE_FAILED", detail: dErr.message };
 
+    // Record the close as a filled order so it appears in the order status /
+    // reconciliation views alongside equity trades.
+    try {
+      await supabase.from("live_orders").insert({
+        portfolio_id: String(p.id),
+        user_id: userId,
+        broker: execution === "spot" ? "saxo" : "internal",
+        symbol: String(holding.symbol),
+        side: qty < 0 ? "buy" : "sell",
+        quantity: Math.abs(qty),
+        order_type: "market",
+        limit_price: fillRate,
+        status: "filled",
+        broker_order_id: brokerOrderId,
+        client_order_id: `close-fx-${String(p.id).slice(0, 8)}-${Date.now()}`,
+        instrument_ccy: quoteCcy,
+        submitted_at: new Date().toISOString(),
+      });
+    } catch {
+      // order-log write is best-effort; the wallet and holding are authoritative
+    }
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.from("live_broker_log").insert({

@@ -35,12 +35,23 @@ async function closeBody(res: Response): Promise<void> {
   }
 }
 
+/**
+ * Yahoo quotes FX as "GBPUSD=X". Bare six-letter pairs reach this fetcher from
+ * the FX leg/stress/backtest paths and 404 forever, silently serving stale
+ * cache — so normalise them here.
+ */
+export function toYahooSymbol(symbol: string): string {
+  const s = symbol.trim().toUpperCase();
+  if (/^[A-Z]{6}$/.test(s)) return `${s}=X`;
+  return symbol;
+}
+
 async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> {
   // range picks: buffer to ensure we get `days` trading days back
   const range =
     days <= 30 ? "3mo" : days <= 180 ? "1y" : days <= 365 ? "2y" : days <= 1200 ? "5y" : "10y";
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    symbol,
+    toYahooSymbol(symbol),
   )}?interval=1d&range=${range}`;
   const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
   const res = await runWithBreaker("yahoo", () =>

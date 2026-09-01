@@ -17,11 +17,11 @@ const WED_LOCAL_11 = new Date("2026-01-14T10:00:00Z"); // 11:00 CET / 10:00 UTC
 describe("sessionForCryptoEtp", () => {
   it("maps each approved ETP suffix to its venue", () => {
     expect(sessionForCryptoEtp("BTCE.DE")?.label).toBe("XETRA");
-    expect(sessionForCryptoEtp("ETHE.DE")?.label).toBe("XETRA");
+    expect(sessionForCryptoEtp("ZETH.DE")?.label).toBe("XETRA");
     expect(sessionForCryptoEtp("ABTC.SW")?.label).toBe("SIX");
     expect(sessionForCryptoEtp("ZETH.SW")?.label).toBe("SIX");
     expect(sessionForCryptoEtp("HODL.SW")?.label).toBe("SIX");
-    expect(sessionForCryptoEtp("VBTC.L")?.label).toBe("LSE");
+    expect(sessionForCryptoEtp("BTCW.L")?.label).toBe("LSE");
   });
   it("returns null for unknown suffixes", () => {
     expect(sessionForCryptoEtp("AAPL")).toBeNull();
@@ -31,12 +31,12 @@ describe("sessionForCryptoEtp", () => {
 describe("isCryptoEtpVenueOpen", () => {
   it("open mid-session on a weekday", () => {
     expect(isCryptoEtpVenueOpen("BTCE.DE", WED_LOCAL_11).open).toBe(true);
-    expect(isCryptoEtpVenueOpen("VBTC.L",  WED_LOCAL_11).open).toBe(true);
+    expect(isCryptoEtpVenueOpen("BTCW.L",  WED_LOCAL_11).open).toBe(true);
     expect(isCryptoEtpVenueOpen("ZETH.SW", WED_LOCAL_11).open).toBe(true);
   });
   it("closed on weekends for every ETP venue", () => {
     const sat = new Date("2026-01-17T11:00:00Z"); // Saturday
-    for (const sym of ["BTCE.DE", "ABTC.SW", "VBTC.L", "ZETH.SW", "ETHE.DE", "HODL.SW"]) {
+    for (const sym of ["BTCE.DE", "ABTC.SW", "BTCW.L", "ZETH.SW", "ZETH.DE", "HODL.SW"]) {
       const r = isCryptoEtpVenueOpen(sym, sat);
       expect(r.open, `${sym} should be closed on Saturday`).toBe(false);
       expect(r.reason).toMatch(/weekend/i);

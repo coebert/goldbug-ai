@@ -31,6 +31,8 @@ export type FxLegHistory = {
   verdict: FxLegPlaybookVerdict;
   /** Most recent AI reasons that touched this currency. */
   aiNotes: Array<{ at: string; kind: string; reason: string }>;
+  /** False for synthetic reference pairs the portfolio does not actually hold. */
+  actual: boolean;
   error: string | null;
 };
 
@@ -52,6 +54,13 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
       .object({
         portfolioId: z.string().uuid(),
         days: z.number().int().min(7).max(7300).default(90),
+        /**
+         * Pairs to include as synthetic reference legs when they are not held,
+         * so the currency picker can chart any pair.
+         */
+        referencePairs: z.array(z.string().length(6)).max(8).default([]),
+        /** Notional (quote ccy) used to size a synthetic reference leg. */
+        referenceNotional: z.number().positive().default(10_000),
       })
       .parse(i),
   )
@@ -79,7 +88,37 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
 
     const baseCcy = String(portfolio?.currency ?? "GBP").toUpperCase();
     const all = holdings ?? [];
-    const fxRows = all.filter((h) => h.asset_class === "fx" && Number(h.quantity) !== 0);
+    type LegRow = {
+      symbol: string;
+      quantity: number;
+      avg_cost: number;
+      instrument_ccy: string | null;
+      actual: boolean;
+    };
+    const fxRows: LegRow[] = all
+      .filter((h) => h.asset_class === "fx" && Number(h.quantity) !== 0)
+      .map((h) => ({
+        symbol: String(h.symbol),
+        quantity: Number(h.quantity),
+        avg_cost: Number(h.avg_cost),
+        instrument_ccy: h.instrument_ccy ?? null,
+        actual: true,
+      }));
+    // Synthetic reference legs for requested pairs with no open exposure: they
+    // chart the same rate path and playbook read on a notional-sized position.
+    for (const raw of data.referencePairs) {
+      const ref = raw.toUpperCase();
+      const quote = ref.slice(3, 6);
+      if (fxRows.some((r) => `${parseFxPair(r.symbol, r.instrument_ccy)?.base ?? ""}${quote}` === ref)) continue;
+      if (fxRows.some((r) => r.symbol.toUpperCase().startsWith(ref))) continue;
+      fxRows.push({
+        symbol: ref,
+        quantity: 0, // sized from the first bar once history is fetched
+        avg_cost: 0,
+        instrument_ccy: quote,
+        actual: false,
+      });
+    }
     const fundedCcys = new Set(
       all
         .filter((h) => h.asset_class !== "fx" && Number(h.quantity) !== 0)
@@ -116,8 +155,8 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
         const pair = parseFxPair(String(h.symbol), h.instrument_ccy ?? null);
         const pairBase = (pair?.base ?? baseCcy).toUpperCase();
         const quoteCcy = (pair?.quote ?? String(h.instrument_ccy ?? baseCcy)).toUpperCase();
-        const qty = Number(h.quantity);
-        const avgCost = Number(h.avg_cost);
+        let qty = Number(h.quantity);
+        let avgCost = Number(h.avg_cost);
 
         let rate: number | null = null;
         let observedAt: string | null = null;
@@ -139,6 +178,15 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
         let error: string | null = null;
         try {
           const bars = await fetchFxHistory(pairBase, quoteCcy, from);
+          if (!h.actual) {
+            // Size the reference leg at the window's opening rate: short base,
+            // funded by the reference notional in the quote currency.
+            const opening = bars[0]?.rate ?? rate ?? 0;
+            if (opening > 0) {
+              avgCost = opening;
+              qty = -data.referenceNotional / opening;
+            }
+          }
           points = bars.map((b) => {
             const pnlQuote = Number.isFinite(avgCost) && avgCost > 0 ? qty * (b.rate - avgCost) : 0;
             const notional = Math.abs(qty) * b.rate;
@@ -204,6 +252,7 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
             .filter((n) => !n.ccy || n.ccy === quoteCcy || n.ccy === pairBase)
             .slice(0, 5)
             .map(({ at, kind, reason }) => ({ at, kind, reason })),
+          actual: h.actual,
           error,
         };
       }),

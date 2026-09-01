@@ -175,7 +175,7 @@ export function InvestableUniverseCard() {
           )}
           <p className="text-xs text-muted-foreground">
             Crypto ETPs are physically-backed exchange-traded products (BTCE.DE,
-            VBTC.L, ABTC.SW, ZETH.SW, ETHE.DE, HODL.SW) — cash-account safe on
+            BTCW.L, ABTC.SW, ZETH.SW, ZETH.DE, HODL.SW) — cash-account safe on
             Saxo, no futures or leverage. Spot pairs like BTC-USD, futures like
             GC=F and Yahoo FX pairs like GBPUSD=X are shown for reference but are
             blocked from broker routing.

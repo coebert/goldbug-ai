@@ -12,8 +12,8 @@ export const CRYPTO_PLAYBOOK = `
 You may allocate to crypto only via approved, Saxo-tradable, physically-backed
 ETPs/ETNs already present in the candidate list. The groups are:
 
-  BTC     — BTCE.DE, ABTC.SW, VBTC.L
-  ETH     — ZETH.SW, ETHE.DE
+  BTC     — BTCE.DE, ABTC.SW, BTCW.L
+  ETH     — ZETH.SW, ZETH.DE
   Basket  — HODL.SW (21Shares Crypto Basket Index ETP)
 
 --- ROLE IN THE PORTFOLIO ---

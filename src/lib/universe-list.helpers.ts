@@ -61,7 +61,7 @@ export function classifyInvestability(symbol: string, name: string): ClassifyRes
       status: "blocked",
       block_reason_code: "crypto_spot_pair",
       status_explanation:
-        `${name} — crypto spot pair. Saxo cash accounts do not trade spot crypto; use an approved physically-backed ETP (BTCE.DE, ABTC.SW, VBTC.L, ZETH.SW, ETHE.DE, HODL.SW).`,
+        `${name} — crypto spot pair. Saxo cash accounts do not trade spot crypto; use an approved physically-backed ETP (BTCE.DE, ABTC.SW, BTCW.L, ZETH.SW, ZETH.DE, HODL.SW).`,
     };
   }
   return {

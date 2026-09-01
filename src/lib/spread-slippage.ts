@@ -33,7 +33,7 @@ export type OrderUrgency = "passive" | "normal" | "aggressive";
 export const BASE_SPREAD_BPS_BY_CLASS: Record<AssetClass, number> = {
   etf: 4,        // SPY-class ETFs quote inside 1bps; VUKE etc. ~6bps.
   stock: 10,     // AAPL/MSFT ~2bps; small-cap LSE names 20-40bps → 10 avg.
-  crypto: 30,    // ETPs like BTCE.DE / VBTC.L quote ~20-40bps depending on venue.
+  crypto: 30,    // ETPs like BTCE.DE / BTCW.L quote ~20-40bps depending on venue.
   commodity: 12, // Physically-backed metals ETCs ~8-15bps.
   fx: 2,         // Major pairs 0.5-2bps at retail prime brokers.
 };
