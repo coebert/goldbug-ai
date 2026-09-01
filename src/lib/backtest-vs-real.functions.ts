@@ -1,0 +1,161 @@
+// Server side of the "backtest vs real P&L" dashboard card.
+//
+// Loads the chosen (or most recent) saved backtest run for a portfolio, the
+// portfolio's real equity snapshots flow-netted against recorded/detected
+// deposits and withdrawals, and the realised broker fees on live fills, then
+// hands them to the pure comparison in `backtest-vs-real.ts`.
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  compareBacktestToReal,
+  EMPTY_COMPARISON,
+  type BacktestVsReal,
+  type CurvePoint,
+} from "@/lib/backtest-vs-real";
+import {
+  detectExternalFlows,
+  flowAdjustedSeries,
+  mergeFlows,
+  type ExternalFlow,
+} from "@/lib/equity-external-flows";
+
+export type BacktestVsRealResult = BacktestVsReal & {
+  runId: string | null;
+  runRanAt: string | null;
+  runRiskLevel: string | null;
+  runDays: number | null;
+  /** Every saved run, newest first, so the card can offer a picker. */
+  availableRuns: Array<{
+    id: string;
+    ran_at: string;
+    risk_level: string | null;
+    days: number;
+  }>;
+  /** Set when there is a run but no usable equity curve stored on it. */
+  note: string | null;
+};
+
+type StoredEquityPoint = { snapshot_date?: string; date?: string; total_value?: number; value?: number };
+
+function curveFromStored(raw: unknown): CurvePoint[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CurvePoint[] = [];
+  for (const r of raw as StoredEquityPoint[]) {
+    const date = r?.snapshot_date ?? r?.date;
+    const value = Number(r?.total_value ?? r?.value);
+    if (typeof date === "string" && date && Number.isFinite(value)) {
+      out.push({ date, value });
+    }
+  }
+  return out;
+}
+
+export const getBacktestVsReal = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { portfolioId: string; runId?: string | null }) => input)
+  .handler(async ({ data, context }): Promise<BacktestVsRealResult> => {
+    const supabase = context.supabase;
+
+    const { data: runs, error: runErr } = await supabase
+      .from("backtest_runs")
+      .select("id, ran_at, risk_level, days, equity")
+      .eq("portfolio_id", data.portfolioId)
+      .order("ran_at", { ascending: false })
+      .limit(25);
+    if (runErr) throw new Error(runErr.message);
+
+    const available = (runs ?? []).map((r) => ({
+      id: r.id as string,
+      ran_at: r.ran_at as string,
+      risk_level: (r.risk_level as string | null) ?? null,
+      days: Number(r.days ?? 0),
+    }));
+
+    const chosen =
+      (data.runId ? (runs ?? []).find((r) => r.id === data.runId) : null) ??
+      (runs ?? []).find((r) => curveFromStored(r.equity).length >= 2) ??
+      (runs ?? [])[0] ??
+      null;
+
+    const base = {
+      runId: (chosen?.id as string | undefined) ?? null,
+      runRanAt: (chosen?.ran_at as string | undefined) ?? null,
+      runRiskLevel: (chosen?.risk_level as string | null | undefined) ?? null,
+      runDays: chosen ? Number(chosen.days ?? 0) : null,
+      availableRuns: available,
+    };
+
+    if (!chosen) {
+      return {
+        ...EMPTY_COMPARISON,
+        ...base,
+        note: "No saved backtest run yet — run a backtest and it will appear here.",
+      };
+    }
+
+    const backtestCurve = curveFromStored(chosen.equity);
+    if (backtestCurve.length < 2) {
+      return {
+        ...EMPTY_COMPARISON,
+        ...base,
+        note: "That run was saved without an equity curve, so there is nothing to line up against live P&L.",
+      };
+    }
+
+    const [{ data: snaps, error: snapErr }, { data: funds }, { data: fills }] = await Promise.all([
+      supabase
+        .from("equity_snapshots")
+        .select("snapshot_date, total_value, cash, holdings_value")
+        .eq("portfolio_id", data.portfolioId)
+        .order("snapshot_date", { ascending: true }),
+      supabase
+        .from("sim_fund_events")
+        .select("created_at, amount")
+        .eq("portfolio_id", data.portfolioId),
+      supabase
+        .from("live_fills")
+        .select("filled_at, created_at, fee")
+        .eq("portfolio_id", data.portfolioId),
+    ]);
+    if (snapErr) throw new Error(snapErr.message);
+
+    const points = (snaps ?? []).map((r) => ({
+      date: String(r.snapshot_date),
+      totalValue: Number(r.total_value ?? 0),
+      cash: Number(r.cash ?? 0),
+      holdingsValue: Number(r.holdings_value ?? 0),
+    }));
+
+    const recorded: ExternalFlow[] = (funds ?? []).map((f) => ({
+      date: String(f.created_at ?? "").slice(0, 10),
+      amount: Number(f.amount ?? 0),
+      source: "recorded" as const,
+    }));
+    const flows = mergeFlows(recorded, detectExternalFlows(points));
+    // flowAdjustedSeries restates history onto today's capital base, so every
+    // point in the real curve is measured on the same money.
+    const realCurve: CurvePoint[] = flowAdjustedSeries(points, flows).map((r) => ({
+      date: r.date,
+      value: r.adjusted,
+    }));
+
+    const fees = (fills ?? []).map((f) => ({
+      date: String(f.filled_at ?? f.created_at ?? "").slice(0, 10),
+      amount: Number(f.fee ?? 0),
+    }));
+
+    const comparison = compareBacktestToReal({
+      backtest: backtestCurve,
+      real: realCurve,
+      fees,
+    });
+
+    return {
+      ...comparison,
+      ...base,
+      note:
+        comparison.days < 2
+          ? "The saved run and your live history don't overlap on any two days yet."
+          : null,
+    };
+  });
