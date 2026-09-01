@@ -31,6 +31,9 @@ const MultiCurrencyExposureCard = lazy(() =>
 const BacktestResultsCard = lazy(() =>
   import("@/components/backtest-results-card").then((m) => ({ default: m.BacktestResultsCard })),
 );
+const BacktestVsRealCard = lazy(() =>
+  import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
+);
 const BacktestRunHistoryCard = lazy(() =>
   import("@/components/backtest-run-history-card").then((m) => ({
     default: m.BacktestRunHistoryCard,
@@ -305,6 +308,9 @@ export function OverviewLookDeeperSection({
           />
         </Suspense>
       )}
+      <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+        <BacktestVsRealCard portfolioId={id} currency={p?.currency ?? "GBP"} />
+      </Suspense>
       <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
         <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level ?? undefined} />
       </Suspense>
