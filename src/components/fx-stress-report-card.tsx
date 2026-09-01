@@ -94,8 +94,16 @@ export function FxStressReportCard({
 }) {
   const fn = useServerFn(getFxStressReport);
   const q = useQuery({
-    queryKey: ["fx-stress-report", portfolioId],
-    queryFn: () => fn({ data: { portfolioId, years: 20 } }),
+    queryKey: ["fx-stress-report", portfolioId, pairFilter ?? "all"],
+    queryFn: () =>
+      fn({
+        data: {
+          portfolioId,
+          years: 20,
+          // Stress the picked pair even with no open exposure in it.
+          referencePairs: pairFilter ? [pairFilter.toUpperCase()] : ["GBPUSD"],
+        },
+      }),
     staleTime: 30 * 60_000,
     enabled: active !== false,
   });
