@@ -7,3 +7,6 @@
 - [ ] Verify admin/broker health page returns real live_broker_log rows (not timeout fallback)
 - [x] Portfolio summary page (real cash, open legs, unrealised P&L, FX risk) matching My Portfolio
 - [x] FX leverage ladder card (1x/2x/3x real cash)
+- [x] Live-cash report claimed a SPY buy that never routed (audit outcome fixed) + stuck VMID.L sell reconciliation (sell-side position fallback)
+- [ ] Live FX risk alert on the Summary tab: red banner + close suggestion when a leg's stress worst case crosses a threshold
+- [ ] Close-leg button on the FX risk dashboard (live rate, fees shown, Summary refreshes automatically)

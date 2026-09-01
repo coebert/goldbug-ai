@@ -3438,6 +3438,8 @@ export async function runDailyTick(
       decisionId,
       runDate: asOf,
       model: "google/gemini-2.5-flash",
+      mode: (portfolio.mode as string | null) ?? null,
+
       executed: executed.map((t) => ({
         ...t,
         instrument_ccy: instrumentCcyFor(t.symbol, t.instrument_ccy ?? null, inferSaxoCurrency(t.symbol)),

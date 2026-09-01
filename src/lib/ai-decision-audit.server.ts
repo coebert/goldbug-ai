@@ -43,7 +43,10 @@ export interface AuditContext {
   runDate: string;               // YYYY-MM-DD
   model: string;                 // e.g. "google/gemini-2.5-flash"
   executed: ExecutedAuditEntry[]; // buy/sell attempts (may be rejected)
+  /** Portfolio mode. In live modes a missing live_orders row means the ticket never routed. */
+  mode?: string | null;
   heldAfter: HoldingAuditEntry[]; // holdings remaining after sells → 'hold' rows
+
   features: Record<string, unknown> | null | undefined; // per-symbol signal snapshot
   regime?: unknown;
   rationale?: string;            // AI rationale for the whole run
@@ -75,7 +78,11 @@ function classifySource(entry: ExecutedAuditEntry): string {
   return "ai_decision";
 }
 
-function outcomeFor(entry: ExecutedAuditEntry, orderId: string | null): {
+function outcomeFor(
+  entry: ExecutedAuditEntry,
+  orderId: string | null,
+  isLive: boolean,
+): {
   outcome: string;
   detail: string | null;
 } {
@@ -83,11 +90,22 @@ function outcomeFor(entry: ExecutedAuditEntry, orderId: string | null): {
   // If we placed an order we mark 'placed' as the initial state; the
   // live_orders trigger will advance it to filled / rejected / etc.
   if (orderId) return { outcome: "placed", detail: null };
+  // LIVE modes ALWAYS create a live_orders row for a routed ticket. No row
+  // means the ticket never reached the broker (routing threw, the POST was
+  // lost, or the order write failed) — recording "placed" here is what made
+  // the daily report claim buys that never happened. Record the truth.
+  if (isLive) {
+    return {
+      outcome: "error",
+      detail: "no broker order was recorded for this ticket — it did not reach the broker",
+    };
+  }
   // Paper / backtest runs never create a live_orders row but the trade did
   // execute against the simulator — still "placed" (immediately filled at
   // the same price).
   return { outcome: "placed", detail: null };
 }
+
 
 function outcomeForOrderStatus(status: string | null | undefined, detail: string | null | undefined): {
   outcome: string;
@@ -175,7 +193,9 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
     const orderOutcome = orderStatusMap.has(key)
       ? outcomeForOrderStatus(orderStatusMap.get(key)?.status, orderStatusMap.get(key)?.rejectReason)
       : null;
-    const { outcome, detail } = orderOutcome ?? outcomeFor(e, orderId);
+    const isLive = String(ctx.mode ?? "").startsWith("live");
+    const { outcome, detail } = orderOutcome ?? outcomeFor(e, orderId, isLive);
+
     const source = classifySource(e);
     if (e.side === "sell") sellSymbols.add(sym);
     const featureBlock = (features as Record<string, unknown>)[sym] ?? null;

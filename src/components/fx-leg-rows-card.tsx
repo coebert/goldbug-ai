@@ -1,10 +1,24 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
+import { closeFxLeg } from "@/lib/fx-leg-close.functions";
+
 
 function money(n: number, ccy: string, signed = true) {
   return new Intl.NumberFormat("en-GB", {
@@ -31,6 +45,9 @@ export function FxLegRowsCard({
 }) {
   const quotesFn = useServerFn(getFxLegQuotes);
   const stressFn = useServerFn(getFxStressReport);
+  const closeFn = useServerFn(closeFxLeg);
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState<FxLegQuote | null>(null);
 
   const quotes = useQuery({
     queryKey: ["fx-leg-quotes", portfolioId],
@@ -41,6 +58,25 @@ export function FxLegRowsCard({
     queryKey: ["fx-stress-report", portfolioId],
     queryFn: () => stressFn({ data: { portfolioId, years: 20 } }),
     staleTime: 30 * 60_000,
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: (symbol: string) => closeFn({ data: { portfolioId, symbol } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("Could not close the leg", { description: res.detail });
+        return;
+      }
+      toast.success(`Closed ${res.pair} at ${res.rate.toFixed(4)}`, {
+        description: `${res.direction === "short" ? "Bought back" : "Sold"} ${res.amountFrom.toLocaleString()} ${res.fromCcy} → ${res.amountTo.toLocaleString()} ${res.toCcy}. Fee ${res.feeQuote.toFixed(2)} ${res.toCcy === res.fromCcy ? "" : ""}, net P&L ${res.pnlQuoteNet.toFixed(2)}.`,
+      });
+      // Refresh every surface that reads holdings/cash — Summary tab included.
+      void queryClient.invalidateQueries();
+    },
+    onError: (e: unknown) =>
+      toast.error("Could not close the leg", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      }),
   });
 
   const baseCcy = quotes.data?.baseCcy ?? "GBP";
@@ -58,6 +94,7 @@ export function FxLegRowsCard({
             <Button
               size="sm"
               variant="ghost"
+
               className="h-7 px-2 text-xs"
               onClick={() => onSelectPair?.(undefined)}
             >
