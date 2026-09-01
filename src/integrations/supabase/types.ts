@@ -2677,6 +2677,8 @@ export type Database = {
           current_cash: number
           fx_enabled: boolean
           fx_execution_mode: string
+          holding_dd_autoclose: boolean
+          holding_dd_budget_pct: number | null
           hyperparams: Json
           id: string
           last_run_date: string | null
@@ -2703,6 +2705,8 @@ export type Database = {
           current_cash?: number
           fx_enabled?: boolean
           fx_execution_mode?: string
+          holding_dd_autoclose?: boolean
+          holding_dd_budget_pct?: number | null
           hyperparams?: Json
           id?: string
           last_run_date?: string | null
@@ -2729,6 +2733,8 @@ export type Database = {
           current_cash?: number
           fx_enabled?: boolean
           fx_execution_mode?: string
+          holding_dd_autoclose?: boolean
+          holding_dd_budget_pct?: number | null
           hyperparams?: Json
           id?: string
           last_run_date?: string | null
@@ -3563,6 +3569,83 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      trade_strategies: {
+        Row: {
+          asset_class: Database["public"]["Enums"]["asset_class"]
+          created_at: string
+          enabled: boolean
+          entered_at: string | null
+          entry_mode: string
+          entry_price: number
+          exit_reason: string | null
+          exited_at: string | null
+          id: string
+          instrument_ccy: string
+          last_error: string | null
+          last_evaluated_at: string | null
+          portfolio_id: string
+          quantity: number
+          status: string
+          stop_loss: number | null
+          symbol: string
+          take_profit: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_class?: Database["public"]["Enums"]["asset_class"]
+          created_at?: string
+          enabled?: boolean
+          entered_at?: string | null
+          entry_mode?: string
+          entry_price: number
+          exit_reason?: string | null
+          exited_at?: string | null
+          id?: string
+          instrument_ccy?: string
+          last_error?: string | null
+          last_evaluated_at?: string | null
+          portfolio_id: string
+          quantity: number
+          status?: string
+          stop_loss?: number | null
+          symbol: string
+          take_profit?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_class?: Database["public"]["Enums"]["asset_class"]
+          created_at?: string
+          enabled?: boolean
+          entered_at?: string | null
+          entry_mode?: string
+          entry_price?: number
+          exit_reason?: string | null
+          exited_at?: string | null
+          id?: string
+          instrument_ccy?: string
+          last_error?: string | null
+          last_evaluated_at?: string | null
+          portfolio_id?: string
+          quantity?: number
+          status?: string
+          stop_loss?: number | null
+          symbol?: string
+          take_profit?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_strategies_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trades: {
         Row: {
