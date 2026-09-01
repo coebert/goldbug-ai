@@ -22,13 +22,18 @@ export const listStrategies = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const { data: p } = await context.supabase
       .from("portfolios")
-      .select("holding_dd_budget_pct, holding_dd_autoclose")
+      .select(
+        "holding_dd_budget_pct, holding_dd_autoclose, concentration_cap_pct, concentration_autotrim",
+      )
       .eq("id", data.portfolioId)
       .maybeSingle();
     return {
       strategies: rows ?? [],
       ddBudgetPct: p?.holding_dd_budget_pct != null ? Number(p.holding_dd_budget_pct) : null,
       ddAutoClose: Boolean(p?.holding_dd_autoclose),
+      concentrationCapPct:
+        p?.concentration_cap_pct != null ? Number(p.concentration_cap_pct) : null,
+      concentrationAutoTrim: Boolean(p?.concentration_autotrim),
     };
   });
 
