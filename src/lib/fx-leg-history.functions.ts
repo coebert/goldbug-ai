@@ -88,7 +88,37 @@ export const getFxLegHistory = createServerFn({ method: "GET" })
 
     const baseCcy = String(portfolio?.currency ?? "GBP").toUpperCase();
     const all = holdings ?? [];
-    const fxRows = all.filter((h) => h.asset_class === "fx" && Number(h.quantity) !== 0);
+    type LegRow = {
+      symbol: string;
+      quantity: number;
+      avg_cost: number;
+      instrument_ccy: string | null;
+      actual: boolean;
+    };
+    const fxRows: LegRow[] = all
+      .filter((h) => h.asset_class === "fx" && Number(h.quantity) !== 0)
+      .map((h) => ({
+        symbol: String(h.symbol),
+        quantity: Number(h.quantity),
+        avg_cost: Number(h.avg_cost),
+        instrument_ccy: h.instrument_ccy ?? null,
+        actual: true,
+      }));
+    // Synthetic reference legs for requested pairs with no open exposure: they
+    // chart the same rate path and playbook read on a notional-sized position.
+    for (const raw of data.referencePairs) {
+      const ref = raw.toUpperCase();
+      const quote = ref.slice(3, 6);
+      if (fxRows.some((r) => `${parseFxPair(r.symbol, r.instrument_ccy)?.base ?? ""}${quote}` === ref)) continue;
+      if (fxRows.some((r) => r.symbol.toUpperCase().startsWith(ref))) continue;
+      fxRows.push({
+        symbol: ref,
+        quantity: 0, // sized from the first bar once history is fetched
+        avg_cost: 0,
+        instrument_ccy: quote,
+        actual: false,
+      });
+    }
     const fundedCcys = new Set(
       all
         .filter((h) => h.asset_class !== "fx" && Number(h.quantity) !== 0)
