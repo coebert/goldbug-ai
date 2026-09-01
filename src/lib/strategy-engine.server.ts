@@ -43,11 +43,13 @@ export type PortfolioLike = {
   live_paused: boolean;
   holding_dd_budget_pct?: number | null;
   holding_dd_autoclose?: boolean | null;
+  concentration_cap_pct?: number | null;
+  concentration_autotrim?: boolean | null;
 };
 
 export type StrategyAction = {
   symbol: string;
-  action: "entry" | "stop_loss" | "take_profit" | "drawdown_budget" | "none";
+  action: "entry" | "stop_loss" | "take_profit" | "drawdown_budget" | "concentration_cap" | "none";
   side?: "buy" | "sell";
   qty?: number;
   price?: number;
@@ -423,6 +425,98 @@ export async function evaluateHoldingDrawdownBudget(args: {
         symbol: h.symbol,
         action: "none",
         detail: `auto-close failed: ${(e as Error).message}`,
+      });
+    }
+  }
+  return out;
+}
+
+
+/**
+ * Risk-concentration guard. Any single non-FX holding whose market value
+ * exceeds `concentration_cap_pct` of gross portfolio value (positions + cash)
+ * is trimmed back to the cap by selling the excess. Unlike the drawdown
+ * budget this fires on winners too — an unmanaged winner is the most common
+ * way a diversified book turns into a single-name bet.
+ */
+export async function evaluateConcentrationCap(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  portfolio: PortfolioLike;
+}): Promise<StrategyAction[]> {
+  const cap = Number(args.portfolio.concentration_cap_pct ?? NaN);
+  const out: StrategyAction[] = [];
+  if (!args.portfolio.concentration_autotrim || !Number.isFinite(cap) || cap <= 0 || cap >= 100) {
+    return out;
+  }
+
+  const { data: holdings } = await args.supabase
+    .from("holdings")
+    .select("id, symbol, quantity, avg_cost, asset_class, instrument_ccy")
+    .eq("portfolio_id", args.portfolio.id);
+
+  const priced: Array<{
+    symbol: string;
+    qty: number;
+    price: number;
+    value: number;
+    asset_class: string;
+    instrument_ccy: string;
+  }> = [];
+  for (const h of holdings ?? []) {
+    const qty = Number(h.quantity);
+    if (!(qty > 0)) continue;
+    if (h.asset_class === "fx") continue; // FX funding legs sit in the cash wallet
+    const price = await latestBasePrice(args.supabase, h.symbol, h.asset_class);
+    if (price == null || !(price > 0)) continue;
+    priced.push({
+      symbol: h.symbol,
+      qty,
+      price,
+      value: qty * price,
+      asset_class: String(h.asset_class),
+      instrument_ccy: String(h.instrument_ccy || args.portfolio.currency),
+    });
+  }
+
+  const cash = Math.max(0, Number(args.portfolio.current_cash) || 0);
+  const gross = priced.reduce((s, p) => s + p.value, 0) + cash;
+  if (!(gross > 0)) return out;
+
+  for (const p of priced) {
+    const weight = (p.value / gross) * 100;
+    if (weight <= cap) continue;
+    // Sell the excess only: target value = cap% of gross.
+    const targetValue = (cap / 100) * gross;
+    const excessQty = (p.value - targetValue) / p.price;
+    const sellQty = Math.min(p.qty, excessQty);
+    if (!(sellQty > 0)) continue;
+    try {
+      const r = await placeStrategyOrder({
+        portfolio: args.portfolio,
+        userId: args.userId,
+        symbol: p.symbol,
+        assetClass: p.asset_class,
+        instrumentCcy: p.instrument_ccy,
+        side: "sell",
+        qty: sellQty,
+        price: p.price,
+        reason: `Concentration cap breach: ${weight.toFixed(1)}% of book vs ${cap}% cap`,
+      });
+      out.push({
+        symbol: p.symbol,
+        action: "concentration_cap",
+        side: "sell",
+        qty: r.qty,
+        price: r.price,
+        status: r.status,
+        detail: `trimmed from ${weight.toFixed(1)}% toward the ${cap}% cap`,
+      });
+    } catch (e) {
+      out.push({
+        symbol: p.symbol,
+        action: "none",
+        detail: `concentration trim failed: ${(e as Error).message}`,
       });
     }
   }

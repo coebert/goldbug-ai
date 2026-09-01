@@ -119,7 +119,7 @@ export const runStrategies = createServerFn({ method: "POST" })
     const { data: p, error: pErr } = await supabase
       .from("portfolios")
       .select(
-        "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose",
+        "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose, concentration_cap_pct, concentration_autotrim",
       )
       .eq("id", data.portfolioId)
       .maybeSingle();
@@ -130,7 +130,7 @@ export const runStrategies = createServerFn({ method: "POST" })
       .select("*")
       .eq("portfolio_id", data.portfolioId);
 
-    const { evaluateStrategies, evaluateHoldingDrawdownBudget } = await import(
+    const { evaluateStrategies, evaluateHoldingDrawdownBudget, evaluateConcentrationCap } = await import(
       "@/lib/strategy-engine.server"
     );
     const portfolio = {
@@ -144,6 +144,9 @@ export const runStrategies = createServerFn({ method: "POST" })
       holding_dd_budget_pct:
         p.holding_dd_budget_pct != null ? Number(p.holding_dd_budget_pct) : null,
       holding_dd_autoclose: Boolean(p.holding_dd_autoclose),
+      concentration_cap_pct:
+        p.concentration_cap_pct != null ? Number(p.concentration_cap_pct) : null,
+      concentration_autotrim: Boolean(p.concentration_autotrim),
     };
 
     const strategyActions = await evaluateStrategies({
@@ -167,5 +170,6 @@ export const runStrategies = createServerFn({ method: "POST" })
     });
 
     const ddActions = await evaluateHoldingDrawdownBudget({ supabase, userId, portfolio });
-    return { actions: [...strategyActions, ...ddActions] };
+    const concActions = await evaluateConcentrationCap({ supabase, userId, portfolio });
+    return { actions: [...strategyActions, ...ddActions, ...concActions] };
   });
