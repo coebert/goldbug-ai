@@ -1,10 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
+import { closeFxLeg } from "@/lib/fx-leg-close.functions";
 import { assessFxRisk } from "@/lib/fx-risk-alert";
 
 /**
