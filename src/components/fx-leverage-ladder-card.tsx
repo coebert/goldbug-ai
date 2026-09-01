@@ -150,8 +150,9 @@ export function FxLeverageLadderCard({
         )}
         <p className="text-[11px] leading-snug text-muted-foreground">
           Leverage scales profit and loss together: a 3x row that triples the P&amp;L also triples
-          the drawdown and the tail. Sized on {capital > 0 ? "your live cash balance" : "portfolio cash"};
-          costs are 6bps per round trip.
+          the drawdown and the tail. Sized on {capital > 0 ? "your live cash balance" : "portfolio cash"},
+          split evenly across the {runPairs.length} pair{runPairs.length === 1 ? "" : "s"} in the run
+          so the totals never assume more cash than you have; costs are 6bps per round trip.
         </p>
       </CardContent>
     </Card>
