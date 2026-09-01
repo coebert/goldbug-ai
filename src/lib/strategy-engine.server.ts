@@ -7,6 +7,17 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+type AssetClassName = "stock" | "etf" | "crypto" | "commodity" | "fx";
+
+type StrategyPatch = {
+  last_evaluated_at?: string;
+  last_error?: string | null;
+  status?: "armed" | "open" | "closed" | "error";
+  entered_at?: string;
+  exited_at?: string;
+  exit_reason?: string;
+};
+
 export type StrategyRow = {
   id: string;
   portfolio_id: string;
@@ -128,7 +139,7 @@ export async function placeStrategyOrder(args: {
   );
   const baseCcy = String(p.currency || "GBP").toUpperCase();
   const ccy = args.instrumentCcy.toUpperCase();
-  const ac = args.assetClass as "stock" | "etf" | "crypto" | "commodity" | "fx";
+  const ac = args.assetClass as AssetClassName;
 
   let fillPrice = price;
   let filledQty = qty;
@@ -187,7 +198,7 @@ export async function placeStrategyOrder(args: {
       await supabaseAdmin.from("holdings").insert({
         portfolio_id: p.id,
         symbol: args.symbol,
-        asset_class: args.assetClass,
+        asset_class: args.assetClass as AssetClassName,
         quantity: filledQty,
         avg_cost: newAvg,
         instrument_ccy: ccy,
@@ -208,7 +219,7 @@ export async function placeStrategyOrder(args: {
   await supabaseAdmin.from("trades").insert({
     portfolio_id: p.id,
     symbol: args.symbol,
-    asset_class: args.assetClass,
+    asset_class: args.assetClass as AssetClassName,
     side,
     quantity: filledQty,
     price: fillPrice,
@@ -253,11 +264,11 @@ export async function evaluateStrategies(args: {
   for (const s of args.strategies) {
     if (!s.enabled || s.status === "closed") continue;
     const price = await latestBasePrice(args.supabase, s.symbol, s.asset_class);
-    const patch: Record<string, unknown> = { last_evaluated_at: new Date().toISOString() };
+    const patch: StrategyPatch = { last_evaluated_at: new Date().toISOString() };
 
     if (price == null) {
       out.push({ symbol: s.symbol, action: "none", detail: "no fresh price — skipped" });
-      patch['last_error'] = "no price available";
+      patch.last_error = "no price available";
       await supabaseAdmin.from("trade_strategies").update(patch).eq("id", s.id);
       continue;
     }
@@ -283,9 +294,9 @@ export async function evaluateStrategies(args: {
             price,
             reason: `Strategy entry (${s.entry_mode} @ ${s.entry_price})`,
           });
-          patch['status'] = "open";
-          patch['entered_at'] = new Date().toISOString();
-          patch['last_error'] = null;
+          patch.status = "open";
+          patch.entered_at = new Date().toISOString();
+          patch.last_error = null;
           out.push({
             symbol: s.symbol,
             action: "entry",
@@ -316,8 +327,8 @@ export async function evaluateStrategies(args: {
             .maybeSingle();
           const qty = Math.min(Number(s.quantity), h ? Number(h.quantity) : 0);
           if (!(qty > 0)) {
-            patch['status'] = "closed";
-            patch['exit_reason'] = "no position held";
+            patch.status = "closed";
+            patch.exit_reason = "no position held";
             out.push({ symbol: s.symbol, action: "none", detail: "no position to exit" });
           } else {
             const r = await placeStrategyOrder({
@@ -331,10 +342,10 @@ export async function evaluateStrategies(args: {
               price,
               reason: `Strategy ${hit} @ ${price}`,
             });
-            patch['status'] = "closed";
-            patch['exited_at'] = new Date().toISOString();
-            patch['exit_reason'] = hit;
-            patch['last_error'] = null;
+            patch.status = "closed";
+            patch.exited_at = new Date().toISOString();
+            patch.exit_reason = hit;
+            patch.last_error = null;
             out.push({
               symbol: s.symbol,
               action: hit,
@@ -348,8 +359,8 @@ export async function evaluateStrategies(args: {
         }
       }
     } catch (e) {
-      patch['status'] = "error";
-      patch['last_error'] = (e as Error).message;
+      patch.status = "error";
+      patch.last_error = (e as Error).message;
       out.push({ symbol: s.symbol, action: "none", detail: `error: ${(e as Error).message}` });
     }
 
