@@ -31,6 +31,8 @@ export type FxLegHistory = {
   verdict: FxLegPlaybookVerdict;
   /** Most recent AI reasons that touched this currency. */
   aiNotes: Array<{ at: string; kind: string; reason: string }>;
+  /** False for synthetic reference pairs the portfolio does not actually hold. */
+  actual: boolean;
   error: string | null;
 };
 
