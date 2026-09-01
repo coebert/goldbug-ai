@@ -144,6 +144,6 @@ describe("crypto-cache-sync", () => {
     expect(report.summary).toMatch(/wrongAssetType=/);
     expect(report.summary).toMatch(/stale=/);
     expect(report.summary).toMatch(/unknown=/);
-    expect(report.drift.missing).toEqual(["ZETH.DE", "HODL.SW", "ZETH.SW"]);
+    expect(report.drift.missing).toEqual(["HODL.SW", "ZETH.DE", "ZETH.SW"]);
   });
 });
