@@ -110,6 +110,29 @@ export const setDrawdownBudget = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const setConcentrationCap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        portfolioId: z.string().uuid(),
+        capPct: z.number().min(1).max(99).nullable(),
+        autoTrim: z.boolean(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("portfolios")
+      .update({
+        concentration_cap_pct: data.capPct,
+        concentration_autotrim: data.autoTrim,
+      })
+      .eq("id", data.portfolioId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
 /** Evaluates all strategies + the drawdown budget and places any triggered orders. */
 export const runStrategies = createServerFn({ method: "POST" })
   .middleware([requireAal2])

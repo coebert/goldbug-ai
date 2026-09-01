@@ -599,7 +599,7 @@ async function runHourlyCycleInner(
             const { data: full } = await supabaseAdmin
               .from("portfolios")
               .select(
-                "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose",
+                "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose, concentration_cap_pct, concentration_autotrim",
               )
               .eq("id", p.id)
               .maybeSingle();
@@ -608,8 +608,13 @@ async function runHourlyCycleInner(
               .select("*")
               .eq("portfolio_id", p.id)
               .eq("enabled", true);
-            if (full && ((strategyRows?.length ?? 0) > 0 || full.holding_dd_autoclose)) {
-              const { evaluateStrategies, evaluateHoldingDrawdownBudget } = await import(
+            if (
+              full &&
+              ((strategyRows?.length ?? 0) > 0 ||
+                full.holding_dd_autoclose ||
+                full.concentration_autotrim)
+            ) {
+              const { evaluateStrategies, evaluateHoldingDrawdownBudget, evaluateConcentrationCap } = await import(
                 "@/lib/strategy-engine.server"
               );
               const portfolioLike = {
@@ -623,6 +628,9 @@ async function runHourlyCycleInner(
                 holding_dd_budget_pct:
                   full.holding_dd_budget_pct != null ? Number(full.holding_dd_budget_pct) : null,
                 holding_dd_autoclose: Boolean(full.holding_dd_autoclose),
+                concentration_cap_pct:
+                  full.concentration_cap_pct != null ? Number(full.concentration_cap_pct) : null,
+                concentration_autotrim: Boolean(full.concentration_autotrim),
               };
               await evaluateStrategies({
                 supabase: supabaseAdmin,
@@ -644,6 +652,11 @@ async function runHourlyCycleInner(
                 })),
               });
               await evaluateHoldingDrawdownBudget({
+                supabase: supabaseAdmin,
+                userId: p.user_id,
+                portfolio: portfolioLike,
+              });
+              await evaluateConcentrationCap({
                 supabase: supabaseAdmin,
                 userId: p.user_id,
                 portfolio: portfolioLike,
