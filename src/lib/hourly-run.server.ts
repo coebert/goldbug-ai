@@ -591,6 +591,69 @@ async function runHourlyCycleInner(
         });
 
 
+        // User-defined strategy rules (entry / stop-loss / take-profit) and
+        // the per-position drawdown budget. Best-effort: a failure here must
+        // not fail the tick.
+        if (p.user_id) {
+          try {
+            const { data: full } = await supabaseAdmin
+              .from("portfolios")
+              .select(
+                "id, mode, status, currency, current_cash, cash_by_ccy, live_paused, holding_dd_budget_pct, holding_dd_autoclose",
+              )
+              .eq("id", p.id)
+              .maybeSingle();
+            const { data: strategyRows } = await supabaseAdmin
+              .from("trade_strategies")
+              .select("*")
+              .eq("portfolio_id", p.id)
+              .eq("enabled", true);
+            if (full && ((strategyRows?.length ?? 0) > 0 || full.holding_dd_autoclose)) {
+              const { evaluateStrategies, evaluateHoldingDrawdownBudget } = await import(
+                "@/lib/strategy-engine.server"
+              );
+              const portfolioLike = {
+                id: full.id,
+                mode: String(full.mode),
+                status: String(full.status),
+                currency: String(full.currency),
+                current_cash: Number(full.current_cash),
+                cash_by_ccy: (full.cash_by_ccy as Record<string, number> | null) ?? null,
+                live_paused: Boolean(full.live_paused),
+                holding_dd_budget_pct:
+                  full.holding_dd_budget_pct != null ? Number(full.holding_dd_budget_pct) : null,
+                holding_dd_autoclose: Boolean(full.holding_dd_autoclose),
+              };
+              await evaluateStrategies({
+                supabase: supabaseAdmin,
+                userId: p.user_id,
+                portfolio: portfolioLike,
+                strategies: (strategyRows ?? []).map((r) => ({
+                  id: r.id,
+                  portfolio_id: r.portfolio_id,
+                  symbol: r.symbol,
+                  asset_class: String(r.asset_class),
+                  instrument_ccy: r.instrument_ccy,
+                  quantity: Number(r.quantity),
+                  entry_price: Number(r.entry_price),
+                  entry_mode: r.entry_mode,
+                  stop_loss: r.stop_loss != null ? Number(r.stop_loss) : null,
+                  take_profit: r.take_profit != null ? Number(r.take_profit) : null,
+                  enabled: r.enabled,
+                  status: r.status,
+                })),
+              });
+              await evaluateHoldingDrawdownBudget({
+                supabase: supabaseAdmin,
+                userId: p.user_id,
+                portfolio: portfolioLike,
+              });
+            }
+          } catch (e) {
+            console.error("strategy evaluation failed", p.id, (e as Error).message);
+          }
+        }
+
         // Post-tick order-status reconciliation for live portfolios.
         // Without this, orders written as `submitted` at POST time never
         // transition to `filled` in our DB — the market-order fills that

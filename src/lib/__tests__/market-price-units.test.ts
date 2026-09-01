@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isLseGbxDisplayQuoted,
   isLsePenceQuoted,
+  normalizeLseDisplayPriceToBase,
   marketQuoteCurrency,
   normalizeMarketPriceForTrading,
 } from "@/lib/market-price-units";
@@ -22,5 +24,14 @@ describe("market price unit normalization", () => {
   it("returns zero for non-finite prices so order sizing cannot emit NaN", () => {
     expect(normalizeMarketPriceForTrading("ULVR.L", Number.NaN)).toBe(0);
     expect(normalizeMarketPriceForTrading("AAPL", Number.POSITIVE_INFINITY)).toBe(0);
+  });
+});
+describe("USD-quoted LSE crypto ETPs", () => {
+  it("does not apply the pence rule to BTCW.L", () => {
+    expect(isLseGbxDisplayQuoted("BTCW.L")).toBe(false);
+    expect(normalizeLseDisplayPriceToBase("BTCW.L", 18.59, "crypto")).toBeCloseTo(18.59, 6);
+  });
+  it("still treats ordinary LSE stocks as pence", () => {
+    expect(normalizeLseDisplayPriceToBase("MKS.L", 404, "stock")).toBeCloseTo(4.04, 6);
   });
 });

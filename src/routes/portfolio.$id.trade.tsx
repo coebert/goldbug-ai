@@ -13,6 +13,7 @@ import { Metric } from "@/components/portfolio-detail/metric";
 import { StalePriceWarning } from "@/components/stale-price-warning";
 import { TradingPnlCharts } from "@/components/trading-pnl-charts";
 import { OrderFillsCard } from "@/components/order-fills-card";
+import { StrategyBuilderCard } from "@/components/strategy-builder-card";
 import { getPortfolio } from "@/lib/portfolios.functions";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { getOrderFills } from "@/lib/order-fills.functions";
@@ -350,6 +351,8 @@ function TradePage() {
             )}
           </CardContent>
         </Card>
+
+        <StrategyBuilderCard portfolioId={id} />
 
         <Card>
           <CardHeader className="pb-3">
