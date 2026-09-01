@@ -120,6 +120,8 @@ export function FxLegRowsCard({
                   <th className="py-1 pr-2 text-right font-medium">Notional ({baseCcy})</th>
                   <th className="py-1 pr-2 text-right font-medium">Close now (net)</th>
                   <th className="py-1 pr-2 text-right font-medium">Stress worst</th>
+                  <th className="py-1 text-right font-medium">Close</th>
+
                 </tr>
               </thead>
               <tbody>
