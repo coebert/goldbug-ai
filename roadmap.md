@@ -13,3 +13,4 @@
 - [ ] Confirm stuck VMID.L sell is reconciled (equity order, not an FX leg — FX close button does not apply)
 - [ ] Project monitoring: leverage ladder 3x overstatement, bare-pair Yahoo 404s, FX pair selector empty cards
 - [ ] FX risk history chart on the Summary tab (per-leg stress + P&L over time, not a single snapshot)
+- [ ] Auto-close FX legs that breach the loss budget (no click) + surface the close in the order status card
