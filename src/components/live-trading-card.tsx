@@ -277,12 +277,11 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         {s && (s.orders.length > 0 || s.fills.length > 0 || s.reconciliation.length > 0) && (
           <>
             <OrderOutcomeSummary orders={s.orders} />
-            <div className="grid gap-3 md:grid-cols-3 text-xs">
+            {/* Real broker fills drive the status table: quantity executed, the
+                fees actually charged and how long the order took. */}
+            <OrderFillsCard portfolioId={portfolioId} />
+            <div className="grid gap-3 md:grid-cols-2 text-xs">
               <OrderTimelineList orders={s.orders} fills={s.fills} />
-              <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
-                key: f.id,
-                text: `${new Date(f.filled_at).toLocaleString("en-GB", { timeZone: "Europe/London" })} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
-              }))} />
               <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
                 key: r.id,
                 text: `${new Date(r.as_of).toLocaleString("en-GB", { timeZone: "Europe/London" })} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
