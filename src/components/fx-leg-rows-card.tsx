@@ -195,9 +195,49 @@ export function FxLegRowsCard({
           </div>
         )}
         <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-          Click a row to run the rate history, backtest and stress test for that pair alone.
+          Click a row to run the rate history, backtest and stress test for that pair alone. "Close"
+          flattens the leg at the live rate — the estimated exit fee is already deducted from the
+          net figure shown, and the Summary tab refreshes as soon as the close settles.
         </p>
       </CardContent>
+
+      <AlertDialog open={pending != null} onOpenChange={(o) => !o && setPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Close {pending ? `${pending.pairBase}${pending.quoteCcy}` : ""} at the live rate?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-xs">
+                <p>
+                  {pending?.quantity != null && pending.quantity < 0 ? "Buying back" : "Selling"}{" "}
+                  {Math.abs(pending?.quantity ?? 0).toLocaleString()} {pending?.pairBase} at{" "}
+                  {pending?.rate?.toFixed(4) ?? "—"}.
+                </p>
+                <p>
+                  Estimated exit fee {(pending?.exitFeeQuote ?? 0).toFixed(2)} {pending?.quoteCcy} (
+                  {(pending?.exitCostBps ?? 0).toFixed(1)}bps).
+                </p>
+                <p>
+                  Net realised P&amp;L {money(pending?.pnlBaseNet ?? 0, baseCcy)} in {baseCcy}.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep the leg</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pending) closeMutation.mutate(pending.symbol);
+                setPending(null);
+              }}
+            >
+              Close at live rate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
+
   );
 }
