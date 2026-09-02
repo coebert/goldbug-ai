@@ -27,6 +27,8 @@ import { JargonText } from "@/components/jargon-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
+import { AlertStrip } from "@/components/alerts/alert-strip";
+import { PORTFOLIO_ALERTS } from "@/lib/alerts/registry";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -98,6 +100,10 @@ import { ReportsSection } from "@/components/portfolio-detail/sections/reports-s
 
 import { Metric } from "@/components/portfolio-detail/metric";
 import { formatMetricValue } from "@/components/portfolio-detail/format";
+import {
+  EquityHeadlineMetrics,
+  EquityBenchmarkMetrics,
+} from "@/components/portfolio-detail/sections/equity-metrics";
 
 import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
@@ -999,12 +1005,40 @@ function PortfolioPage() {
 
 
               <TabsContent value="overview" className="mt-4">
-                <CurrencyDiagnosticsBanner
-                  portfolioId={id}
-                  portfolioCurrency={p.currency}
-                  mode={p.mode}
+                <AlertStrip
+                  className="mt-4"
+                  alerts={PORTFOLIO_ALERTS}
+                  render={(alertId) => {
+                    switch (alertId) {
+                      case "risk-halt":
+                        return <RiskHaltBanner portfolioId={id} />;
+                      case "precheck-cash":
+                        return <PrecheckCashAlertBanner portfolioId={id} />;
+                      case "valuation-consistency":
+                        return <ValuationConsistencyAlert portfolioId={id} />;
+                      case "instrument-ccy":
+                        return <InstrumentCcyAlert portfolioId={id} />;
+                      case "currency-diagnostics":
+                        return (
+                          <CurrencyDiagnosticsBanner
+                            portfolioId={id}
+                            portfolioCurrency={p.currency}
+                            mode={p.mode}
+                          />
+                        );
+                      case "cost-sync":
+                        return <CostSyncAlertBanner portfolioId={id} />;
+                      case "coverage-trend":
+                        return <CoverageTrendAlertBanner portfolioId={id} />;
+                      case "reconcile-fills":
+                        return <ReconcileFillsCard portfolioId={id} />;
+                      case "price-unit-audit":
+                        return <PriceUnitAuditCard portfolioId={id} />;
+                      default:
+                        return null;
+                    }
+                  }}
                 />
-                <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
                 <SignalWeightHistoryCard portfolioId={id} className="mb-4" />
                 <PolicyRegimeTimelineCard portfolioId={id} className="mb-4" />
                 <div className="mb-4">
@@ -1016,14 +1050,6 @@ function PortfolioPage() {
                 <PolicyNudgeReplayCard className="mb-4" />
                 <PolicyNudgeSweepCard className="mb-4" />
 
-                <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
-                <CostSyncAlertBanner portfolioId={id} className="mb-4" />
-                <CoverageTrendAlertBanner portfolioId={id} className="mb-4" />
-
-                <ValuationConsistencyAlert portfolioId={id} className="mb-4" />
-                <InstrumentCcyAlert portfolioId={id} className="mb-4" />
-                <ReconcileFillsCard portfolioId={id} className="mb-4" />
-                <PriceUnitAuditCard portfolioId={id} className="mb-4" />
                 <div id="holdings" className="mb-6 scroll-below-sticky">
                   <LiveHoldingsCard
                     holdings={holdings}
@@ -1198,201 +1224,16 @@ function PortfolioPage() {
                     </CardHeader>
 
                     {perfMetrics && (
-                      <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {(
-                          [
-                            {
-                              label: "CAGR",
-                              term: "cagr" as TermId,
-                              value: perfMetrics.port.annReturn,
-                              suffix: "%",
-                              signed: true,
-                              negative: false,
-                            },
-                            {
-                              label: "Volatility (ann.)",
-                              term: "volatility" as TermId,
-                              value: perfMetrics.port.annVol,
-                              suffix: "%",
-                              signed: false,
-                              negative: false,
-                            },
-                            {
-                              label: `Sharpe (rf=${riskFreeRate}%)`,
-                              term: "sharpe" as TermId,
-                              value:
-                                perfMetrics.port.annVol > 0
-                                  ? (perfMetrics.port.annReturn - riskFreeRate) /
-                                    perfMetrics.port.annVol
-                                  : null,
-                              suffix: "",
-                              signed: true,
-                              negative: false,
-                            },
-                            {
-                              label: "Max drawdown",
-                              term: "max_drawdown" as TermId,
-                              value: perfMetrics.port.maxDrawdown,
-                              suffix: "%",
-                              signed: false,
-                              negative: true,
-                            },
-                          ] as const
-                        ).map((m) => {
-                          const bv =
-                            m.label === "CAGR"
-                              ? perfMetrics.bench?.annReturn
-                              : m.label === "Volatility (ann.)"
-                                ? perfMetrics.bench?.annVol
-                                : m.label === "Max drawdown"
-                                  ? perfMetrics.bench?.maxDrawdown
-                                  : perfMetrics.bench && perfMetrics.bench.annVol > 0
-                                    ? (perfMetrics.bench.annReturn - riskFreeRate) /
-                                      perfMetrics.bench.annVol
-                                    : null;
-                          const fmt = (v: number | null | undefined) =>
-                            formatMetricValue(v, m.signed, m.suffix);
-
-                          const color = (v: number | null | undefined) => {
-                            if (v == null) return "text-muted-foreground";
-                            if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
-                            if (!m.signed) return "text-foreground";
-                            return v >= 0 ? "text-primary" : "text-destructive";
-                          };
-                          return (
-                            <div
-                              key={m.label}
-                              className="min-w-0 rounded-md border border-border/70 bg-muted/30 p-3"
-                            >
-                              <div className="flex min-w-0 items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                <span className="truncate">{m.label}</span>
-                                <span className="shrink-0">
-                                  <ExplainIcon term={m.term} />
-                                </span>
-                              </div>
-                              <div
-                                title={fmt(m.value)}
-                                className={`mt-0.5 truncate tabular-nums text-base font-semibold leading-tight sm:text-lg ${color(m.value)}`}
-                              >
-                                {fmt(m.value)}
-                              </div>
-                              {perfMetrics.bench && (
-                                <div className="truncate tabular-nums text-[11px] text-muted-foreground">
-                                  {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-
-                        })}
-                      </div>
+                      <EquityHeadlineMetrics
+                        perfMetrics={perfMetrics}
+                        benchmark={benchmark}
+                        riskFreeRate={riskFreeRate}
+                      />
                     )}
                     {perfMetrics && (
-                      <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                          <span className="min-w-0 truncate">
-                            Performance vs {benchmark === "none" ? "benchmark" : benchmark}
-                          </span>
-                          {perfMetrics.correlation != null && (
-                            <span className="shrink-0 tabular-nums">
-                              Correlation:{" "}
-                              <span className="font-medium text-foreground">
-                                {perfMetrics.correlation.toFixed(2)}
-                              </span>
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
-
-                          {(
-                            [
-                              {
-                                label: "Total return",
-                                key: "totalReturn",
-                                suffix: "%",
-                                signed: true,
-                                negative: false,
-                                derived: false,
-                              },
-                              {
-                                label: "Annualized return",
-                                key: "annReturn",
-                                suffix: "%",
-                                signed: true,
-                                negative: false,
-                                derived: false,
-                              },
-                              {
-                                label: "Volatility (ann.)",
-                                key: "annVol",
-                                suffix: "%",
-                                signed: false,
-                                negative: false,
-                                derived: false,
-                              },
-                              {
-                                label: "Max drawdown",
-                                key: "maxDrawdown",
-                                suffix: "%",
-                                signed: false,
-                                negative: true,
-                                derived: false,
-                              },
-                              {
-                                label: "Return / Vol",
-                                key: "rvr",
-                                suffix: "",
-                                signed: true,
-                                negative: false,
-                                derived: true,
-                              },
-                            ] as const
-                          ).map((m) => {
-                            const fmt = (v: number | null | undefined) =>
-                              formatMetricValue(v, m.signed, m.suffix);
-
-                            const derived = (obj: { annReturn: number; annVol: number } | null) =>
-                              obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
-                            const pick = (obj: typeof perfMetrics.port | null) => {
-                              if (!obj) return null;
-                              const v = (obj as unknown as Record<string, unknown>)[m.key];
-                              return typeof v === "number" ? v : null;
-                            };
-                            const pv = m.derived
-                              ? derived(perfMetrics.port)
-                              : pick(perfMetrics.port);
-                            const bv = m.derived
-                              ? derived(perfMetrics.bench)
-                              : pick(perfMetrics.bench);
-                            const color = (v: number | null) => {
-                              if (v == null) return "text-muted-foreground";
-                              if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
-                              if (!m.signed) return "text-foreground";
-                              return v >= 0 ? "text-primary" : "text-destructive";
-                            };
-                            return (
-                              <div key={m.label} className="min-w-0">
-                                <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">
-                                  {m.label}
-                                </div>
-                                <div
-                                  title={fmt(pv)}
-                                  className={`truncate tabular-nums font-medium ${color(pv)}`}
-                                >
-                                  {fmt(pv)}
-                                </div>
-                                {perfMetrics.bench && (
-                                  <div className="truncate tabular-nums text-[11px] text-muted-foreground">
-                                    {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
-                                  </div>
-                                )}
-                              </div>
-
-                            );
-                          })}
-                        </div>
-                      </div>
+                      <EquityBenchmarkMetrics perfMetrics={perfMetrics} benchmark={benchmark} />
                     )}
+
                     <CardContent
                       className="h-64 min-w-0 max-w-full overflow-hidden sm:h-80"
 
