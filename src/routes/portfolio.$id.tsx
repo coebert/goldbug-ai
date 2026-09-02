@@ -2184,7 +2184,7 @@ function PortfolioPage() {
                     <div className="grid gap-4 lg:grid-cols-2">
                       <SignalDecayCard portfolioId={p.id} />
                       <CorrelationHeatmapCard portfolioId={p.id} />
-                      <StressPanelCard portfolioId={p.id} currency={p.currency} />
+                      
                       <LearningDiagnosticsCard portfolioId={p.id} />
                       <ShadowVariantCard portfolioId={p.id} />
                     </div>
