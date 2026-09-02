@@ -3,6 +3,7 @@ import { SectionIndex } from "@/components/nav/section-index";
 import { OverviewLookDeeperSection } from "@/components/portfolio-detail/sections/overview-look-deeper";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { RiskSection, type RiskSectionPortfolio } from "@/components/portfolio-detail/sections/risk-section";
+import { OverviewActions } from "@/components/portfolio-detail/sections/overview-actions";
 import { TradesSection, type TradeRow } from "@/components/portfolio-detail/sections/trades-section";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
