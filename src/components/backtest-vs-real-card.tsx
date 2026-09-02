@@ -160,10 +160,10 @@ export function BacktestVsRealCard({
                 tone={c.realStats.totalReturnPct >= 0 ? "up" : "down"}
               />
               <Stat
-                label="Gap (real − backtest)"
-                value={pct(c.returnGapPct)}
-                sub={money(c.pnlGap, currency)}
-                tone={c.returnGapPct >= 0 ? "up" : "down"}
+                label="Money lost to execution"
+                value={money(c.moneyLost, currency)}
+                sub={`worst ${money(c.worstMoneyLost, currency)}`}
+                tone={c.moneyLost < 0 ? "down" : "up"}
               />
               <Stat
                 label="Broker fees paid"
@@ -174,6 +174,27 @@ export function BacktestVsRealCard({
                     : ""
                 }`}
                 tone={c.fees > 0 ? "down" : "flat"}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Stat
+                label="Underperformance days"
+                value={`${c.underperformDays} days`}
+                sub="real daily money change below backtest"
+                tone={c.underperformDays > 0 ? "down" : "flat"}
+              />
+              <Stat
+                label="Recovery delay"
+                value={c.daysBehind == null ? "—" : `${c.daysBehind} days`}
+                sub={c.daysBehind == null ? "not behind at the latest point" : "behind the backtest path"}
+                tone={c.daysBehind != null && c.daysBehind > 0 ? "down" : "flat"}
+              />
+              <Stat
+                label="Exact live equity"
+                value={money(c.realEquityNow, currency)}
+                sub={`shadow ${money(c.shadowEquityNow, currency)}`}
+                tone="flat"
               />
             </div>
 
@@ -253,10 +274,11 @@ export function BacktestVsRealCard({
             </div>
 
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Both curves start at 100 on the first shared day, and real equity is netted
-              of deposits and withdrawals, so only trading shows. A negative gap is the
-              cost of executing the strategy for real — fees are broken out above; the
-              rest is spread, slippage and fills you didn't get.
+              The chart is an indexed shape comparison for readability. The money tiles keep the
+              live curve in its exact flow-netted currency: shadow equity applies the backtest's
+              day-by-day path to the same starting capital, so execution loss is not a rebased
+              estimate. Underperformance days count daily money shortfalls; recovery delay measures
+              how many shared days behind the backtest's path live equity sits.
             </p>
           </>
         )}

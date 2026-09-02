@@ -44,7 +44,17 @@ export type ComparisonPoint = {
   real: number;
   /** real − backtest, in index points (≈ percentage points of the base). */
   gap: number;
+  /** Real equity in its own money, exactly as recorded (never rebased). */
+  realMoney: number;
+  /**
+   * What the account would be worth if the backtest's own day-by-day path had
+   * been applied to the SAME starting money. Money, not an index.
+   */
+  shadowMoney: number;
+  /** realMoney − shadowMoney. Negative = money live execution has cost. */
+  moneyGap: number;
 };
+
 
 export type BacktestVsReal = {
   /** Aligned, rebased curves for charting. Empty when there is no overlap. */
@@ -77,7 +87,25 @@ export type BacktestVsReal = {
   /** Days in either curve that had no partner and were dropped. */
   droppedBacktestDays: number;
   droppedRealDays: number;
+
+  // ── Exact money / exact days (no rebasing of the live curve) ──────────────
+  /** Real equity today, in its own money. */
+  realEquityNow: number;
+  /** What the account would be worth on the backtest's own path, same money. */
+  shadowEquityNow: number;
+  /** realEquityNow − shadowEquityNow. Negative = money lost to live execution. */
+  moneyLost: number;
+  /** Worst money shortfall reached at any point in the shared window. */
+  worstMoneyLost: number;
+  /** Shared days where real money moved less than the backtest that day. */
+  underperformDays: number;
+  /**
+   * How far back the shadow curve was last worth what real money is worth
+   * today — "live is this many shared days behind". Null when not behind.
+   */
+  daysBehind: number | null;
 };
+
 
 const EMPTY_STATS: CurveStats = {
   totalReturnPct: 0,
@@ -105,7 +133,14 @@ export const EMPTY_COMPARISON: BacktestVsReal = {
   to: null,
   droppedBacktestDays: 0,
   droppedRealDays: 0,
+  realEquityNow: 0,
+  shadowEquityNow: 0,
+  moneyLost: 0,
+  worstMoneyLost: 0,
+  underperformDays: 0,
+  daysBehind: null,
 };
+
 
 function dayKey(iso: string): string {
   return iso.slice(0, 10);
@@ -172,19 +207,48 @@ export function compareBacktestToReal(input: {
   const rlVals = shared.map((d) => rl.get(d) as number);
   const btBase = btVals[0];
   const rlBase = rlVals[0];
+  const startEquity = rlBase;
 
+  const shadowVals = btVals.map((value) =>
+    btBase !== 0 ? startEquity * (value / btBase) : startEquity,
+  );
   const points: ComparisonPoint[] = shared.map((d, i) => {
     const b = btBase !== 0 ? (btVals[i] / btBase) * 100 : 100;
     const r = rlBase !== 0 ? (rlVals[i] / rlBase) * 100 : 100;
-    return { date: d, backtest: b, real: r, gap: r - b };
+    return {
+      date: d,
+      backtest: b,
+      real: r,
+      gap: r - b,
+      realMoney: rlVals[i],
+      shadowMoney: shadowVals[i],
+      moneyGap: rlVals[i] - shadowVals[i],
+    };
   });
 
   const backtestStats = curveStats(btVals);
   const realStats = curveStats(rlVals);
 
-  const startEquity = rlBase;
-  const realPnl = rlVals[rlVals.length - 1] - rlBase;
-  const backtestPnl = startEquity * (backtestStats.totalReturnPct / 100);
+  const realEquityNow = rlVals[rlVals.length - 1];
+  const shadowEquityNow = shadowVals[shadowVals.length - 1];
+  const realPnl = realEquityNow - startEquity;
+  const backtestPnl = shadowEquityNow - startEquity;
+  const moneyLost = realEquityNow - shadowEquityNow;
+  const worstMoneyLost = Math.min(...rlVals.map((value, i) => value - shadowVals[i]), 0);
+  const underperformDays = rlVals.slice(1).reduce(
+    (count, value, i) => count + (value - rlVals[i] < shadowVals[i + 1] - shadowVals[i] ? 1 : 0),
+    0,
+  );
+  let daysBehind: number | null = null;
+  if (moneyLost < 0) {
+    for (let i = shadowVals.length - 1; i >= 0; i -= 1) {
+      if (shadowVals[i] <= realEquityNow) {
+        daysBehind = shadowVals.length - 1 - i;
+        break;
+      }
+    }
+  }
+
 
   const fees = (input.fees ?? [])
     .filter((f) => {
@@ -194,7 +258,7 @@ export function compareBacktestToReal(input: {
     .reduce((s, f) => s + (Number.isFinite(f.amount) ? Math.abs(Number(f.amount)) : 0), 0);
 
   const returnGapPct = realStats.totalReturnPct - backtestStats.totalReturnPct;
-  const pnlGap = realPnl - backtestPnl;
+  const pnlGap = moneyLost;
   const feesBps = startEquity > 0 ? (fees / startEquity) * 10_000 : 0;
   // Fees only "explain" a shortfall — a gap in your favour isn't explained by
   // paying the broker, so the share is only defined when the real book lagged.
@@ -219,6 +283,12 @@ export function compareBacktestToReal(input: {
     to,
     droppedBacktestDays: Math.max(0, bt.size - shared.length),
     droppedRealDays: Math.max(0, rl.size - shared.length),
+    realEquityNow,
+    shadowEquityNow,
+    moneyLost,
+    worstMoneyLost,
+    underperformDays,
+    daysBehind,
   };
 }
 
