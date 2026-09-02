@@ -2,6 +2,7 @@ import { ChartFrame } from "@/components/chart-frame";
 import { SectionIndex } from "@/components/nav/section-index";
 import { OverviewLookDeeperSection } from "@/components/portfolio-detail/sections/overview-look-deeper";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
+import { RiskSection, type RiskSectionPortfolio } from "@/components/portfolio-detail/sections/risk-section";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
@@ -99,21 +100,6 @@ const TodaysDecisionSummaryCard = lazy(() =>
   })),
 );
 
-const FxHealthCard = lazy(() =>
-  import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
-);
-const FxIntentsCard = lazy(() =>
-  import("@/components/fx-intents-card").then((m) => ({ default: m.FxIntentsCard })),
-);
-const FxIntentPnlCard = lazy(() =>
-  import("@/components/fx-intent-pnl-card").then((m) => ({ default: m.FxIntentPnlCard })),
-);
-const RiskSimulatorCard = lazy(() =>
-  import("@/components/risk-simulator-card").then((m) => ({ default: m.RiskSimulatorCard })),
-);
-const ManualFxConvertCard = lazy(() =>
-  import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
-);
 const WalletAffordabilityCard = lazy(() =>
   import("@/components/wallet-affordability-card").then((m) => ({
     default: m.WalletAffordabilityCard,
@@ -136,13 +122,9 @@ import { OrderExplanationsBackfillCard } from "@/components/order-explanations-b
 import { Metric } from "@/components/portfolio-detail/metric";
 import { formatMetricValue } from "@/components/portfolio-detail/format";
 
-import { RiskControlsCard } from "@/components/risk-controls-card";
-import { SwingModeToggle } from "@/components/swing-mode-toggle";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
-import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
-import { ConcentrationAlertCard } from "@/components/concentration-alert-card";
 import { InsiderDealingsCard } from "@/components/insider-dealings-card";
 import { PolicyDecisionExplainCard } from "@/components/policy-decision-explain-card";
 import { PolicyRegimeTimelineCard } from "@/components/policy-regime-timeline-card";
@@ -161,7 +143,6 @@ import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { useIsAdvanced } from "@/lib/use-experience-level";
 
-import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
@@ -176,7 +157,6 @@ import { FearIndexCard } from "@/components/fear-index-card";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { SignalDecayCard } from "@/components/signal-decay-card";
-import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -208,8 +188,6 @@ import { PriceUnitAuditCard } from "@/components/price-unit-audit-card";
 import { ValuationConsistencyAlert } from "@/components/valuation-consistency-alert";
 import { InstrumentCcyAlert } from "@/components/instrument-ccy-alert";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
-import { FxAuditCard } from "@/components/fx-audit-card";
-import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
 
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 
@@ -1051,7 +1029,7 @@ function PortfolioPage() {
                   Why ({decisions.length})
                 </TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">
-                  Safety limits
+                  Risk
                 </TabsTrigger>
                 {/* Expert-only tabs. Hidden in Simple mode so a newcomer sees
                     four choices instead of nine — the Simple/Advanced switch
@@ -1085,14 +1063,6 @@ function PortfolioPage() {
                   mode={p.mode}
                 />
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
-                <ConcentrationAlertCard
-                  holdings={holdings}
-                  series={holdingsSeries}
-                  totalValue={totalValue}
-                  currency={p.currency}
-                  mode={p.mode}
-                  className="mb-4"
-                />
                 <SignalWeightHistoryCard portfolioId={id} className="mb-4" />
                 <PolicyRegimeTimelineCard portfolioId={id} className="mb-4" />
                 <div className="mb-4">
@@ -1868,25 +1838,12 @@ function PortfolioPage() {
 
                 {(p.mode === "live_sim" || p.mode === "live_prod") && (
                   <div className="mt-6 space-y-4">
-                    <FxAuditCard portfolioId={id} active={tab === "overview"} />
-                    <FxCashAtRiskCard portfolioId={id} />
-                    <Link
-                      to="/portfolio/$id/fx-risk"
-                      params={{ id }}
-                      className="inline-block text-xs text-primary hover:underline"
-                    >
-                      Open the FX risk dashboard — rate history, decision log, backtest & stress test →
-                    </Link>
                     <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
 
                     <CashReconciliationLogCard portfolioId={id} />
                   </div>
                 )}
 
-
-                <div className="mt-6">
-                  <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} equity={totalValue} currency={p.currency} />
-                </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <RegimePanel />
@@ -1896,39 +1853,15 @@ function PortfolioPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="risk" className="mt-4 space-y-4">
-                <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} equity={totalValue} currency={p.currency} />
-                <RiskControlsCard
-                  portfolioId={id}
-                  riskConfig={p.risk_config}
-                  baseCurrency={p.currency}
-                />
-                <RiskCurveComparisonCard
-                  portfolioId={id}
-                  currentLevel={clampDialLevel(
-                    (p.risk_config as { risk_level?: number } | null)?.risk_level,
-                  )}
-                />
-                <ExecutionCalibrationCard
-                  portfolioId={id}
-                  execParams={
-                    (
-                      p.risk_config as {
-                        execution_params?: Parameters<
-                          typeof ExecutionCalibrationCard
-                        >[0]["execParams"];
-                      } | null
-                    )?.execution_params ?? null
-                  }
-                  calibration={
-                    (
-                      p.risk_config as {
-                        execution_calibration?: Parameters<
-                          typeof ExecutionCalibrationCard
-                        >[0]["calibration"];
-                      } | null
-                    )?.execution_calibration ?? null
-                  }
+              <TabsContent value="risk" className="mt-4">
+                <RiskSection
+                  id={id}
+                  p={p as unknown as RiskSectionPortfolio}
+                  totalValue={totalValue}
+                  holdings={holdings}
+                  holdingsSeries={holdingsSeries}
+                  active={tab === "risk"}
+                  clampDialLevel={(v: unknown) => clampDialLevel(v as number | undefined)}
                 />
               </TabsContent>
 
@@ -1971,17 +1904,6 @@ function PortfolioPage() {
               <TabsContent value="errors" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <div className="space-y-4">
-                    <FxHealthCard portfolioId={p.id} active={tab === "errors"} />
-                    {p.fx_enabled === true && (
-                      <FxIntentsCard portfolioId={p.id} active={tab === "errors"} />
-                    )}
-                    {p.fx_enabled === true && (
-                      <FxIntentPnlCard portfolioId={p.id} active={tab === "errors"} />
-                    )}
-                    {p.fx_enabled === true && (
-                      <RiskSimulatorCard portfolioId={p.id} active={tab === "errors"} />
-                    )}
-                    {p.fx_enabled === true && <ManualFxConvertCard portfolio={p} />}
                     <TradeOutcomePanelCard portfolioId={p.id} active={tab === "errors"} />
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
                   </div>
@@ -2184,7 +2106,7 @@ function PortfolioPage() {
                     <div className="grid gap-4 lg:grid-cols-2">
                       <SignalDecayCard portfolioId={p.id} />
                       <CorrelationHeatmapCard portfolioId={p.id} />
-                      <StressPanelCard portfolioId={p.id} currency={p.currency} />
+                      
                       <LearningDiagnosticsCard portfolioId={p.id} />
                       <ShadowVariantCard portfolioId={p.id} />
                     </div>
