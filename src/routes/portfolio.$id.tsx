@@ -69,33 +69,9 @@ import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
 // Heavy tab bodies are code-split via React.lazy to keep the main
 // portfolio route chunk lean on mobile.
-const TradeAuditLogCard = lazy(() =>
-  import("@/components/trade-audit-log-card").then((m) => ({ default: m.TradeAuditLogCard })),
-);
 const CorporateActionsCard = lazy(() =>
   import("@/components/corporate-actions-card").then((m) => ({
     default: m.CorporateActionsCard,
-  })),
-);
-
-const ConfidenceTimelineCard = lazy(() =>
-  import("@/components/confidence-timeline-card").then((m) => ({
-    default: m.ConfidenceTimelineCard,
-  })),
-);
-const TradeErrorDashboardCard = lazy(() =>
-  import("@/components/trade-error-dashboard-card").then((m) => ({
-    default: m.TradeErrorDashboardCard,
-  })),
-);
-const TradeOutcomePanelCard = lazy(() =>
-  import("@/components/trade-outcome-panel-card").then((m) => ({
-    default: m.TradeOutcomePanelCard,
-  })),
-);
-const TodaysDecisionSummaryCard = lazy(() =>
-  import("@/components/todays-decision-summary-card").then((m) => ({
-    default: m.TodaysDecisionSummaryCard,
   })),
 );
 
@@ -1806,85 +1782,12 @@ function PortfolioPage() {
               </TabsContent>
 
 
-              <TabsContent value="diagnostics" className="mt-4 space-y-4">
-                <DiagnosticsPanel portfolioId={p.id} />
-                <Collapsible open={showAdvancedDiag} onOpenChange={setShowAdvancedDiag}>
-                  <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${showAdvancedDiag ? "rotate-180" : ""}`}
-                    />
-                    {showAdvancedDiag ? "Hide" : "Show"} advanced diagnostics (signal decay,
-                    correlations, stress, learning delta, shadow variants)
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4">
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <SignalDecayCard portfolioId={p.id} />
-                      <CorrelationHeatmapCard portfolioId={p.id} />
-                      
-                      <LearningDiagnosticsCard portfolioId={p.id} />
-                      <ShadowVariantCard portfolioId={p.id} />
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
+              <TabsContent value="diagnostics" className="mt-4">
+                <DiagnosticsSection portfolioId={p.id} />
               </TabsContent>
 
               <TabsContent value="reports" className="mt-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {(
-                    [
-                      {
-                        to: "/portfolio/$id/analytics",
-                        label: "Performance analytics",
-                        desc: "Equity, drawdown and PnL attribution across regime, sizing, exit and execution phases.",
-                        Icon: BarChart3,
-                      },
-                      {
-                        to: "/portfolio/$id/attribution",
-                        label: "Attribution",
-                        desc: "Per-asset P&L contribution and factor breakdown.",
-                        Icon: BarChart3,
-                      },
-                      {
-                        to: "/portfolio/$id/sma-report",
-                        label: "SMA crossover report",
-                        desc: "Per-symbol SMA20/50 crosses, golden/death regime and the trades taken against that trend.",
-                        Icon: BarChart3,
-                      },
-                      {
-                        to: "/portfolio/$id/report",
-                        label: "Report",
-                        desc: "Downloadable performance report for this portfolio.",
-                        Icon: FileText,
-                      },
-                      {
-                        to: "/portfolio/$id/optimizer",
-                        label: "Optimizer",
-                        desc: "Re-run the AI with alternate risk profiles for comparison.",
-                        Icon: Settings2,
-                      },
-                      {
-                        to: "/long-horizon/$id",
-                        label: "Long-horizon backtest",
-                        desc: "Multi-decade rule-based simulation vs benchmarks.",
-                        Icon: CalendarClock,
-                      },
-                    ] as const
-                  ).map((r) => (
-                    <Link key={r.to} to={r.to} params={{ id: p.id }} className="block">
-                      <Card className="h-full transition-colors hover:border-primary/40">
-                        <CardContent className="flex items-start gap-3 py-4">
-                          <div className="mt-0.5 rounded-md bg-muted p-2">
-                            <r.Icon className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-medium">{r.label}</div>
-                            <p className="text-xs text-muted-foreground">{r.desc}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
+                <ReportsSection portfolioId={p.id} />
               </TabsContent>
             </Tabs>
           </>
