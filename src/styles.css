@@ -19,6 +19,12 @@
  */
 
 @theme inline {
+  /* Motion budget: state changes only, 150ms ease-out. Data never
+   * animates in; numbers transition only when the value changes. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 100ms;
+  --motion-base: 150ms;
+  --motion-slow: 220ms;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
