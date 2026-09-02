@@ -1971,17 +1971,6 @@ function PortfolioPage() {
               <TabsContent value="errors" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <div className="space-y-4">
-                    <FxHealthCard portfolioId={p.id} active={tab === "errors"} />
-                    {p.fx_enabled === true && (
-                      <FxIntentsCard portfolioId={p.id} active={tab === "errors"} />
-                    )}
-                    {p.fx_enabled === true && (
-                      <FxIntentPnlCard portfolioId={p.id} active={tab === "errors"} />
-                    )}
-                    {p.fx_enabled === true && (
-                      <RiskSimulatorCard portfolioId={p.id} active={tab === "errors"} />
-                    )}
-                    {p.fx_enabled === true && <ManualFxConvertCard portfolio={p} />}
                     <TradeOutcomePanelCard portfolioId={p.id} active={tab === "errors"} />
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
                   </div>
