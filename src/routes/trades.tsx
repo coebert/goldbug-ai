@@ -1,5 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { PageShell, PageSection } from "@/components/layout/page-shell";
+
+const DecisionNewsBreakdown = lazy(() =>
+  import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
+);
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Drawer,
@@ -38,7 +44,6 @@ import {
   RefreshCw,
   XCircle,
   AlertTriangle,
-  ArrowLeft,
 } from "lucide-react";
 import { getTradesDashboard, type TradeRow } from "@/lib/trades.functions";
 
@@ -149,32 +154,25 @@ function TradesPage() {
   }, [rows]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-surface-1">
       <AppHeader email={email} />
-      <main className="mx-auto w-full min-w-0 max-w-6xl 2xl:max-w-7xl px-4 py-6 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Dashboard
-            </Link>
-          </div>
+      <PageShell
+        title="Trades"
+        purpose="Every order's lifecycle — submitted, filled, rejected — alongside the position it moved."
+        actions={
           <Button
             variant="outline"
             size="sm"
+            className="min-h-11"
             onClick={() => query.refetch()}
             disabled={query.isFetching}
           >
             <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
             <span className="ml-1.5">Refresh</span>
           </Button>
-        </div>
+        }
+      >
 
-        <div>
-          <h1 className="text-xl font-semibold leading-tight tracking-tight sm:text-2xl">Trades</h1>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            Every order's lifecycle — submitted, filled, rejected — alongside the current position it moved.
-          </p>
-        </div>
 
         {summary && (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -284,7 +282,18 @@ function TradesPage() {
             ))}
           </div>
         )}
-      </main>
+
+        <PageSection
+          id="why"
+          title="Why the AI bought and sold"
+          description="Each recent decision traced back to the news and signals behind it."
+        >
+          <Suspense fallback={<div className="skeleton-shimmer h-80 w-full" aria-hidden="true" />}>
+            <DecisionNewsBreakdown />
+          </Suspense>
+        </PageSection>
+      </PageShell>
+
     </div>
   );
 }

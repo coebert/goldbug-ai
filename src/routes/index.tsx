@@ -15,6 +15,9 @@ import { ukHour, ukZoneAbbr } from "@/lib/uk-time";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionIndex } from "@/components/nav/section-index";
+import { PageShell } from "@/components/layout/page-shell";
+import { CardShell } from "@/components/layout/card-shell";
+
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
 import { HomeCoachMarks } from "@/components/home-coach-marks";
@@ -44,33 +47,24 @@ export { ModeSummaryTile } from "@/components/home/mode-summary-tile";
 const AllPortfoliosChart = lazy(() =>
   import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
 );
-const NewsReel = lazy(() =>
-  import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
-);
-const ExecPostsCard = lazy(() =>
-  import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
-);
-const PolicyMakersCard = lazy(() =>
-  import("@/components/policy-makers-card").then((m) => ({ default: m.PolicyMakersCard })),
-);
-const TickerWatchCard = lazy(() =>
-  import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
-);
-
-
-const DecisionNewsBreakdown = lazy(() =>
-  import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
-);
 
 export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Aegis — Your AI Paper Portfolios" },
+      { title: "Aegis — Your AI trading portfolios" },
       {
         name: "description",
-        content: "Manage AI-driven paper trading portfolios. Backtest, run daily, watch results.",
+        content:
+          "Today's equity, what the AI did this hour and what it plans next, across every portfolio.",
       },
+      { property: "og:title", content: "Aegis — Your AI trading portfolios" },
+      {
+        property: "og:description",
+        content: "Today's equity, what the AI did and what it plans next.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Home,
@@ -78,10 +72,11 @@ export const Route = createFileRoute("/")({
 
 const HOME_SECTIONS = [
   { id: "today", label: "Today" },
+  { id: "combined-equity", label: "Combined" },
   { id: "portfolios", label: "Portfolios" },
   { id: "create-portfolio", label: "New portfolio" },
-  { id: "look-deeper", label: "Look deeper" },
 ] as const;
+
 
 function Home() {
   const navigate = useNavigate();
@@ -229,18 +224,15 @@ function Home() {
     <div className="min-h-dvh overflow-x-hidden bg-surface-1">
       <AppHeader email={session?.user.email} />
       <HomeCoachMarks />
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8 2xl:max-w-7xl">
-        {/* Page heading + density control */}
-        <div className="mb-5 space-y-3 sm:mb-7 sm:flex sm:flex-wrap sm:items-start sm:justify-between sm:gap-3 sm:space-y-0">
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Your money</h1>
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              {portfolioCount === 0
-                ? "Nothing set up yet — start with pretend money and watch how the AI invests."
-                : "Everything below updates by itself. The AI reviews the market every hour."}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 sm:shrink-0 sm:flex-nowrap sm:gap-2">
+      <PageShell
+        title="Your money"
+        purpose={
+          portfolioCount === 0
+            ? "Nothing set up yet — start with pretend money and watch how the AI invests."
+            : "Everything here updates by itself. The AI reviews the market every hour."
+        }
+        actions={
+          <>
             <ExperienceLevelToggle />
             <DashboardSettings
               includeDeposits={includeDeposits}
@@ -250,20 +242,14 @@ function Home() {
               focusMode={focusMode}
               onFocusModeChange={setFocusMode}
             />
-            <a href="#create-portfolio" className="hidden sm:inline-flex">
-              <Button size="sm">
+            <a href="#create-portfolio">
+              <Button size="sm" className="min-h-11">
                 <PlusCircle className="mr-1 h-4 w-4" /> New portfolio
               </Button>
             </a>
-            <a href="#create-portfolio" className="ml-auto sm:hidden">
-              <Button size="sm" className="min-h-11 px-4">
-                <PlusCircle className="mr-1 h-4 w-4" /> New
-              </Button>
-            </a>
-          </div>
-        </div>
-
-
+          </>
+        }
+      >
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
 
         {mirrorQ.isLoading && portfolioCount > 1 ? (
@@ -275,7 +261,7 @@ function Home() {
         <SectionIndex items={HOME_SECTIONS} />
 
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
-        <div id="today" className="mb-6 grid scroll-mt-28 gap-4 lg:grid-cols-3">
+        <div id="today" className="scroll-below-sticky mb-6 grid gap-4 lg:grid-cols-3">
           <div className="min-w-0 lg:col-span-2">
             {equityQ.isLoading && !equityQ.data ? (
               <TodayHeroSkeleton />
@@ -292,24 +278,41 @@ function Home() {
 
         <NewHereBanner />
 
+        {/* Everything added together — the only chart Home keeps. */}
+        {!focusMode && (
+          <CardShell
+            anchor="combined-equity"
+            title="All portfolios on one chart"
+            subtitle="Your combined value over time, every portfolio added together."
+            level={2}
+            className="mb-6"
+          >
+            <Suspense fallback={<div className="skeleton-shimmer h-64 w-full" aria-hidden="true" />}>
+              <AllPortfoliosChart />
+            </Suspense>
+          </CardShell>
+        )}
+
         {/* Markets live on their own page now — Home keeps one compact
             link so the wider picture is always one tap away. */}
         <Link
           to="/markets"
-          className="mb-6 grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted"
+          className="mb-6 grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-surface-2 px-4 py-3 tween hover:bg-surface-3"
         >
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">Markets today</span>
             <span className="block truncate text-xs text-muted-foreground">
-              Market pulse, moving-average trends and trading hours
+              Market pulse, moving-average trends, watchlist and the news the AI is reading
             </span>
           </span>
           <LineChart className="h-5 w-5 shrink-0 text-primary" aria-hidden />
         </Link>
 
-
         {/* Portfolios — real money first, practice money folded away */}
-        <div id="portfolios" className="grid scroll-mt-28 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div
+          id="portfolios"
+          className="scroll-below-sticky grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]"
+        >
           <div className="min-w-0 space-y-3">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-display text-lg font-semibold tracking-tight">Real money</h2>
@@ -348,108 +351,57 @@ function Home() {
                 <AdvancedSection
                   title={`Practice portfolios (${simPortfolios.length})`}
                   summary="Simulated money at real prices. Useful for comparison — no real cash involved."
-                  defaultOpen={false}
+                  defaultOpen={advanced}
                 >
                   <div className="space-y-3">{simPortfolios.map(renderPortfolioRow)}</div>
                 </AdvancedSection>
               </div>
             )}
           </div>
-          <div id="create-portfolio" className="min-w-0 scroll-mt-24">
+          <div id="create-portfolio" className="min-w-0 scroll-below-sticky">
             <CreatePortfolioCard />
           </div>
         </div>
 
-
-        {/* Everything expert-level lives here: present, labelled in plain
-            English, but folded away unless asked for. */}
-        {level === "simple" && (
-          <p className="mt-8 text-xs text-muted-foreground">
-            Showing the essentials. Switch to <strong className="font-medium">Standard</strong> or{" "}
-            <strong className="font-medium">Everything</strong> at the top of the page for the
-            deeper panels.
+        {/* Home is deliberately one screen now. Everything that used to
+            stack below lives on the page it belongs to. */}
+        <nav aria-label="Where the deeper panels went" className="mt-8">
+          <h2 className="font-display text-lg font-semibold tracking-tight">Go deeper</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            The analysis panels moved to the page they belong to. Nothing was removed.
           </p>
-        )}
-
-        {!focusMode && level !== "simple" && (
-          <div id="look-deeper" className="mt-8 scroll-mt-28 space-y-3">
-            <h2 className="font-display text-lg font-semibold tracking-tight">Look deeper</h2>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Optional detail. Nothing here needs your attention day to day.
-            </p>
-
-            <AdvancedSection
-              title="All portfolios on one chart"
-              summary="Your combined value over time, every portfolio added together."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <AllPortfoliosChart />
-              </Suspense>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="Symbols the AI is watching"
-              summary="Individual shares under close watch, with the price levels that trigger an alert."
-              defaultOpen
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <TickerWatchCard />
-              </Suspense>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Scanners and backtests moved to{" "}
-                <Link to="/research" className="text-primary underline-offset-2 hover:underline">
-                  Research
+          <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+            {[
+              {
+                to: "/markets" as const,
+                title: "Markets",
+                hint: "Pulse, trends, watchlist, news, CEO posts and policy makers.",
+              },
+              {
+                to: "/trades" as const,
+                title: "Trades",
+                hint: "Every order, why it was placed, and what it cost.",
+              },
+              {
+                to: "/research" as const,
+                title: "Research",
+                hint: "Scanners, backtests and walk-forward studies.",
+              },
+            ].map((l) => (
+              <li key={l.to}>
+                <Link
+                  to={l.to}
+                  className="flex min-h-16 flex-col justify-center rounded-xl bg-surface-2 px-4 py-3 tween hover:bg-surface-3"
+                >
+                  <span className="text-sm font-medium">{l.title}</span>
+                  <span className="mt-0.5 text-xs text-muted-foreground">{l.hint}</span>
                 </Link>
-                .
-              </p>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="CEO posts the AI is tracking"
-              summary="Market-moving social posts by figures such as Elon Musk, and the symbols they affect."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <ExecPostsCard />
-              </Suspense>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="Policy makers the AI is tracking"
-              summary="Central bank and finance-ministry remarks, scored hawkish to dovish, and the assets they affect."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <PolicyMakersCard />
-              </Suspense>
-            </AdvancedSection>
-
-
-            <AdvancedSection
-              title="News the AI is reading"
-              summary="Headlines feeding this hour's decisions, grouped by company or asset."
-              defaultOpen={advanced}
-            >
-              <div data-coach="news-reel">
-                <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
-                  <NewsReel />
-                </Suspense>
-              </div>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="Why the AI bought and sold"
-              summary="Each recent decision traced back to the news and signals behind it."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <DecisionNewsBreakdown />
-              </Suspense>
-            </AdvancedSection>
-          </div>
-        )}
-      </main>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </PageShell>
     </div>
   );
 }
+

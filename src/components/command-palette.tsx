@@ -25,8 +25,11 @@ import {
   LogOut,
   Briefcase,
   Grid3x3,
+  LayoutGrid,
 } from "lucide-react";
+import { CARD_CATALOG } from "@/lib/card-catalog";
 import { listPortfolios } from "@/lib/trading.functions";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { qk } from "@/lib/query-keys";
@@ -71,6 +74,13 @@ export function CommandPalette({
     () => (q.data ?? []) as Array<{ id: string; name: string; mode: string }>,
     [q.data],
   );
+
+  /** Card links that live under /portfolio/$id resolve against the
+   * real-money portfolio when there is one, else the first listed. */
+  const firstPortfolioId =
+    portfolios.find((p) => p.mode === "live_prod")?.id ?? portfolios[0]?.id ?? null;
+
+
 
   const go = (fn: () => void) => {
     setOpen(false);
@@ -146,6 +156,32 @@ export function CommandPalette({
               <Shield className="mr-2 h-4 w-4" /> Admin
             </CommandItem>
           </CommandGroup>
+
+          <CommandSeparator />
+          <CommandGroup heading="Cards & charts">
+            {CARD_CATALOG.filter((c) => !c.page.includes("$id") || !!firstPortfolioId).map((c) => {
+              const path = c.page.includes("$id")
+                ? c.page.replace("$id", firstPortfolioId as string)
+                : c.page;
+              return (
+                <CommandItem
+                  key={`${c.page}#${c.anchor}`}
+                  value={`card ${c.title} ${c.keywords ?? ""} ${c.area}`}
+                  onSelect={() =>
+                    go(() => navigate({ to: path as never, hash: c.anchor }))
+                  }
+                >
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  <span className="truncate">{c.title}</span>
+                  <span className="ml-2 shrink-0 text-[10px] uppercase text-muted-foreground">
+                    {c.area}
+                  </span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+
+
 
           {portfolios.length > 0 && (
             <>

@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { GitCompare, Network } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { PageShell, PageSection } from "@/components/layout/page-shell";
+import { SectionIndex } from "@/components/nav/section-index";
 import { useSessionEmail } from "@/lib/use-session-email";
 
 const MarketPulseCard = lazy(() =>
@@ -16,6 +18,15 @@ const MarketHoursCard = lazy(() =>
 const NewsReel = lazy(() =>
   import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
 );
+const TickerWatchCard = lazy(() =>
+  import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
+);
+const ExecPostsCard = lazy(() =>
+  import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
+);
+const PolicyMakersCard = lazy(() =>
+  import("@/components/policy-makers-card").then((m) => ({ default: m.PolicyMakersCard })),
+);
 
 export const Route = createFileRoute("/markets")({
   ssr: false,
@@ -25,20 +36,28 @@ export const Route = createFileRoute("/markets")({
       {
         name: "description",
         content:
-          "Market pulse, moving-average trends, trading hours and the news the AI is reading.",
+          "Market pulse, moving-average trends, trading hours, watched symbols and the news the AI is reading.",
       },
       { property: "og:title", content: "Markets — Aegis" },
       {
         property: "og:description",
         content: "Market pulse, moving-average trends, trading hours and live market news.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: MarketsPage,
 });
 
+const MARKET_SECTIONS = [
+  { id: "conditions", label: "Conditions" },
+  { id: "watchlist", label: "Watchlist" },
+  { id: "intel", label: "Intel" },
+] as const;
+
 const fallback = (h: string) => (
-  <div className={`${h} rounded-2xl border border-border bg-card/50`} aria-hidden="true" />
+  <div className={`${h} skeleton-shimmer w-full`} aria-hidden="true" />
 );
 
 function MarketsPage() {
@@ -46,44 +65,74 @@ function MarketsPage() {
   return (
     <div className="min-h-dvh overflow-x-hidden bg-surface-1">
       <AppHeader email={email} />
-      <main className="mx-auto min-w-0 max-w-6xl px-4 py-5 sm:py-8 2xl:max-w-7xl">
-        <header className="mb-5 min-w-0">
-          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Markets</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            The state of the wider market — read this before judging your own numbers.
-          </p>
-        </header>
+      <PageShell
+        title="Markets"
+        purpose="The state of the wider market — read this before judging your own numbers."
+        actions={
+          <>
+            <Link
+              to="/compare"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
+            >
+              <GitCompare className="h-4 w-4 text-primary" aria-hidden /> Compare
+            </Link>
+            <Link
+              to="/spillover"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
+            >
+              <Network className="h-4 w-4 text-primary" aria-hidden /> Spillover
+            </Link>
+          </>
+        }
+      >
+        <SectionIndex items={MARKET_SECTIONS} />
 
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <Link
-            to="/compare"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm hover:bg-muted"
-          >
-            <GitCompare className="h-4 w-4 text-primary" aria-hidden /> Compare
-          </Link>
-          <Link
-            to="/spillover"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm hover:bg-muted"
-          >
-            <Network className="h-4 w-4 text-primary" aria-hidden /> Spillover
-          </Link>
-        </div>
+        <PageSection
+          id="conditions"
+          title="Conditions"
+          description="Is the market helping or fighting you right now?"
+        >
+          <div className="space-y-4">
+            <Suspense fallback={fallback("h-72")}>
+              <MarketPulseCard />
+            </Suspense>
+            <Suspense fallback={fallback("h-96")}>
+              <SmaTrendCard />
+            </Suspense>
+            <Suspense fallback={fallback("h-40")}>
+              <MarketHoursCard />
+            </Suspense>
+          </div>
+        </PageSection>
 
-        <div className="space-y-6">
-          <Suspense fallback={fallback("h-72")}>
-            <MarketPulseCard />
+        <PageSection
+          id="watchlist"
+          title="Watchlist"
+          description="Symbols under close watch and the price levels that trigger an alert."
+        >
+          <Suspense fallback={fallback("h-64")}>
+            <TickerWatchCard />
           </Suspense>
-          <Suspense fallback={fallback("h-96")}>
-            <SmaTrendCard />
-          </Suspense>
-          <Suspense fallback={fallback("h-40")}>
-            <MarketHoursCard />
-          </Suspense>
-          <Suspense fallback={fallback("h-80")}>
-            <NewsReel />
-          </Suspense>
-        </div>
-      </main>
+        </PageSection>
+
+        <PageSection
+          id="intel"
+          title="What the AI is reading"
+          description="The headlines, executive posts and policy remarks feeding this hour's decisions."
+        >
+          <div className="space-y-4">
+            <Suspense fallback={fallback("h-80")}>
+              <NewsReel />
+            </Suspense>
+            <Suspense fallback={fallback("h-64")}>
+              <ExecPostsCard />
+            </Suspense>
+            <Suspense fallback={fallback("h-64")}>
+              <PolicyMakersCard />
+            </Suspense>
+          </div>
+        </PageSection>
+      </PageShell>
     </div>
   );
 }

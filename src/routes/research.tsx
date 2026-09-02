@@ -2,7 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { FileText } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
-import { AdvancedSection } from "@/components/advanced-section";
+import { PageShell, PageSection } from "@/components/layout/page-shell";
+import { CardShell } from "@/components/layout/card-shell";
+import { SectionIndex } from "@/components/nav/section-index";
+
 import { useSessionEmail } from "@/lib/use-session-email";
 import { RiskLevelMetricsCard } from "@/components/risk-level-metrics-card";
 
@@ -40,81 +43,110 @@ export const Route = createFileRoute("/research")({
 });
 
 const fallback = (h: string) => (
-  <div className={`${h} rounded-2xl border border-border bg-card/50`} aria-hidden="true" />
+  <div className={`${h} skeleton-shimmer w-full`} aria-hidden="true" />
 );
+
+const RESEARCH_SECTIONS = [
+  { id: "scanners", label: "Scanners" },
+  { id: "backtests", label: "Backtests" },
+  { id: "learned", label: "Learned rules" },
+] as const;
 
 function ResearchPage() {
   const email = useSessionEmail();
   return (
     <div className="min-h-dvh overflow-x-hidden bg-surface-1">
       <AppHeader email={email} />
-      <main className="mx-auto min-w-0 max-w-6xl px-4 py-5 sm:py-8 2xl:max-w-7xl">
-        <header className="mb-5 min-w-0">
-          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Research</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Scanners and backtests. Nothing here places a trade — it only tests ideas.
-          </p>
-        </header>
-
-        <div className="mb-4">
+      <PageShell
+        title="Research"
+        purpose="Scanners and backtests. Nothing here places a trade — it only tests ideas."
+        actions={
           <Link
             to="/simulation-report"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm hover:bg-muted"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
           >
             <FileText className="h-4 w-4 text-primary" aria-hidden /> Simulation report
           </Link>
-        </div>
+        }
+      >
+        <SectionIndex items={RESEARCH_SECTIONS} />
 
-        <div className="space-y-3">
-          <AdvancedSection
+        <PageSection
+          id="scanners"
+          title="Scanners"
+          description="What matches the AI's setups in today's market."
+        >
+          <CardShell
+            anchor="reclaim-scan"
             title="Market scanner"
-            summary="Shares matching the post-reclaim setup the AI learned, with a chart for each match."
-            defaultOpen
+            subtitle="Shares matching the post-reclaim setup the AI learned, with a chart for each match."
+            level={1}
           >
             <Suspense fallback={fallback("h-48")}>
               <ReclaimScanCard />
             </Suspense>
-          </AdvancedSection>
+          </CardShell>
+        </PageSection>
 
-          <AdvancedSection
-            title="Setup backtest"
-            summary="How often that setup actually paid, over the last few years."
-            defaultOpen={false}
-          >
-            <Suspense fallback={fallback("h-64")}>
-              <SetupBacktestCard />
-            </Suspense>
-          </AdvancedSection>
+        <PageSection
+          id="backtests"
+          title="Backtests"
+          description="Did the idea actually pay, after costs?"
+        >
+          <div className="space-y-4">
+            <CardShell
+              anchor="setup-backtest"
+              title="Setup backtest"
+              subtitle="How often that setup actually paid, over the last few years."
+              level={2}
+            >
+              <Suspense fallback={fallback("h-64")}>
+                <SetupBacktestCard />
+              </Suspense>
+            </CardShell>
 
-          <AdvancedSection
-            title="Risk levels at a glance"
-            summary="Risk, drawdown and diversification for each risk level, side by side."
-            defaultOpen={false}
-          >
-            <RiskLevelMetricsCard />
-          </AdvancedSection>
+            <CardShell
+              anchor="risk-levels"
+              title="Risk levels at a glance"
+              subtitle="Risk, drawdown and diversification for each risk level, side by side."
+              level={2}
+            >
+              <RiskLevelMetricsCard />
+            </CardShell>
+          </div>
+        </PageSection>
 
-          <AdvancedSection
-            title="What the AI learned from 20 years of news"
-            summary="Two decades of drawdowns and the headlines behind them, turned into rules."
-            defaultOpen={false}
-          >
-            <Suspense fallback={fallback("h-64")}>
-              <MacroLessonsCard />
-            </Suspense>
-          </AdvancedSection>
+        <PageSection
+          id="learned"
+          title="Learned rules"
+          description="What past markets taught the AI, and how it applies them now."
+        >
+          <div className="space-y-4">
+            <CardShell
+              anchor="macro-lessons"
+              title="What the AI learned from 20 years of news"
+              subtitle="Two decades of drawdowns and the headlines behind them, turned into rules."
+              level={3}
+            >
+              <Suspense fallback={fallback("h-64")}>
+                <MacroLessonsCard />
+              </Suspense>
+            </CardShell>
 
-          <AdvancedSection
-            title="What the AI learned from CEO posts"
-            summary="Past posts studied against the price path that followed."
-            defaultOpen={false}
-          >
-            <Suspense fallback={fallback("h-64")}>
-              <ExecPostLessonsCard />
-            </Suspense>
-          </AdvancedSection>
-        </div>
-      </main>
+            <CardShell
+              anchor="exec-post-lessons"
+              title="What the AI learned from CEO posts"
+              subtitle="Past posts studied against the price path that followed."
+              level={3}
+            >
+              <Suspense fallback={fallback("h-64")}>
+                <ExecPostLessonsCard />
+              </Suspense>
+            </CardShell>
+          </div>
+        </PageSection>
+      </PageShell>
     </div>
   );
 }
+
