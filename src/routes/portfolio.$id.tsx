@@ -48,17 +48,13 @@ import {
   PlayCircle,
   RotateCcw,
   Zap,
-  ChevronDown,
+  
   ShieldCheck,
   ShieldAlert,
   TrendingUp,
   TrendingDown,
   Newspaper,
   Activity,
-  CalendarClock,
-  FileText,
-  BarChart3,
-  Settings2,
   Sparkles,
   Pencil,
   Banknote,
@@ -124,7 +120,7 @@ import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { useIsAdvanced } from "@/lib/use-experience-level";
 
-import { DiagnosticsPanel } from "@/components/diagnostics-panel";
+
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
 import {
@@ -137,9 +133,6 @@ import { RegimePanel } from "@/components/regime-panel";
 import { FearIndexCard } from "@/components/fear-index-card";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
-import { SignalDecayCard } from "@/components/signal-decay-card";
-import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
-import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useChartPreset } from "@/lib/chart-axis";
 
@@ -159,7 +152,7 @@ import {
 } from "@/lib/portfolio-performance-format";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
 
-import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
+
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { TailHedgeCard } from "@/components/tail-hedge-card";
 import { TailHedgeReportCard } from "@/components/tail-hedge-report-card";
@@ -289,7 +282,7 @@ function PortfolioPage() {
 
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
+  
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
