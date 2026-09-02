@@ -2,6 +2,7 @@ import { ChartFrame } from "@/components/chart-frame";
 import { SectionIndex } from "@/components/nav/section-index";
 import { OverviewLookDeeperSection } from "@/components/portfolio-detail/sections/overview-look-deeper";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
+import { RiskSection, type RiskSectionPortfolio } from "@/components/portfolio-detail/sections/risk-section";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
@@ -1051,7 +1052,7 @@ function PortfolioPage() {
                   Why ({decisions.length})
                 </TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">
-                  Safety limits
+                  Risk
                 </TabsTrigger>
                 {/* Expert-only tabs. Hidden in Simple mode so a newcomer sees
                     four choices instead of nine — the Simple/Advanced switch
@@ -1878,12 +1879,12 @@ function PortfolioPage() {
               <TabsContent value="risk" className="mt-4">
                 <RiskSection
                   id={id}
-                  p={p as unknown as import("@/components/portfolio-detail/sections/risk-section").RiskSectionPortfolio}
+                  p={p as unknown as RiskSectionPortfolio}
                   totalValue={totalValue}
                   holdings={holdings}
                   holdingsSeries={holdingsSeries}
                   active={tab === "risk"}
-                  clampDialLevel={(v) => clampDialLevel(v as number | undefined)}
+                  clampDialLevel={(v: unknown) => clampDialLevel(v as number | undefined)}
                 />
               </TabsContent>
 
