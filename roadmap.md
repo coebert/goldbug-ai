@@ -26,4 +26,5 @@
 - [x] Dashboard holdings show average cost, book value, unrealised P&L and today's move (not just backtest numbers)
 - [x] Live per-holding price charts on the Trade tab (hourly/daily, avg-cost reference line)
 - [x] Risk-concentration cap with auto-trim of over-weight holdings, alongside the drawdown budget
-- [x] Backtest vs real P&L comparison card on the portfolio dashboard (shared-day curve overlay, return/drawdown gap, broker-fee attribution)
+- [ ] Backtest vs real P&L card: compare exact live equity money and days lost, not a rebased curve
+- [ ] Real-time trading dashboard: live order book, trade history, position details and fill-based P&L
