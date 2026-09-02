@@ -3,6 +3,7 @@ import { SectionIndex } from "@/components/nav/section-index";
 import { OverviewLookDeeperSection } from "@/components/portfolio-detail/sections/overview-look-deeper";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { RiskSection, type RiskSectionPortfolio } from "@/components/portfolio-detail/sections/risk-section";
+import { TradesSection, type TradeRow } from "@/components/portfolio-detail/sections/trades-section";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
@@ -308,10 +309,6 @@ function PortfolioPage() {
 
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [tradeSort, setTradeSort] = useState<{
-    key: "date" | "symbol" | "side" | "qty" | "price" | "value";
-    dir: "asc" | "desc";
-  }>({ key: "date", dir: "desc" });
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -797,34 +794,6 @@ function PortfolioPage() {
   const pnl = totalValue - startingCash;
   const pnlPct = startingCash > 0 ? (pnl / startingCash) * 100 : 0;
 
-  const sortedTrades = useMemo(() => {
-    const arr = [...trades];
-    const dir = tradeSort.dir === "asc" ? 1 : -1;
-    const val = (t: (typeof trades)[number]) => {
-      switch (tradeSort.key) {
-        case "date":
-          return `${t.trade_date} ${t.executed_at ?? ""}`;
-        case "symbol":
-          return t.symbol;
-        case "side":
-          return t.side;
-        case "qty":
-          return Number(t.quantity);
-        case "price":
-          return Number(t.price);
-        case "value":
-          return Number(t.value);
-      }
-    };
-    arr.sort((a, b) => {
-      const av = val(a);
-      const bv = val(b);
-      if (av < bv) return -dir;
-      if (av > bv) return dir;
-      return 0;
-    });
-    return arr;
-  }, [trades, tradeSort]);
 
   const underfunded = useMemo(() => {
     const latest = decisions[0] as { raw?: unknown } | undefined;
