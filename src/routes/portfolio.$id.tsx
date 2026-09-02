@@ -1776,55 +1776,29 @@ function PortfolioPage() {
                 />
               </TabsContent>
 
-              <TabsContent value="decisions" className="mt-4 space-y-4">
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <TodaysDecisionSummaryCard portfolioId={p.id} currency={p.currency} />
-                </Suspense>
-                <OrderExplanationsBackfillCard portfolioId={p.id} />
-
-                {decisions.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No AI decisions yet. Run one day or a backtest to see the AI's reasoning here.
-                  </p>
-                )}
-                {decisions.map((d) => (
-                  <DecisionCard
-                    key={d.id}
-                    decision={d}
-                    currency={p.currency}
-                    tradingStyle={
-                      (p.risk_config as { trading_style?: string } | null)?.trading_style ===
-                      "swing"
-                        ? "swing"
-                        : "position"
-                    }
-                  />
-                ))}
+              <TabsContent value="decisions" className="mt-4">
+                <DecisionsSection
+                  portfolioId={p.id}
+                  currency={p.currency}
+                  tradingStyle={
+                    (p.risk_config as { trading_style?: string } | null)?.trading_style === "swing"
+                      ? "swing"
+                      : "position"
+                  }
+                  decisions={decisions}
+                />
               </TabsContent>
 
               <TabsContent value="audit" className="mt-4">
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <TradeAuditLogCard
-                    portfolioId={p.id}
-                    portfolioName={p.name}
-                    active={tab === "audit"}
-                  />
-                </Suspense>
+                <AuditSection portfolioId={p.id} portfolioName={p.name} active={tab === "audit"} />
               </TabsContent>
 
               <TabsContent value="errors" className="mt-4">
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <div className="space-y-4">
-                    <TradeOutcomePanelCard portfolioId={p.id} active={tab === "errors"} />
-                    <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
-                  </div>
-                </Suspense>
+                <ErrorsSection portfolioId={p.id} active={tab === "errors"} />
               </TabsContent>
 
               <TabsContent value="confidence" className="mt-4">
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <ConfidenceTimelineCard decisions={decisions} />
-                </Suspense>
+                <ConfidenceSection decisions={decisions} />
               </TabsContent>
 
               <TabsContent value="trades" className="mt-4">
