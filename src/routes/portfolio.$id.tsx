@@ -91,8 +91,14 @@ const MultiCurrencyExposureCard = lazy(() =>
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { DecisionCard } from "@/components/portfolio-detail/decision-card";
-import { OrderExplanationsBackfillCard } from "@/components/order-explanations-backfill-card";
+import {
+  AuditSection,
+  ConfidenceSection,
+  DecisionsSection,
+  ErrorsSection,
+} from "@/components/portfolio-detail/sections/activity-section";
+import { DiagnosticsSection } from "@/components/portfolio-detail/sections/diagnostics-section";
+import { ReportsSection } from "@/components/portfolio-detail/sections/reports-section";
 
 import { Metric } from "@/components/portfolio-detail/metric";
 import { formatMetricValue } from "@/components/portfolio-detail/format";
