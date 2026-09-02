@@ -100,6 +100,10 @@ import { ReportsSection } from "@/components/portfolio-detail/sections/reports-s
 
 import { Metric } from "@/components/portfolio-detail/metric";
 import { formatMetricValue } from "@/components/portfolio-detail/format";
+import {
+  EquityHeadlineMetrics,
+  EquityBenchmarkMetrics,
+} from "@/components/portfolio-detail/sections/equity-metrics";
 
 import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
