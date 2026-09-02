@@ -100,21 +100,6 @@ const TodaysDecisionSummaryCard = lazy(() =>
   })),
 );
 
-const FxHealthCard = lazy(() =>
-  import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
-);
-const FxIntentsCard = lazy(() =>
-  import("@/components/fx-intents-card").then((m) => ({ default: m.FxIntentsCard })),
-);
-const FxIntentPnlCard = lazy(() =>
-  import("@/components/fx-intent-pnl-card").then((m) => ({ default: m.FxIntentPnlCard })),
-);
-const RiskSimulatorCard = lazy(() =>
-  import("@/components/risk-simulator-card").then((m) => ({ default: m.RiskSimulatorCard })),
-);
-const ManualFxConvertCard = lazy(() =>
-  import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
-);
 const WalletAffordabilityCard = lazy(() =>
   import("@/components/wallet-affordability-card").then((m) => ({
     default: m.WalletAffordabilityCard,
@@ -137,13 +122,9 @@ import { OrderExplanationsBackfillCard } from "@/components/order-explanations-b
 import { Metric } from "@/components/portfolio-detail/metric";
 import { formatMetricValue } from "@/components/portfolio-detail/format";
 
-import { RiskControlsCard } from "@/components/risk-controls-card";
-import { SwingModeToggle } from "@/components/swing-mode-toggle";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
-import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
-import { ConcentrationAlertCard } from "@/components/concentration-alert-card";
 import { InsiderDealingsCard } from "@/components/insider-dealings-card";
 import { PolicyDecisionExplainCard } from "@/components/policy-decision-explain-card";
 import { PolicyRegimeTimelineCard } from "@/components/policy-regime-timeline-card";
@@ -162,7 +143,6 @@ import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { useIsAdvanced } from "@/lib/use-experience-level";
 
-import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
@@ -177,7 +157,6 @@ import { FearIndexCard } from "@/components/fear-index-card";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { SignalDecayCard } from "@/components/signal-decay-card";
-import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -209,8 +188,6 @@ import { PriceUnitAuditCard } from "@/components/price-unit-audit-card";
 import { ValuationConsistencyAlert } from "@/components/valuation-consistency-alert";
 import { InstrumentCcyAlert } from "@/components/instrument-ccy-alert";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
-import { FxAuditCard } from "@/components/fx-audit-card";
-import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
 
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 
