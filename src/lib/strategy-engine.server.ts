@@ -455,7 +455,19 @@ export async function evaluateConcentrationCap(args: {
     .select("id, symbol, quantity, avg_cost, asset_class, instrument_ccy")
     .eq("portfolio_id", args.portfolio.id);
 
+  const baseCcy = String(args.portfolio.currency || "GBP").toUpperCase();
   const priced: Array<{
+    symbol: string;
+    qty: number;
+    price: number;
+    /** Market value in the instrument's own currency. */
+    value: number;
+    /** Market value converted into the portfolio base currency. */
+    valueBase: number;
+    asset_class: string;
+    instrument_ccy: string;
+  }> = [];
+  const rawPriced: Array<{
     symbol: string;
     qty: number;
     price: number;
@@ -469,28 +481,75 @@ export async function evaluateConcentrationCap(args: {
     if (h.asset_class === "fx") continue; // FX funding legs sit in the cash wallet
     const price = await latestBasePrice(args.supabase, h.symbol, h.asset_class);
     if (price == null || !(price > 0)) continue;
-    priced.push({
+    rawPriced.push({
       symbol: h.symbol,
       qty,
       price,
       value: qty * price,
       asset_class: String(h.asset_class),
-      instrument_ccy: String(h.instrument_ccy || args.portfolio.currency),
+      instrument_ccy: String(h.instrument_ccy || baseCcy).toUpperCase(),
     });
   }
 
-  const cash = Math.max(0, Number(args.portfolio.current_cash) || 0);
-  const gross = priced.reduce((s, p) => s + p.value, 0) + cash;
+  // Weights must be computed in one currency. Convert every holding value and
+  // every cash bucket into the portfolio base currency first; a mixed-currency
+  // `gross` inflates or deflates weights and can auto-trim a compliant holding.
+  const { readWallet } = await import("@/lib/portfolio-wallet");
+  const { getFxMatrix } = await import("@/lib/fx.server");
+  const wallet = readWallet(args.portfolio);
+  const pairs = [
+    ...rawPriced.map((p) => ({ from: p.instrument_ccy, to: baseCcy })),
+    ...Object.keys(wallet).map((c) => ({ from: c.toUpperCase(), to: baseCcy })),
+  ];
+  const fx = await getFxMatrix(pairs);
+  const rateOf = (from: string) => {
+    const f = from.toUpperCase();
+    if (f === baseCcy) return { rate: 1, stale: false };
+    const r = fx.get(`${f}${baseCcy}`);
+    if (!r || !(r.rate > 0) || !Number.isFinite(r.rate)) return { rate: 1, stale: true };
+    return { rate: r.rate, stale: r.stale };
+  };
+
+  let anyStale = false;
+  let cash = 0;
+  for (const [ccy, amt] of Object.entries(wallet)) {
+    const v = Number(amt);
+    if (!Number.isFinite(v)) continue;
+    const r = rateOf(ccy);
+    if (r.stale) anyStale = true;
+    cash += v * r.rate;
+  }
+  cash = Math.max(0, cash);
+
+  for (const p of rawPriced) {
+    const r = rateOf(p.instrument_ccy);
+    if (r.stale) anyStale = true;
+    priced.push({ ...p, valueBase: p.value * r.rate });
+  }
+
+  // Never auto-sell on an FX rate we don't trust — weights would be wrong.
+  if (anyStale) {
+    return [
+      {
+        symbol: "-",
+        action: "none",
+        detail: "concentration trim skipped: stale or missing FX rate for base-currency valuation",
+      },
+    ];
+  }
+
+  const gross = priced.reduce((s, p) => s + p.valueBase, 0) + cash;
   if (!(gross > 0)) return out;
 
   for (const p of priced) {
-    const weight = (p.value / gross) * 100;
+    const weight = (p.valueBase / gross) * 100;
     if (weight <= cap) continue;
-    // Sell the excess only: target value = cap% of gross.
+    // Sell the excess only: target value = cap% of gross (base currency).
     const targetValue = (cap / 100) * gross;
-    const excessQty = (p.value - targetValue) / p.price;
+    const excessQty = (p.valueBase - targetValue) / (p.valueBase / p.qty);
     const sellQty = Math.min(p.qty, excessQty);
     if (!(sellQty > 0)) continue;
+
     try {
       const r = await placeStrategyOrder({
         portfolio: args.portfolio,
