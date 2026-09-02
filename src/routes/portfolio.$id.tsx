@@ -1085,14 +1085,6 @@ function PortfolioPage() {
                   mode={p.mode}
                 />
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
-                <ConcentrationAlertCard
-                  holdings={holdings}
-                  series={holdingsSeries}
-                  totalValue={totalValue}
-                  currency={p.currency}
-                  mode={p.mode}
-                  className="mb-4"
-                />
                 <SignalWeightHistoryCard portfolioId={id} className="mb-4" />
                 <PolicyRegimeTimelineCard portfolioId={id} className="mb-4" />
                 <div className="mb-4">
