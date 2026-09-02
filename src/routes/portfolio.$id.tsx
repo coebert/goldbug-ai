@@ -999,12 +999,40 @@ function PortfolioPage() {
 
 
               <TabsContent value="overview" className="mt-4">
-                <CurrencyDiagnosticsBanner
-                  portfolioId={id}
-                  portfolioCurrency={p.currency}
-                  mode={p.mode}
+                <AlertStrip
+                  className="mt-4"
+                  alerts={PORTFOLIO_ALERTS}
+                  render={(alertId) => {
+                    switch (alertId) {
+                      case "risk-halt":
+                        return <RiskHaltBanner portfolioId={id} />;
+                      case "precheck-cash":
+                        return <PrecheckCashAlertBanner portfolioId={id} />;
+                      case "valuation-consistency":
+                        return <ValuationConsistencyAlert portfolioId={id} />;
+                      case "instrument-ccy":
+                        return <InstrumentCcyAlert portfolioId={id} />;
+                      case "currency-diagnostics":
+                        return (
+                          <CurrencyDiagnosticsBanner
+                            portfolioId={id}
+                            portfolioCurrency={p.currency}
+                            mode={p.mode}
+                          />
+                        );
+                      case "cost-sync":
+                        return <CostSyncAlertBanner portfolioId={id} />;
+                      case "coverage-trend":
+                        return <CoverageTrendAlertBanner portfolioId={id} />;
+                      case "reconcile-fills":
+                        return <ReconcileFillsCard portfolioId={id} />;
+                      case "price-unit-audit":
+                        return <PriceUnitAuditCard portfolioId={id} />;
+                      default:
+                        return null;
+                    }
+                  }}
                 />
-                <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
                 <SignalWeightHistoryCard portfolioId={id} className="mb-4" />
                 <PolicyRegimeTimelineCard portfolioId={id} className="mb-4" />
                 <div className="mb-4">
@@ -1016,14 +1044,6 @@ function PortfolioPage() {
                 <PolicyNudgeReplayCard className="mb-4" />
                 <PolicyNudgeSweepCard className="mb-4" />
 
-                <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
-                <CostSyncAlertBanner portfolioId={id} className="mb-4" />
-                <CoverageTrendAlertBanner portfolioId={id} className="mb-4" />
-
-                <ValuationConsistencyAlert portfolioId={id} className="mb-4" />
-                <InstrumentCcyAlert portfolioId={id} className="mb-4" />
-                <ReconcileFillsCard portfolioId={id} className="mb-4" />
-                <PriceUnitAuditCard portfolioId={id} className="mb-4" />
                 <div id="holdings" className="mb-6 scroll-below-sticky">
                   <LiveHoldingsCard
                     holdings={holdings}
