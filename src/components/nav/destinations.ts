@@ -3,6 +3,7 @@ import {
   LineChart,
   FlaskConical,
   Receipt,
+  Activity,
   Wrench,
   GitCompare,
   Network,
@@ -139,6 +140,14 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     area: "trades",
     primary: true,
     keywords: "orders fills executions",
+  },
+  {
+    to: "/live-dashboard",
+    label: "Live dashboard",
+    hint: "Real-time positions, broker orders, fills, and execution P&L.",
+    icon: Activity,
+    area: "trades",
+    keywords: "live order book positions fills execution pnl",
   },
   {
     to: "/daily-report",
