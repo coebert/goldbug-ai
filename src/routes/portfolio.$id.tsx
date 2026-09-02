@@ -27,6 +27,8 @@ import { JargonText } from "@/components/jargon-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
+import { AlertStrip } from "@/components/alerts/alert-strip";
+import { PORTFOLIO_ALERTS } from "@/lib/alerts/registry";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
