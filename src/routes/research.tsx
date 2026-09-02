@@ -2,7 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import { FileText } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
-import { AdvancedSection } from "@/components/advanced-section";
+import { PageShell, PageSection } from "@/components/layout/page-shell";
+import { CardShell } from "@/components/layout/card-shell";
+import { SectionIndex } from "@/components/nav/section-index";
+
 import { useSessionEmail } from "@/lib/use-session-email";
 import { RiskLevelMetricsCard } from "@/components/risk-level-metrics-card";
 
