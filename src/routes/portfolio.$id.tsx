@@ -1896,39 +1896,15 @@ function PortfolioPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="risk" className="mt-4 space-y-4">
-                <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} equity={totalValue} currency={p.currency} />
-                <RiskControlsCard
-                  portfolioId={id}
-                  riskConfig={p.risk_config}
-                  baseCurrency={p.currency}
-                />
-                <RiskCurveComparisonCard
-                  portfolioId={id}
-                  currentLevel={clampDialLevel(
-                    (p.risk_config as { risk_level?: number } | null)?.risk_level,
-                  )}
-                />
-                <ExecutionCalibrationCard
-                  portfolioId={id}
-                  execParams={
-                    (
-                      p.risk_config as {
-                        execution_params?: Parameters<
-                          typeof ExecutionCalibrationCard
-                        >[0]["execParams"];
-                      } | null
-                    )?.execution_params ?? null
-                  }
-                  calibration={
-                    (
-                      p.risk_config as {
-                        execution_calibration?: Parameters<
-                          typeof ExecutionCalibrationCard
-                        >[0]["calibration"];
-                      } | null
-                    )?.execution_calibration ?? null
-                  }
+              <TabsContent value="risk" className="mt-4">
+                <RiskSection
+                  id={id}
+                  p={p as unknown as import("@/components/portfolio-detail/sections/risk-section").RiskSectionPortfolio}
+                  totalValue={totalValue}
+                  holdings={holdings}
+                  holdingsSeries={holdingsSeries}
+                  active={tab === "risk"}
+                  clampDialLevel={(v) => clampDialLevel(v as number | undefined)}
                 />
               </TabsContent>
 
