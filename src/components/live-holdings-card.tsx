@@ -804,8 +804,12 @@ export function LiveHoldingsCard({
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {currency}{" "}
                         {r.avg.toFixed(2)} avg cost
                         {!r.unitsUnknown && (
-                          <span className="ml-1 text-muted-foreground/70">
-                            · book {fmt(r.costBase)}
+                          <span
+                            className="ml-1 text-muted-foreground/70"
+                            data-testid={`holding-cost-basis-${r.symbol}`}
+                            title="What you paid for this position in total, including the shares still held."
+                          >
+                            · cost basis {fmt(r.costBase)} → now {fmt(r.value)}
                           </span>
                         )}
                         {openedLabel && (

@@ -36,6 +36,7 @@ import { Route as PortfolioIdSummaryRouteImport } from './routes/portfolio.$id.s
 import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
 import { Route as PortfolioIdRiskRouteImport } from './routes/portfolio.$id.risk'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
+import { Route as PortfolioIdPerformanceRouteImport } from './routes/portfolio.$id.performance'
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdFxRiskRouteImport } from './routes/portfolio.$id.fx-risk'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
@@ -200,6 +201,11 @@ const PortfolioIdRiskRoute = PortfolioIdRiskRouteImport.update({
 const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
   id: '/report',
   path: '/report',
+  getParentRoute: () => PortfolioIdRoute,
+} as any)
+const PortfolioIdPerformanceRoute = PortfolioIdPerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
   getParentRoute: () => PortfolioIdRoute,
 } as any)
 const PortfolioIdOptimizerRoute = PortfolioIdOptimizerRouteImport.update({
@@ -404,6 +410,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
+  '/portfolio/$id/performance': typeof PortfolioIdPerformanceRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/portfolio/$id/risk': typeof PortfolioIdRiskRoute
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
@@ -463,6 +470,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
+  '/portfolio/$id/performance': typeof PortfolioIdPerformanceRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/portfolio/$id/risk': typeof PortfolioIdRiskRoute
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
@@ -523,6 +531,7 @@ export interface FileRoutesById {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
+  '/portfolio/$id/performance': typeof PortfolioIdPerformanceRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/portfolio/$id/risk': typeof PortfolioIdRiskRoute
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
@@ -584,6 +593,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
+    | '/portfolio/$id/performance'
     | '/portfolio/$id/report'
     | '/portfolio/$id/risk'
     | '/portfolio/$id/sma-report'
@@ -643,6 +653,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
+    | '/portfolio/$id/performance'
     | '/portfolio/$id/report'
     | '/portfolio/$id/risk'
     | '/portfolio/$id/sma-report'
@@ -702,6 +713,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
+    | '/portfolio/$id/performance'
     | '/portfolio/$id/report'
     | '/portfolio/$id/risk'
     | '/portfolio/$id/sma-report'
@@ -973,6 +985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdReportRouteImport
       parentRoute: typeof PortfolioIdRoute
     }
+    '/portfolio/$id/performance': {
+      id: '/portfolio/$id/performance'
+      path: '/performance'
+      fullPath: '/portfolio/$id/performance'
+      preLoaderRoute: typeof PortfolioIdPerformanceRouteImport
+      parentRoute: typeof PortfolioIdRoute
+    }
     '/portfolio/$id/optimizer': {
       id: '/portfolio/$id/optimizer'
       path: '/optimizer'
@@ -1191,6 +1210,7 @@ interface PortfolioIdRouteChildren {
   PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
   PortfolioIdFxRiskRoute: typeof PortfolioIdFxRiskRoute
   PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
+  PortfolioIdPerformanceRoute: typeof PortfolioIdPerformanceRoute
   PortfolioIdReportRoute: typeof PortfolioIdReportRoute
   PortfolioIdRiskRoute: typeof PortfolioIdRiskRoute
   PortfolioIdSmaReportRoute: typeof PortfolioIdSmaReportRoute
@@ -1203,6 +1223,7 @@ const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
   PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
   PortfolioIdFxRiskRoute: PortfolioIdFxRiskRoute,
   PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
+  PortfolioIdPerformanceRoute: PortfolioIdPerformanceRoute,
   PortfolioIdReportRoute: PortfolioIdReportRoute,
   PortfolioIdRiskRoute: PortfolioIdRiskRoute,
   PortfolioIdSmaReportRoute: PortfolioIdSmaReportRoute,
