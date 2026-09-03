@@ -14,6 +14,7 @@ import { LiveHoldingsCard } from "@/components/live-holdings-card";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { getPortfolio, listPortfolios } from "@/lib/portfolios.functions";
 import { previewBrokerBalance } from "@/lib/live.functions";
+import { getBrokerQuotes, type BrokerQuoteResult } from "@/lib/broker-quotes.functions";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
