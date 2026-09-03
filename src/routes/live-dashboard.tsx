@@ -123,7 +123,9 @@ function LiveDashboardPage() {
     return { ...h, quantity, price, value, pnl: price == null ? null : value - cost };
   }).sort((a, b) => Math.abs(b.value) - Math.abs(a.value)), [holdings, priceBySymbol]);
   const currency = String(portfolio?.currency ?? "GBP").toUpperCase();
-  const fmt = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 2 }).format(n);
+  const fmtCcy = (n: number, ccy: string) =>
+    new Intl.NumberFormat("en-GB", { style: "currency", currency: (ccy || "GBP").toUpperCase(), maximumFractionDigits: 2 }).format(n);
+  const fmt = (n: number) => fmtCcy(n, currency);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-surface-1">
