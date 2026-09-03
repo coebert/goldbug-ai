@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareBacktestToReal, curveStats, verdictFor } from "@/lib/backtest-vs-real";
+import { compareBacktestToReal, curveStats, spliceCapitalSteps, verdictFor } from "@/lib/backtest-vs-real";
 
 const days = (n: number) =>
   Array.from({ length: n }, (_, i) => `2026-08-${String(i + 1).padStart(2, "0")}`);
@@ -214,5 +214,26 @@ describe("verdictFor", () => {
       ],
     });
     expect(verdictFor(c)).toMatch(/ahead of the backtest/);
+  });
+});
+
+describe("capital-base steps in a saved run", () => {
+  it("splices out an implausible one-day jump instead of reporting it as return", () => {
+    // Shape of the real regression: six flat days at ~2.2k, then the snapshot
+    // history catches up to the true ~10.2k account. Raw = +368%.
+    const dates = ["01", "02", "03", "04", "05", "06", "07"].map((d) => `2026-07-${d}`);
+    const raw = [2177.53, 2177.53, 2177.53, 2177.53, 2177.53, 2177.53, 10189.12];
+    const c = compareBacktestToReal({
+      backtest: dates.map((date, i) => ({ date, value: raw[i]! })),
+      real: dates.map((date) => ({ date, value: 10000 })),
+    });
+    expect(c.backtestBaseShifts).toBe(1);
+    expect(Math.abs(c.backtestStats.totalReturnPct)).toBeLessThan(1);
+  });
+
+  it("leaves an ordinary curve untouched", () => {
+    const { values, shifts } = spliceCapitalSteps([100, 101, 99, 104]);
+    expect(shifts).toBe(0);
+    expect(values).toEqual([100, 101, 99, 104]);
   });
 });

@@ -123,6 +123,14 @@ export function BacktestVsRealCard({
           </p>
         )}
         {c?.note && <p className="text-xs text-muted-foreground">{c.note}</p>}
+        {c && c.backtestBaseShifts > 0 && (
+          <p className="text-xs text-amber-400">
+            {c.backtestBaseShifts === 1 ? "One day in" : `${c.backtestBaseShifts} days in`} the saved
+            run moved the account by more than 25% in a single step — a deposit or a rebuilt
+            history, not trading. {c.backtestBaseShifts === 1 ? "It has" : "They have"} been
+            removed, so the backtest return shown here is lower than the raw saved figure.
+          </p>
+        )}
 
         {c && c.days >= 2 && (
           <>

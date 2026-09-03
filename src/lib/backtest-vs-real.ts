@@ -104,6 +104,13 @@ export type BacktestVsReal = {
    * today — "live is this many shared days behind". Null when not behind.
    */
   daysBehind: number | null;
+  /**
+   * Number of day-steps in the saved backtest curve that were too large to be
+   * a trading result and were spliced out as capital-base changes (deposits,
+   * a rebuilt snapshot history, a currency/unit change). Anything above 0
+   * means the raw stored curve overstated the strategy's return.
+   */
+  backtestBaseShifts: number;
 };
 
 
@@ -139,6 +146,7 @@ export const EMPTY_COMPARISON: BacktestVsReal = {
   worstMoneyLost: 0,
   underperformDays: 0,
   daysBehind: null,
+  backtestBaseShifts: 0,
 };
 
 
@@ -155,6 +163,48 @@ function byDay(points: CurvePoint[]): Map<string, number> {
     out.set(dayKey(p.date), v);
   }
   return out;
+}
+
+/**
+ * A single day cannot plausibly change a diversified book by more than this.
+ * Anything larger is a capital-base change, not a trading result.
+ */
+export const MAX_PLAUSIBLE_DAILY_STEP = 0.25;
+
+/**
+ * Removes capital-base jumps from an equity curve.
+ *
+ * A saved backtest curve is read out of the shared `equity_snapshots` table,
+ * so a deposit — or a snapshot history that was rebuilt/backfilled part-way
+ * through the window — shows up as one enormous day. Left alone that reads as
+ * strategy performance (this is what produced a "+367%" backtest return on a
+ * live account that never moved off ~£10k).
+ *
+ * Each offending step is spliced out by rescaling everything after it, so the
+ * curve keeps its real day-to-day shape on one continuous capital base.
+ */
+export function spliceCapitalSteps(
+  values: number[],
+  maxStep = MAX_PLAUSIBLE_DAILY_STEP,
+): { values: number[]; shifts: number } {
+  if (values.length < 2) return { values: [...values], shifts: 0 };
+  const out: number[] = [values[0]];
+  let scale = 1;
+  let shifts = 0;
+  for (let i = 1; i < values.length; i += 1) {
+    const prev = values[i - 1];
+    const cur = values[i];
+    if (Number.isFinite(prev) && Number.isFinite(cur) && prev !== 0) {
+      const ratio = cur / prev;
+      if (Math.abs(ratio - 1) > maxStep) {
+        // Neutralise the jump: the base changed, the strategy did not earn it.
+        scale /= ratio;
+        shifts += 1;
+      }
+    }
+    out.push(cur * scale);
+  }
+  return { values: out, shifts };
 }
 
 export function curveStats(values: number[]): CurveStats {
@@ -203,7 +253,10 @@ export function compareBacktestToReal(input: {
 
   const from = shared[0];
   const to = shared[shared.length - 1];
-  const btVals = shared.map((d) => bt.get(d) as number);
+  const rawBtVals = shared.map((d) => bt.get(d) as number);
+  const spliced = spliceCapitalSteps(rawBtVals);
+  const btVals = spliced.values;
+  const backtestBaseShifts = spliced.shifts;
   const rlVals = shared.map((d) => rl.get(d) as number);
   const btBase = btVals[0];
   const rlBase = rlVals[0];
@@ -289,6 +342,7 @@ export function compareBacktestToReal(input: {
     worstMoneyLost,
     underperformDays,
     daysBehind,
+    backtestBaseShifts,
   };
 }
 
