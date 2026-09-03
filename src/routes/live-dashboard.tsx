@@ -187,7 +187,14 @@ function LiveDashboardPage() {
                   <div className="space-y-4">
                     <LiveHoldingsCard holdings={holdings} currency={currency} cash={metrics.cash} cashByCcy={portfolio.cash_by_ccy ?? null} totalValue={metrics.totalValue} invested={metrics.invested} mode={portfolio.mode ?? "paper"} series={Object.fromEntries(history.map((item) => [item.symbol, item]))} portfolioId={portfolio.id} />
                     <Card>
-                      <CardHeader className="pb-3"><CardTitle className="text-base">Position details</CardTitle></CardHeader>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Position details</CardTitle>
+                        <p className="text-[11px] text-muted-foreground">
+                          {brokerQuotes && brokerQuotes.covered > 0
+                            ? `Live Saxo quotes on ${brokerQuotes.covered} of ${brokerQuotes.requested} positions${brokerQuotes.covered < brokerQuotes.requested ? " — the rest fall back to the cached daily close" : ""}.`
+                            : "Broker quotes unavailable — prices shown are the cached daily close."}
+                        </p>
+                      </CardHeader>
                       <CardContent>
                         {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
                       </CardContent>
