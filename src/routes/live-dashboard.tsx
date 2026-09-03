@@ -14,6 +14,10 @@ import { LiveHoldingsCard } from "@/components/live-holdings-card";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { getPortfolio, listPortfolios } from "@/lib/portfolios.functions";
 import { previewBrokerBalance } from "@/lib/live.functions";
+
+const BacktestVsRealCard = lazy(() =>
+  import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
+);
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 import { holdingNativeValue } from "@/lib/fx-leg-value";
