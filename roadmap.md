@@ -28,3 +28,6 @@
 - [x] Risk-concentration cap with auto-trim of over-weight holdings, alongside the drawdown budget
 - [x] Backtest vs real P&L card: compare exact live equity money and days lost, not a rebased curve
 - [x] Real-time trading dashboard: live order book, trade history, position details and fill-based P&L
+- [x] Home page header mobile rendering: actions were squashing the title/purpose to one word per line — actions now drop to their own row below the title on phones
+- [ ] Live dashboard: select the real-money portfolio by default (not the sandbox) so it shows actual balances, holdings, fills and P&L
+- [ ] Trading strategy rule set: explicit entry / exit / position-sizing logic, runnable in the backtester against historical prices
