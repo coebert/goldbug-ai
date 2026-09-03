@@ -104,6 +104,13 @@ export type BacktestVsReal = {
    * today — "live is this many shared days behind". Null when not behind.
    */
   daysBehind: number | null;
+  /**
+   * Number of day-steps in the saved backtest curve that were too large to be
+   * a trading result and were spliced out as capital-base changes (deposits,
+   * a rebuilt snapshot history, a currency/unit change). Anything above 0
+   * means the raw stored curve overstated the strategy's return.
+   */
+  backtestBaseShifts: number;
 };
 
 
