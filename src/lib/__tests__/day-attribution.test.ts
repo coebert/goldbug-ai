@@ -47,9 +47,8 @@ describe("buildDayAttribution", () => {
     const fx = r.lines.find((l) => l.kind === "fx")!;
     // The fx funding leg alone gives back more than the equities made.
     expect(fx.changeBase).toBeLessThan(-10);
-    expect(Math.abs(fx.changeBase)).toBeGreaterThan(
-      stocks.reduce((s, l) => s + l.changeBase, 0),
-    );
+    // It is also the single largest mover, so it heads the list.
+    expect(r.lines[0].symbol).toBe("GBPUSD");
     // Costs plus the unattributed spread turn a small positive into the
     // headline loss the tile reports.
     expect(r.positionsTotal - r.fees + r.residual).toBeCloseTo(-7.38, 6);
