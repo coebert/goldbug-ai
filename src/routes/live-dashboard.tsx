@@ -169,6 +169,9 @@ function LiveDashboardPage() {
                   </div>
                   <div className="space-y-4">
                     <Card><CardHeader className="pb-3"><CardTitle className="text-base">Live order book &amp; fills</CardTitle></CardHeader><CardContent><OrderFillsCard portfolioId={portfolio.id} /></CardContent></Card>
+                    <Suspense fallback={<Card><CardContent className="py-8 text-sm text-muted-foreground">Loading backtest comparison…</CardContent></Card>}>
+                      <BacktestVsRealCard portfolioId={portfolio.id} currency={currency} />
+                    </Suspense>
                     <LiveTradingCard portfolioId={portfolio.id} />
                   </div>
                 </div>
