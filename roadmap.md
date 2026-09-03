@@ -32,3 +32,5 @@
 - [x] Live dashboard: select the real-money portfolio by default (not the sandbox) so it shows actual balances, holdings, fills and P&L
 - [x] Live dashboard: backtest vs live P&L overlay comparing strategy history to the real account over the same period
 - [ ] Trading strategy rule set: explicit entry / exit / position-sizing logic, runnable in the backtester against historical prices
+- [x] Backtester priced off real historical bars (as-of-date range fetch) instead of the most recent tape
+- [ ] Investigate reported TSLA buy-then-immediate-sell: confirm whether it happened and explain the rationale
