@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareBacktestToReal, curveStats, verdictFor } from "@/lib/backtest-vs-real";
+import { compareBacktestToReal, curveStats, spliceCapitalSteps, verdictFor } from "@/lib/backtest-vs-real";
 
 const days = (n: number) =>
   Array.from({ length: n }, (_, i) => `2026-08-${String(i + 1).padStart(2, "0")}`);
