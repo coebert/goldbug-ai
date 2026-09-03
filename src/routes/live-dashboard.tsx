@@ -117,7 +117,28 @@ function LiveDashboardPage() {
   const latestSnapshot = equity.at(-1) ?? null;
   const metrics = useMemo(() => derivePortfolioMetrics({ latestSnapshot, currentCash: portfolio?.current_cash, holdings }), [latestSnapshot, portfolio?.current_cash, holdings]);
   const history = historyQ.data ?? [];
-  const priceBySymbol = useMemo(() => new Map(history.map((item) => [item.symbol, item.currentPrice])), [history]);
+  // Broker quotes are the venue's own prices; the cached daily tape is only a
+  // fallback for instruments Saxo cannot quote.
+  const quotes = useServerFn(getBrokerQuotes);
+  const quotesQ = useQuery({
+    queryKey: ["live-dashboard-broker-quotes", portfolioId],
+    queryFn: () => quotes({ data: { portfolioId: portfolioId as string } }),
+    enabled: Boolean(portfolioId),
+    refetchInterval: POLL.SEMI_LIVE,
+    retry: false,
+  });
+  const brokerQuotes = quotesQ.data ?? null;
+  const priceBySymbol = useMemo(() => {
+    const map = new Map(history.map((item) => [item.symbol, item.currentPrice]));
+    for (const [symbol, quote] of Object.entries(brokerQuotes?.quotes ?? {})) {
+      if (Number.isFinite(quote.price) && quote.price > 0) map.set(symbol, quote.price);
+    }
+    return map;
+  }, [history, brokerQuotes]);
+  const quoteSourceBySymbol = useMemo(
+    () => new Set(Object.keys(brokerQuotes?.quotes ?? {})),
+    [brokerQuotes],
+  );
   const positions = useMemo(() => holdings.filter((h) => Number(h.quantity) !== 0).map((h) => {
     const quantity = Number(h.quantity);
     const avgCost = Number(h.avg_cost);
