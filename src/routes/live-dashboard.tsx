@@ -150,10 +150,10 @@ function LiveDashboardPage() {
             {!portfolioId || portfolioQ.isLoading ? <p className="text-sm text-muted-foreground">Loading live portfolio…</p> : portfolioQ.isError ? <p className="text-sm text-destructive">Could not load this portfolio: {(portfolioQ.error as Error).message}</p> : portfolio ? (
               <>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <DeskMetric icon={<Wallet className="h-4 w-4" />} label="Exact equity" value={fmt(metrics.totalValue)} />
-                  <DeskMetric label="Cash" value={fmt(metrics.cash)} />
-                  <DeskMetric label="Open positions" value={String(positions.length)} />
-                  <DeskMetric icon={<BookOpen className="h-4 w-4" />} label="Equity source" value={metrics.source === "snapshot" ? "Broker snapshot" : "Fallback"} />
+                  <DeskMetric icon={<Wallet className="h-4 w-4" />} label="Account equity" value={broker ? fmtCcy(broker.totalValue, broker.currency) : fmt(metrics.totalValue)} sub={broker ? "Live from broker" : metrics.source === "snapshot" ? "Latest snapshot" : "Fallback estimate"} />
+                  <DeskMetric label="Cash" value={broker ? fmtCcy(broker.cash, broker.currency) : fmt(metrics.cash)} sub={broker?.cashAvailable != null ? `${fmtCcy(broker.cashAvailable, broker.currency)} available` : undefined} />
+                  <DeskMetric label="Positions value" value={broker ? fmtCcy(broker.positionsValue, broker.currency) : fmt(metrics.invested)} sub={`${broker?.positionsCount ?? positions.length} open`} />
+                  <DeskMetric icon={<BookOpen className="h-4 w-4" />} label="Unrealised P&L" value={broker?.unrealizedPnl != null ? fmtCcy(broker.unrealizedPnl, broker.currency) : "—"} sub={brokerQ.isError ? "Broker unavailable" : brokerEnv ? `Saxo ${brokerEnv}` : "Not broker-linked"} />
                 </div>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
                   <div className="space-y-4">
