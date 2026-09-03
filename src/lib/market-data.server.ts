@@ -234,6 +234,50 @@ type PriceRow = {
   volume: number | null;
 };
 
+/** Write candles into `price_cache` (chunked) so later reads are free. */
+async function cacheCandles(symbol: string, candles: Candle[]): Promise<void> {
+  if (candles.length === 0) return;
+  const rows = candles.map((c) => ({
+    symbol,
+    price_date: c.date,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+    volume: c.volume,
+  }));
+  for (let i = 0; i < rows.length; i += 500) {
+    await supabaseAdmin
+      .from("price_cache")
+      .upsert(rows.slice(i, i + 500), { onConflict: "symbol,price_date" });
+  }
+}
+
+/**
+ * Primary source: the broker's own tape.
+ *
+ * Backtests and live valuation must both price off the venue we actually
+ * trade on. Yahoo stays as the fallback for instruments Saxo cannot resolve
+ * (indices, FX pseudo-pairs, retired listings) and for when the broker
+ * session is unavailable.
+ */
+async function fetchBrokerDaily(
+  symbol: string,
+  count: number,
+  to?: string,
+): Promise<Candle[] | null> {
+  try {
+    const { fetchBrokerDailyBars } = await import("@/lib/brokers/saxo-prices.server");
+    const bars = await fetchBrokerDailyBars(symbol, { count, to });
+    if (!bars || bars.length === 0) return null;
+    await cacheCandles(symbol, bars);
+    return bars;
+  } catch (err) {
+    console.warn(`market-data: broker bars unavailable for ${symbol}:`, err);
+    return null;
+  }
+}
+
 function rowToCandle(r: PriceRow | Record<string, unknown>): Candle {
   const row = r as PriceRow;
   const close = Number(row.close);
@@ -324,6 +368,13 @@ async function loadDailyCandles(
   // entirely (leaving the backtest unpriced) or, worse, price a past session
   // off a newer tape.
   if (isHistorical) {
+    // Broker tape first: the backtest should replay the prices our orders
+    // would actually have met, not a third-party adjusted series.
+    const broker = await fetchBrokerDaily(symbol, Math.max(days + 30, 90), asOfDate);
+    if (broker) {
+      const usable = broker.filter((c) => c.date <= asOfDate).slice(-days);
+      if (usable.length > 0) return usable;
+    }
     try {
       const from = shiftDays(asOfDate, -Math.max(days * 2 + 40, 90));
       const range = await getDailyCandlesRange(symbol, from, asOfDate);
@@ -335,26 +386,15 @@ async function loadDailyCandles(
     return cachedCandles;
   }
 
-  // Fetch fresh from Yahoo and upsert
+  // Live window: broker tape first, Yahoo only as the fallback feed.
+  const brokerFresh = await fetchBrokerDaily(symbol, Math.max(days + 30, 90));
+  if (brokerFresh) {
+    const usable = brokerFresh.filter((c) => c.date <= asOfDate).slice(-days);
+    if (usable.length > 0) return usable;
+  }
   try {
     const fresh = await fetchYahooDaily(symbol, Math.max(days + 30, 90));
-    if (fresh.length > 0) {
-      const rows = fresh.map((c) => ({
-        symbol,
-        price_date: c.date,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-      }));
-      // Upsert in chunks
-      for (let i = 0; i < rows.length; i += 500) {
-        await supabaseAdmin
-          .from("price_cache")
-          .upsert(rows.slice(i, i + 500), { onConflict: "symbol,price_date" });
-      }
-    }
+    await cacheCandles(symbol, fresh);
     return fresh.filter((c) => c.date <= asOfDate).slice(-days);
   } catch (err) {
     console.error(`market-data: fallback to cache for ${symbol}:`, err);
@@ -411,6 +451,15 @@ export async function getDailyCandlesRange(
       close: Number(r.close),
       volume: Number(r.volume ?? 0),
     }));
+  }
+
+  // Broker tape first for the whole window (Saxo caps a chart request at 1200
+  // bars, roughly five years of sessions).
+  const brokerCount = Math.min(1200, Math.ceil(yearsSpan * 260) + 30);
+  const brokerBars = await fetchBrokerDaily(symbol, brokerCount, to);
+  if (brokerBars) {
+    const usable = brokerBars.filter((c) => c.date >= from && c.date <= to);
+    if (usable.length > 0) return usable;
   }
 
   const period1 = Math.floor(new Date(from).getTime() / 1000);

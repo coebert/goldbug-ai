@@ -729,6 +729,118 @@ export class SaxoAdapter implements BrokerAdapter {
     return scheme;
   }
 
+  /**
+   * Real broker daily bars from Saxo's chart service.
+   *
+   * `Mode=UpTo` + `Time` asks for the `count` most recent sessions ending on
+   * (or before) that instant, which is exactly what a historical backtest
+   * needs: the tape as it stood then, not today's tape.
+   *
+   * Prices come back in the instrument's native quote units, and Saxo quotes
+   * many LSE lines in GBX. `price_cache` stores the same convention (pence for
+   * LSE), so a GBP-quoted response is pushed back into pence via
+   * `nativeQuotePrice` rather than landing a 100x-low bar in the cache.
+   */
+  async fetchDailyBars(
+    symbol: string,
+    opts: { count: number; to?: string },
+  ): Promise<Array<{
+    date: string; open: number; high: number; low: number; close: number; volume: number;
+  }>> {
+    const inst = await this.lookupUic(symbol);
+    const count = Math.min(1200, Math.max(1, Math.round(opts.count)));
+    const query: Record<string, string | number> = {
+      Uic: inst.uic,
+      AssetType: inst.assetType,
+      Horizon: 1440,
+      Count: count,
+      FieldGroups: "Data,DisplayAndFormat",
+    };
+    if (opts.to) {
+      query.Mode = "UpTo";
+      // Saxo wants an instant; end-of-day on the requested session.
+      query.Time = `${opts.to}T23:59:59Z`;
+    }
+    const res = await this.req<{
+      Data?: Array<{
+        Time?: string;
+        Open?: number; High?: number; Low?: number; Close?: number;
+        OpenBid?: number; HighBid?: number; LowBid?: number; CloseBid?: number;
+        Volume?: number; Interest?: number;
+      }>;
+      DisplayAndFormat?: { Currency?: string };
+    }>("GET", "/chart/v1/charts", { query });
+
+    const ccy = res.DisplayAndFormat?.Currency ?? inst.currency;
+    const out: Array<{
+      date: string; open: number; high: number; low: number; close: number; volume: number;
+    }> = [];
+    for (const bar of res.Data ?? []) {
+      const close = firstPositiveNumber(bar.Close, bar.CloseBid);
+      if (!(close > 0) || !bar.Time) continue;
+      const q = (v: number | undefined, fallback: number) =>
+        nativeQuotePrice(symbol, firstPositiveNumber(v) || fallback, ccy);
+      const closeQ = nativeQuotePrice(symbol, close, ccy);
+      out.push({
+        date: String(bar.Time).slice(0, 10),
+        open: q(bar.Open ?? bar.OpenBid, close),
+        high: q(bar.High ?? bar.HighBid, close),
+        low: q(bar.Low ?? bar.LowBid, close),
+        close: closeQ,
+        volume: Number(bar.Volume ?? 0) || 0,
+      });
+    }
+    out.sort((a, b) => a.date.localeCompare(b.date));
+    return out;
+  }
+
+  /**
+   * Live broker quote (mid, else last traded) in native quote units — the same
+   * price the venue is showing, so fills and holdings stop being valued off a
+   * delayed third-party tape.
+   */
+  async fetchQuote(symbol: string): Promise<{
+    symbol: string; price: number; bid: number | null; ask: number | null;
+    currency: string; at: string;
+  } | null> {
+    const inst = await this.lookupUic(symbol);
+    const accountKey = await this.getDefaultAccountKey();
+    const query: Record<string, string | number | undefined> = {
+      Uic: inst.uic,
+      AssetType: inst.assetType,
+      FieldGroups: "Quote,PriceInfo,PriceInfoDetails,DisplayAndFormat",
+      ...(accountKey ? { AccountKey: accountKey } : {}),
+    };
+    const res = await this.req<{
+      Quote?: { Bid?: number; Ask?: number; Mid?: number; Amount?: number };
+      PriceInfoDetails?: { LastTraded?: number; LastClose?: number };
+      PriceInfo?: { High?: number; Low?: number };
+      DisplayAndFormat?: { Currency?: string };
+      LastUpdated?: string;
+    }>("GET", "/trade/v1/infoprices", { query });
+
+    const ccy = res.DisplayAndFormat?.Currency ?? inst.currency;
+    const bid = firstPositiveNumber(res.Quote?.Bid) || null;
+    const ask = firstPositiveNumber(res.Quote?.Ask) || null;
+    const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
+    const raw = firstPositiveNumber(
+      res.Quote?.Mid,
+      mid ?? undefined,
+      res.PriceInfoDetails?.LastTraded,
+      res.PriceInfoDetails?.LastClose,
+    );
+    if (!(raw > 0)) return null;
+    return {
+      symbol,
+      price: nativeQuotePrice(symbol, raw, ccy),
+      bid: bid == null ? null : nativeQuotePrice(symbol, bid, ccy),
+      ask: ask == null ? null : nativeQuotePrice(symbol, ask, ccy),
+      currency: String(ccy ?? "GBP"),
+      at: res.LastUpdated ?? new Date().toISOString(),
+    };
+  }
+
+
 
   /**
    * Dry-run an order against Saxo's precheck endpoint WITHOUT placing it.

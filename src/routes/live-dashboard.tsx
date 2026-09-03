@@ -14,6 +14,7 @@ import { LiveHoldingsCard } from "@/components/live-holdings-card";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { getPortfolio, listPortfolios } from "@/lib/portfolios.functions";
 import { previewBrokerBalance } from "@/lib/live.functions";
+import { getBrokerQuotes, type BrokerQuoteResult } from "@/lib/broker-quotes.functions";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
@@ -117,7 +118,28 @@ function LiveDashboardPage() {
   const latestSnapshot = equity.at(-1) ?? null;
   const metrics = useMemo(() => derivePortfolioMetrics({ latestSnapshot, currentCash: portfolio?.current_cash, holdings }), [latestSnapshot, portfolio?.current_cash, holdings]);
   const history = historyQ.data ?? [];
-  const priceBySymbol = useMemo(() => new Map(history.map((item) => [item.symbol, item.currentPrice])), [history]);
+  // Broker quotes are the venue's own prices; the cached daily tape is only a
+  // fallback for instruments Saxo cannot quote.
+  const quotes = useServerFn(getBrokerQuotes);
+  const quotesQ = useQuery({
+    queryKey: ["live-dashboard-broker-quotes", portfolioId],
+    queryFn: () => quotes({ data: { portfolioId: portfolioId as string } }),
+    enabled: Boolean(portfolioId),
+    refetchInterval: POLL.SEMI_LIVE,
+    retry: false,
+  });
+  const brokerQuotes = (quotesQ.data ?? null) as BrokerQuoteResult | null;
+  const priceBySymbol = useMemo(() => {
+    const map = new Map(history.map((item) => [item.symbol, item.currentPrice]));
+    for (const [symbol, quote] of Object.entries(brokerQuotes?.quotes ?? {})) {
+      if (Number.isFinite(quote.price) && quote.price > 0) map.set(symbol, quote.price);
+    }
+    return map;
+  }, [history, brokerQuotes]);
+  const quoteSourceBySymbol = useMemo(
+    () => new Set(Object.keys(brokerQuotes?.quotes ?? {})),
+    [brokerQuotes],
+  );
   const positions = useMemo(() => holdings.filter((h) => Number(h.quantity) !== 0).map((h) => {
     const quantity = Number(h.quantity);
     const avgCost = Number(h.avg_cost);
@@ -165,9 +187,16 @@ function LiveDashboardPage() {
                   <div className="space-y-4">
                     <LiveHoldingsCard holdings={holdings} currency={currency} cash={metrics.cash} cashByCcy={portfolio.cash_by_ccy ?? null} totalValue={metrics.totalValue} invested={metrics.invested} mode={portfolio.mode ?? "paper"} series={Object.fromEntries(history.map((item) => [item.symbol, item]))} portfolioId={portfolio.id} />
                     <Card>
-                      <CardHeader className="pb-3"><CardTitle className="text-base">Position details</CardTitle></CardHeader>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Position details</CardTitle>
+                        <p className="text-[11px] text-muted-foreground">
+                          {brokerQuotes && brokerQuotes.covered > 0
+                            ? `Live Saxo quotes on ${brokerQuotes.covered} of ${brokerQuotes.requested} positions${brokerQuotes.covered < brokerQuotes.requested ? " — the rest fall back to the cached daily close" : ""}.`
+                            : "Broker quotes unavailable — prices shown are the cached daily close."}
+                        </p>
+                      </CardHeader>
                       <CardContent>
-                        {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
+                        {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}{quoteSourceBySymbol.has(p.symbol) ? <span className="ml-1 text-[10px] text-muted-foreground">live</span> : null}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
                       </CardContent>
                     </Card>
                   </div>
