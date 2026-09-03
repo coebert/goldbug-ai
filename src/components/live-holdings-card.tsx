@@ -553,6 +553,26 @@ export function LiveHoldingsCard({
 
 
 
+        {rows.length > 0 && (
+          <div
+            data-testid="holdings-cost-basis-summary"
+            className="mb-3 flex flex-wrap items-baseline justify-between gap-2 rounded-lg border bg-muted/20 px-3 py-2 text-xs"
+          >
+            <span className="text-muted-foreground">
+              Paid {fmt(totalCostBasis)} for the open positions · worth{" "}
+              {fmt(authoritativeInvested)} now
+            </span>
+            <span
+              className={`font-semibold tabular-nums ${
+                totalUnrealised >= 0 ? "text-emerald-500" : "text-rose-400"
+              }`}
+            >
+              {fmtSigned(totalUnrealised)}
+              {totalUnrealisedPct != null && ` (${fmtPct(totalUnrealisedPct)})`} unrealised
+            </span>
+          </div>
+        )}
+
         {holdings.length > 0 && (
           <div
             data-testid="positions-consistency"
