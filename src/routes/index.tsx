@@ -270,6 +270,7 @@ function Home() {
                 summary={todaySummary}
                 mixedCurrency={equityQ.data?.mixedCurrency ?? false}
                 currencies={equityQ.data?.currencies ?? []}
+                movers={<WhatMovedToday />}
               />
             )}
           </div>
