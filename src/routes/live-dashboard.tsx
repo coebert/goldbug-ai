@@ -128,7 +128,7 @@ function LiveDashboardPage() {
     refetchInterval: POLL.SEMI_LIVE,
     retry: false,
   });
-  const brokerQuotes = quotesQ.data ?? null;
+  const brokerQuotes = (quotesQ.data ?? null) as BrokerQuoteResult | null;
   const priceBySymbol = useMemo(() => {
     const map = new Map(history.map((item) => [item.symbol, item.currentPrice]));
     for (const [symbol, quote] of Object.entries(brokerQuotes?.quotes ?? {})) {
