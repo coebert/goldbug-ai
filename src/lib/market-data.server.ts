@@ -234,6 +234,50 @@ type PriceRow = {
   volume: number | null;
 };
 
+/** Write candles into `price_cache` (chunked) so later reads are free. */
+async function cacheCandles(symbol: string, candles: Candle[]): Promise<void> {
+  if (candles.length === 0) return;
+  const rows = candles.map((c) => ({
+    symbol,
+    price_date: c.date,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+    volume: c.volume,
+  }));
+  for (let i = 0; i < rows.length; i += 500) {
+    await supabaseAdmin
+      .from("price_cache")
+      .upsert(rows.slice(i, i + 500), { onConflict: "symbol,price_date" });
+  }
+}
+
+/**
+ * Primary source: the broker's own tape.
+ *
+ * Backtests and live valuation must both price off the venue we actually
+ * trade on. Yahoo stays as the fallback for instruments Saxo cannot resolve
+ * (indices, FX pseudo-pairs, retired listings) and for when the broker
+ * session is unavailable.
+ */
+async function fetchBrokerDaily(
+  symbol: string,
+  count: number,
+  to?: string,
+): Promise<Candle[] | null> {
+  try {
+    const { fetchBrokerDailyBars } = await import("@/lib/brokers/saxo-prices.server");
+    const bars = await fetchBrokerDailyBars(symbol, { count, to });
+    if (!bars || bars.length === 0) return null;
+    await cacheCandles(symbol, bars);
+    return bars;
+  } catch (err) {
+    console.warn(`market-data: broker bars unavailable for ${symbol}:`, err);
+    return null;
+  }
+}
+
 function rowToCandle(r: PriceRow | Record<string, unknown>): Candle {
   const row = r as PriceRow;
   const close = Number(row.close);
