@@ -58,7 +58,14 @@ function LiveDashboardPage() {
   });
   const portfolios = (portfoliosQ.data ?? []) as PortfolioRow[];
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const portfolioId = selectedId ?? portfolios[0]?.id ?? null;
+  // Default to the real-money account, not a sandbox: live_prod first, then a
+  // broker-linked live_sim, then anything else.
+  const defaultPortfolio = useMemo(() => {
+    const rank = (p: PortfolioRow) =>
+      p.mode === "live_prod" ? 0 : p.mode === "live_sim" ? 1 : p.mode === "paper" ? 2 : 3;
+    return [...portfolios].sort((a, b) => rank(a) - rank(b))[0] ?? null;
+  }, [portfolios]);
+  const portfolioId = selectedId ?? defaultPortfolio?.id ?? null;
   const portfolioQ = useQuery({
     queryKey: qk.portfolio.detail(portfolioId ?? "none"),
     queryFn: () => get({ data: { id: portfolioId as string } }),
