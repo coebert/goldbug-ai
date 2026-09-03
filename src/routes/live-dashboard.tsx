@@ -13,6 +13,7 @@ import { LiveTradingCard } from "@/components/live-trading-card";
 import { LiveHoldingsCard } from "@/components/live-holdings-card";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { getPortfolio, listPortfolios } from "@/lib/portfolios.functions";
+import { previewBrokerBalance } from "@/lib/live.functions";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 import { holdingNativeValue } from "@/lib/fx-leg-value";
