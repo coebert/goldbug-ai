@@ -211,7 +211,10 @@ export function compareBacktestToReal(input: {
 
   const from = shared[0];
   const to = shared[shared.length - 1];
-  const btVals = shared.map((d) => bt.get(d) as number);
+  const rawBtVals = shared.map((d) => bt.get(d) as number);
+  const spliced = spliceCapitalSteps(rawBtVals);
+  const btVals = spliced.values;
+  const backtestBaseShifts = spliced.shifts;
   const rlVals = shared.map((d) => rl.get(d) as number);
   const btBase = btVals[0];
   const rlBase = rlVals[0];
