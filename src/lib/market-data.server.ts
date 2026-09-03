@@ -453,6 +453,15 @@ export async function getDailyCandlesRange(
     }));
   }
 
+  // Broker tape first for the whole window (Saxo caps a chart request at 1200
+  // bars, roughly five years of sessions).
+  const brokerCount = Math.min(1200, Math.ceil(yearsSpan * 260) + 30);
+  const brokerBars = await fetchBrokerDaily(symbol, brokerCount, to);
+  if (brokerBars) {
+    const usable = brokerBars.filter((c) => c.date >= from && c.date <= to);
+    if (usable.length > 0) return usable;
+  }
+
   const period1 = Math.floor(new Date(from).getTime() / 1000);
   const period2 = Math.floor(new Date(to).getTime() / 1000) + 86400;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
