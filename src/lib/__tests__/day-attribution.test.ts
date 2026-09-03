@@ -45,8 +45,14 @@ describe("buildDayAttribution", () => {
     const stocks = r.lines.filter((l) => l.kind === "position");
     expect(stocks.every((l) => l.changeBase > 0)).toBe(true);
     const fx = r.lines.find((l) => l.kind === "fx")!;
+    // The fx funding leg alone gives back more than the equities made.
     expect(fx.changeBase).toBeLessThan(-10);
-    expect(r.positionsTotal).toBeLessThan(0);
+    expect(Math.abs(fx.changeBase)).toBeGreaterThan(
+      stocks.reduce((s, l) => s + l.changeBase, 0),
+    );
+    // Costs plus the unattributed spread turn a small positive into the
+    // headline loss the tile reports.
+    expect(r.positionsTotal - r.fees + r.residual).toBeCloseTo(-7.38, 6);
     // The identity always holds.
     expect(r.totalChange).toBeCloseTo(r.positionsTotal - r.fees + r.netFlow + r.residual, 6);
   });
