@@ -34,3 +34,5 @@
 - [ ] Trading strategy rule set: explicit entry / exit / position-sizing logic, runnable in the backtester against historical prices
 - [x] Backtester priced off real historical bars (as-of-date range fetch) instead of the most recent tape
 - [ ] Investigate reported TSLA buy-then-immediate-sell: confirm whether it happened and explain the rationale
+- [x] Broker-sourced market data: Saxo chart bars replace Yahoo as the primary price feed for backtests (Yahoo kept as fallback)
+- [x] Live dashboard prices holdings from Saxo live quotes instead of the cached daily tape
