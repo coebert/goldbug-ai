@@ -146,6 +146,7 @@ export const EMPTY_COMPARISON: BacktestVsReal = {
   worstMoneyLost: 0,
   underperformDays: 0,
   daysBehind: null,
+  backtestBaseShifts: 0,
 };
 
 
@@ -296,6 +297,7 @@ export function compareBacktestToReal(input: {
     worstMoneyLost,
     underperformDays,
     daysBehind,
+    backtestBaseShifts,
   };
 }
 
