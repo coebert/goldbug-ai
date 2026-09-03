@@ -95,6 +95,17 @@ function LiveDashboardPage() {
   }, [portfolioId]);
 
   const data = portfolioQ.data;
+  const selectedMode = (portfolios.find((p) => p.id === portfolioId)?.mode ?? null) as string | null;
+  const brokerEnv = selectedMode === "live_prod" ? "live" : selectedMode === "live_sim" ? "sim" : null;
+  const balance = useServerFn(previewBrokerBalance);
+  const brokerQ = useQuery({
+    queryKey: ["live-dashboard-broker-balance", portfolioId, brokerEnv],
+    queryFn: () => balance({ data: { env: brokerEnv as "sim" | "live" } }),
+    enabled: Boolean(portfolioId && brokerEnv),
+    refetchInterval: POLL.SEMI_LIVE,
+    retry: false,
+  });
+  const broker = brokerQ.data ?? null;
   const portfolio = data?.portfolio as (PortfolioRow & { cash_by_ccy?: Record<string, number> | null; currency?: string | null }) | undefined;
   const holdings = (data?.holdings ?? []) as HoldingRow[];
   const equity = (data?.equity ?? []) as Array<{ snapshot_date: string; total_value: number; cash?: number | null }>;
