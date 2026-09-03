@@ -31,6 +31,8 @@
 - [x] Home page header mobile rendering: actions were squashing the title/purpose to one word per line — actions now drop to their own row below the title on phones
 - [x] Live dashboard: select the real-money portfolio by default (not the sandbox) so it shows actual balances, holdings, fills and P&L
 - [x] Live dashboard: backtest vs live P&L overlay comparing strategy history to the real account over the same period
+- [x] Holdings rows show cost basis and unrealised P&L per position, plus a book-level paid-vs-worth strip
+- [x] Strategy performance page (/portfolio/$id/performance): annualised return, Sharpe/Sortino, drawdown episodes, beside the backtest-vs-real comparison
 - [ ] Trading strategy rule set: explicit entry / exit / position-sizing logic, runnable in the backtester against historical prices
 - [x] Backtester priced off real historical bars (as-of-date range fetch) instead of the most recent tape
 - [ ] Investigate reported TSLA buy-then-immediate-sell: confirm whether it happened and explain the rationale

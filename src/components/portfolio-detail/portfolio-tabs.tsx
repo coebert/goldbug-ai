@@ -10,6 +10,7 @@ const TABS = [
   { to: "/portfolio/$id/summary", label: "Summary" },
   { to: "/portfolio/$id/trade", label: "Trade" },
   { to: "/portfolio/$id/risk", label: "Risk" },
+  { to: "/portfolio/$id/performance", label: "Performance" },
   { to: "/portfolio/$id/attribution", label: "Attribution" },
   { to: "/portfolio/$id/analytics", label: "Analytics" },
   { to: "/portfolio/$id/optimizer", label: "Optimizer" },

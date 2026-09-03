@@ -312,6 +312,17 @@ export function LiveHoldingsCard({
   });
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
+  // Book-level cost basis and unrealised P&L: what the open positions cost
+  // versus what they are worth now. Rows with unresolved price units are
+  // excluded from both sides so the pair stays comparable.
+  const totalCostBasis = roundMoney(
+    rows.filter((r) => !r.unitsUnknown).reduce((s, r) => s + r.costBase, 0),
+  );
+  const totalUnrealised = roundMoney(
+    rows.filter((r) => !r.unitsUnknown).reduce((s, r) => s + (r.unrealised ?? 0), 0),
+  );
+  const totalUnrealisedPct = totalCostBasis > 0 ? totalUnrealised / totalCostBasis : null;
+
   // Reconcile what the engine holds against what this card actually paints:
   // every non-FX position rendered exactly once, quantities equal, and the
   // per-row values summing to the Invested tile. FX funding legs are counted
@@ -552,6 +563,26 @@ export function LiveHoldingsCard({
         )}
 
 
+
+        {rows.length > 0 && (
+          <div
+            data-testid="holdings-cost-basis-summary"
+            className="mb-3 flex flex-wrap items-baseline justify-between gap-2 rounded-lg border bg-muted/20 px-3 py-2 text-xs"
+          >
+            <span className="text-muted-foreground">
+              Paid {fmt(totalCostBasis)} for the open positions · worth{" "}
+              {fmt(authoritativeInvested)} now
+            </span>
+            <span
+              className={`font-semibold tabular-nums ${
+                totalUnrealised >= 0 ? "text-emerald-500" : "text-rose-400"
+              }`}
+            >
+              {fmtSigned(totalUnrealised)}
+              {totalUnrealisedPct != null && ` (${fmtPct(totalUnrealisedPct)})`} unrealised
+            </span>
+          </div>
+        )}
 
         {holdings.length > 0 && (
           <div
@@ -804,8 +835,12 @@ export function LiveHoldingsCard({
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {currency}{" "}
                         {r.avg.toFixed(2)} avg cost
                         {!r.unitsUnknown && (
-                          <span className="ml-1 text-muted-foreground/70">
-                            · book {fmt(r.costBase)}
+                          <span
+                            className="ml-1 text-muted-foreground/70"
+                            data-testid={`holding-cost-basis-${r.symbol}`}
+                            title="What you paid for this position in total, including the shares still held."
+                          >
+                            · cost basis {fmt(r.costBase)} → now {fmt(r.value)}
                           </span>
                         )}
                         {openedLabel && (
