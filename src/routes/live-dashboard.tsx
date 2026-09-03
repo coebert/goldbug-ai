@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Activity, BookOpen, RefreshCw, Wallet } from "lucide-react";
@@ -13,6 +13,11 @@ import { LiveTradingCard } from "@/components/live-trading-card";
 import { LiveHoldingsCard } from "@/components/live-holdings-card";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { getPortfolio, listPortfolios } from "@/lib/portfolios.functions";
+import { previewBrokerBalance } from "@/lib/live.functions";
+
+const BacktestVsRealCard = lazy(() =>
+  import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
+);
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 import { holdingNativeValue } from "@/lib/fx-leg-value";
@@ -58,7 +63,14 @@ function LiveDashboardPage() {
   });
   const portfolios = (portfoliosQ.data ?? []) as PortfolioRow[];
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const portfolioId = selectedId ?? portfolios[0]?.id ?? null;
+  // Default to the real-money account, not a sandbox: live_prod first, then a
+  // broker-linked live_sim, then anything else.
+  const defaultPortfolio = useMemo(() => {
+    const rank = (p: PortfolioRow) =>
+      p.mode === "live_prod" ? 0 : p.mode === "live_sim" ? 1 : p.mode === "paper" ? 2 : 3;
+    return [...portfolios].sort((a, b) => rank(a) - rank(b))[0] ?? null;
+  }, [portfolios]);
+  const portfolioId = selectedId ?? defaultPortfolio?.id ?? null;
   const portfolioQ = useQuery({
     queryKey: qk.portfolio.detail(portfolioId ?? "none"),
     queryFn: () => get({ data: { id: portfolioId as string } }),
@@ -88,6 +100,17 @@ function LiveDashboardPage() {
   }, [portfolioId]);
 
   const data = portfolioQ.data;
+  const selectedMode = (portfolios.find((p) => p.id === portfolioId)?.mode ?? null) as string | null;
+  const brokerEnv = selectedMode === "live_prod" ? "live" : selectedMode === "live_sim" ? "sim" : null;
+  const balance = useServerFn(previewBrokerBalance);
+  const brokerQ = useQuery({
+    queryKey: ["live-dashboard-broker-balance", portfolioId, brokerEnv],
+    queryFn: () => balance({ data: { env: brokerEnv as "sim" | "live" } }),
+    enabled: Boolean(portfolioId && brokerEnv),
+    refetchInterval: POLL.SEMI_LIVE,
+    retry: false,
+  });
+  const broker = brokerQ.data ?? null;
   const portfolio = data?.portfolio as (PortfolioRow & { cash_by_ccy?: Record<string, number> | null; currency?: string | null }) | undefined;
   const holdings = (data?.holdings ?? []) as HoldingRow[];
   const equity = (data?.equity ?? []) as Array<{ snapshot_date: string; total_value: number; cash?: number | null }>;
@@ -104,7 +127,9 @@ function LiveDashboardPage() {
     return { ...h, quantity, price, value, pnl: price == null ? null : value - cost };
   }).sort((a, b) => Math.abs(b.value) - Math.abs(a.value)), [holdings, priceBySymbol]);
   const currency = String(portfolio?.currency ?? "GBP").toUpperCase();
-  const fmt = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 2 }).format(n);
+  const fmtCcy = (n: number, ccy: string) =>
+    new Intl.NumberFormat("en-GB", { style: "currency", currency: (ccy || "GBP").toUpperCase(), maximumFractionDigits: 2 }).format(n);
+  const fmt = (n: number) => fmtCcy(n, currency);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-surface-1">
@@ -131,10 +156,10 @@ function LiveDashboardPage() {
             {!portfolioId || portfolioQ.isLoading ? <p className="text-sm text-muted-foreground">Loading live portfolio…</p> : portfolioQ.isError ? <p className="text-sm text-destructive">Could not load this portfolio: {(portfolioQ.error as Error).message}</p> : portfolio ? (
               <>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <DeskMetric icon={<Wallet className="h-4 w-4" />} label="Exact equity" value={fmt(metrics.totalValue)} />
-                  <DeskMetric label="Cash" value={fmt(metrics.cash)} />
-                  <DeskMetric label="Open positions" value={String(positions.length)} />
-                  <DeskMetric icon={<BookOpen className="h-4 w-4" />} label="Equity source" value={metrics.source === "snapshot" ? "Broker snapshot" : "Fallback"} />
+                  <DeskMetric icon={<Wallet className="h-4 w-4" />} label="Account equity" value={broker ? fmtCcy(broker.totalValue, broker.currency) : fmt(metrics.totalValue)} sub={broker ? "Live from broker" : metrics.source === "snapshot" ? "Latest snapshot" : "Fallback estimate"} />
+                  <DeskMetric label="Cash" value={broker ? fmtCcy(broker.cash, broker.currency) : fmt(metrics.cash)} sub={broker?.cashAvailable != null ? `${fmtCcy(broker.cashAvailable, broker.currency)} available` : undefined} />
+                  <DeskMetric label="Positions value" value={broker ? fmtCcy(broker.positionsValue, broker.currency) : fmt(metrics.invested)} sub={`${broker?.positionsCount ?? positions.length} open`} />
+                  <DeskMetric icon={<BookOpen className="h-4 w-4" />} label="Unrealised P&L" value={broker?.unrealizedPnl != null ? fmtCcy(broker.unrealizedPnl, broker.currency) : "—"} sub={brokerQ.isError ? "Broker unavailable" : brokerEnv ? `Saxo ${brokerEnv}` : "Not broker-linked"} />
                 </div>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
                   <div className="space-y-4">
@@ -148,6 +173,9 @@ function LiveDashboardPage() {
                   </div>
                   <div className="space-y-4">
                     <Card><CardHeader className="pb-3"><CardTitle className="text-base">Live order book &amp; fills</CardTitle></CardHeader><CardContent><OrderFillsCard portfolioId={portfolio.id} /></CardContent></Card>
+                    <Suspense fallback={<Card><CardContent className="py-8 text-sm text-muted-foreground">Loading backtest comparison…</CardContent></Card>}>
+                      <BacktestVsRealCard portfolioId={portfolio.id} currency={currency} />
+                    </Suspense>
                     <LiveTradingCard portfolioId={portfolio.id} />
                   </div>
                 </div>
@@ -160,6 +188,12 @@ function LiveDashboardPage() {
   );
 }
 
-function DeskMetric({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {
-  return <div className="rounded-lg border border-border bg-card p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div><div className="mt-1 text-base font-semibold tabular-nums">{value}</div></div>;
+function DeskMetric({ icon, label, value, sub }: { icon?: React.ReactNode; label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
+      <div className="mt-1 text-base font-semibold tabular-nums">{value}</div>
+      {sub ? <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div> : null}
+    </div>
+  );
 }
