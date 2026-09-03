@@ -312,6 +312,17 @@ export function LiveHoldingsCard({
   });
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
+  // Book-level cost basis and unrealised P&L: what the open positions cost
+  // versus what they are worth now. Rows with unresolved price units are
+  // excluded from both sides so the pair stays comparable.
+  const totalCostBasis = roundMoney(
+    rows.filter((r) => !r.unitsUnknown).reduce((s, r) => s + r.costBase, 0),
+  );
+  const totalUnrealised = roundMoney(
+    rows.filter((r) => !r.unitsUnknown).reduce((s, r) => s + (r.unrealised ?? 0), 0),
+  );
+  const totalUnrealisedPct = totalCostBasis > 0 ? totalUnrealised / totalCostBasis : null;
+
   // Reconcile what the engine holds against what this card actually paints:
   // every non-FX position rendered exactly once, quantities equal, and the
   // per-row values summing to the Invested tile. FX funding legs are counted
