@@ -165,6 +165,48 @@ function byDay(points: CurvePoint[]): Map<string, number> {
   return out;
 }
 
+/**
+ * A single day cannot plausibly change a diversified book by more than this.
+ * Anything larger is a capital-base change, not a trading result.
+ */
+export const MAX_PLAUSIBLE_DAILY_STEP = 0.25;
+
+/**
+ * Removes capital-base jumps from an equity curve.
+ *
+ * A saved backtest curve is read out of the shared `equity_snapshots` table,
+ * so a deposit — or a snapshot history that was rebuilt/backfilled part-way
+ * through the window — shows up as one enormous day. Left alone that reads as
+ * strategy performance (this is what produced a "+367%" backtest return on a
+ * live account that never moved off ~£10k).
+ *
+ * Each offending step is spliced out by rescaling everything after it, so the
+ * curve keeps its real day-to-day shape on one continuous capital base.
+ */
+export function spliceCapitalSteps(
+  values: number[],
+  maxStep = MAX_PLAUSIBLE_DAILY_STEP,
+): { values: number[]; shifts: number } {
+  if (values.length < 2) return { values: [...values], shifts: 0 };
+  const out: number[] = [values[0]];
+  let scale = 1;
+  let shifts = 0;
+  for (let i = 1; i < values.length; i += 1) {
+    const prev = values[i - 1];
+    const cur = values[i];
+    if (Number.isFinite(prev) && Number.isFinite(cur) && prev !== 0) {
+      const ratio = cur / prev;
+      if (Math.abs(ratio - 1) > maxStep) {
+        // Neutralise the jump: the base changed, the strategy did not earn it.
+        scale /= ratio;
+        shifts += 1;
+      }
+    }
+    out.push(cur * scale);
+  }
+  return { values: out, shifts };
+}
+
 export function curveStats(values: number[]): CurveStats {
   if (values.length < 2) return EMPTY_STATS;
   const first = values[0];
