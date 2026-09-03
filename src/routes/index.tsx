@@ -29,6 +29,7 @@ import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { Sparkles, PlusCircle, LineChart } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
+import { WhatMovedToday } from "@/components/home/what-moved-today";
 import { TodayHeroSkeleton } from "@/components/home/today-hero-skeleton";
 import { PortfolioListSkeleton } from "@/components/home/portfolio-row-skeleton";
 import { MirrorAlertSkeleton } from "@/components/home/mirror-alert-skeleton";

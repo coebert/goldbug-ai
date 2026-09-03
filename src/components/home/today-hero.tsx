@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Clock, TrendingDown, TrendingUp } from "lucide-react";
 import type { ModeSummaryPair } from "@/lib/mode-summary";
 import { ukHour, ukZoneAbbr } from "@/lib/uk-time";
@@ -16,10 +16,13 @@ export function TodayHero({
   summary,
   mixedCurrency = false,
   currencies = [],
+  movers,
 }: {
   summary: ModeSummaryPair;
   mixedCurrency?: boolean;
   currencies?: string[];
+  /** Optional "what moved today" breakdown slot (self-fetching). */
+  movers?: ReactNode;
 }) {
   const nextRun = useNextRunCountdown();
   if (!summary) {
@@ -104,6 +107,7 @@ export function TodayHero({
             </div>
           )}
 
+          {movers}
         </div>
         <div className="flex w-full items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2.5 sm:w-auto sm:shrink-0 sm:py-2">
           <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
