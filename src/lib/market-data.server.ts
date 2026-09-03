@@ -300,6 +300,9 @@ async function loadDailyCandles(
     }))
     .reverse();
 
+  const today = new Date().toISOString().slice(0, 10);
+  const isHistorical = asOfDate < today;
+
   // A valuation for a specific day must not silently reuse a close from several
   // sessions earlier. That made held portfolios appear flat even while their
   // assets moved. Use the cache only when it reaches the requested date; on
@@ -307,6 +310,29 @@ async function loadDailyCandles(
   if (cachedCandles.length >= Math.min(days, 20)) {
     const lastDate = cachedCandles[cachedCandles.length - 1].date;
     if (lastDate === asOfDate) return cachedCandles;
+    // Backtests ask for dates that are weekends, holidays or simply long past.
+    // Yahoo will never return a bar dated exactly then, so demanding an exact
+    // match here forced a pointless refetch of *recent* bars and left the
+    // replay priced off today's tape (or off nothing at all). A cached run that
+    // reaches within a few calendar days of the requested date IS the real
+    // historical close for that session.
+    if (isHistorical && daysBetween(lastDate, asOfDate) <= 5) return cachedCandles;
+  }
+
+  // Historical request: fetch the real window that ends on `asOfDate` rather
+  // than the most recent `days` bars, which would either be filtered away
+  // entirely (leaving the backtest unpriced) or, worse, price a past session
+  // off a newer tape.
+  if (isHistorical) {
+    try {
+      const from = shiftDays(asOfDate, -Math.max(days * 2 + 40, 90));
+      const range = await getDailyCandlesRange(symbol, from, asOfDate);
+      const usable = range.filter((c) => c.date <= asOfDate).slice(-days);
+      if (usable.length > 0) return usable;
+    } catch (err) {
+      console.error(`market-data: historical range failed for ${symbol}:`, err);
+    }
+    return cachedCandles;
   }
 
   // Fetch fresh from Yahoo and upsert
@@ -335,6 +361,19 @@ async function loadDailyCandles(
     return cachedCandles;
   }
 }
+
+/** Whole calendar days between two ISO dates (absolute). */
+function daysBetween(a: string, b: string): number {
+  return Math.abs(new Date(b).getTime() - new Date(a).getTime()) / 86400000;
+}
+
+/** ISO date shifted by `n` calendar days. */
+function shiftDays(iso: string, n: number): string {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 
 export async function getPriceOn(symbol: string, date: string): Promise<number | null> {
   const candles = await getDailyCandles(symbol, 5, date);
