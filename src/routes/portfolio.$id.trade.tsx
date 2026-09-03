@@ -15,6 +15,8 @@ import { TradingPnlCharts } from "@/components/trading-pnl-charts";
 import { HoldingPriceCharts } from "@/components/holding-price-charts";
 import { OrderFillsCard } from "@/components/order-fills-card";
 import { StrategyBuilderCard } from "@/components/strategy-builder-card";
+import { ManualOrderTicketCard } from "@/components/manual-order-ticket-card";
+import { BrokerHistoryBackfillCard } from "@/components/broker-history-backfill-card";
 import { getPortfolio } from "@/lib/portfolios.functions";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { getOrderFills } from "@/lib/order-fills.functions";
@@ -230,6 +232,10 @@ function TradePage() {
         </div>
 
         <StalePriceWarning portfolioId={id} />
+
+        <ManualOrderTicketCard portfolioId={id} currency={ccy} mode={p?.mode ?? ""} />
+
+        <BrokerHistoryBackfillCard portfolioId={id} />
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
           <Metric label="Total value" value={fmt(metrics.totalValue)} />

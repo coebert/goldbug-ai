@@ -34,6 +34,7 @@ import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdTradeRouteImport } from './routes/portfolio.$id.trade'
 import { Route as PortfolioIdSummaryRouteImport } from './routes/portfolio.$id.summary'
 import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
+import { Route as PortfolioIdRiskRouteImport } from './routes/portfolio.$id.risk'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdFxRiskRouteImport } from './routes/portfolio.$id.fx-risk'
@@ -189,6 +190,11 @@ const PortfolioIdSummaryRoute = PortfolioIdSummaryRouteImport.update({
 const PortfolioIdSmaReportRoute = PortfolioIdSmaReportRouteImport.update({
   id: '/sma-report',
   path: '/sma-report',
+  getParentRoute: () => PortfolioIdRoute,
+} as any)
+const PortfolioIdRiskRoute = PortfolioIdRiskRouteImport.update({
+  id: '/risk',
+  path: '/risk',
   getParentRoute: () => PortfolioIdRoute,
 } as any)
 const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
@@ -399,6 +405,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/portfolio/$id/risk': typeof PortfolioIdRiskRoute
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/portfolio/$id/summary': typeof PortfolioIdSummaryRoute
   '/portfolio/$id/trade': typeof PortfolioIdTradeRoute
@@ -457,6 +464,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/portfolio/$id/risk': typeof PortfolioIdRiskRoute
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/portfolio/$id/summary': typeof PortfolioIdSummaryRoute
   '/portfolio/$id/trade': typeof PortfolioIdTradeRoute
@@ -516,6 +524,7 @@ export interface FileRoutesById {
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/portfolio/$id/risk': typeof PortfolioIdRiskRoute
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/portfolio/$id/summary': typeof PortfolioIdSummaryRoute
   '/portfolio/$id/trade': typeof PortfolioIdTradeRoute
@@ -576,6 +585,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/portfolio/$id/risk'
     | '/portfolio/$id/sma-report'
     | '/portfolio/$id/summary'
     | '/portfolio/$id/trade'
@@ -634,6 +644,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/portfolio/$id/risk'
     | '/portfolio/$id/sma-report'
     | '/portfolio/$id/summary'
     | '/portfolio/$id/trade'
@@ -692,6 +703,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/portfolio/$id/risk'
     | '/portfolio/$id/sma-report'
     | '/portfolio/$id/summary'
     | '/portfolio/$id/trade'
@@ -947,6 +959,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdSmaReportRouteImport
       parentRoute: typeof PortfolioIdRoute
     }
+    '/portfolio/$id/risk': {
+      id: '/portfolio/$id/risk'
+      path: '/risk'
+      fullPath: '/portfolio/$id/risk'
+      preLoaderRoute: typeof PortfolioIdRiskRouteImport
+      parentRoute: typeof PortfolioIdRoute
+    }
     '/portfolio/$id/report': {
       id: '/portfolio/$id/report'
       path: '/report'
@@ -1173,6 +1192,7 @@ interface PortfolioIdRouteChildren {
   PortfolioIdFxRiskRoute: typeof PortfolioIdFxRiskRoute
   PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
   PortfolioIdReportRoute: typeof PortfolioIdReportRoute
+  PortfolioIdRiskRoute: typeof PortfolioIdRiskRoute
   PortfolioIdSmaReportRoute: typeof PortfolioIdSmaReportRoute
   PortfolioIdSummaryRoute: typeof PortfolioIdSummaryRoute
   PortfolioIdTradeRoute: typeof PortfolioIdTradeRoute
@@ -1184,6 +1204,7 @@ const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
   PortfolioIdFxRiskRoute: PortfolioIdFxRiskRoute,
   PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
   PortfolioIdReportRoute: PortfolioIdReportRoute,
+  PortfolioIdRiskRoute: PortfolioIdRiskRoute,
   PortfolioIdSmaReportRoute: PortfolioIdSmaReportRoute,
   PortfolioIdSummaryRoute: PortfolioIdSummaryRoute,
   PortfolioIdTradeRoute: PortfolioIdTradeRoute,

@@ -36,3 +36,7 @@
 - [ ] Investigate reported TSLA buy-then-immediate-sell: confirm whether it happened and explain the rationale
 - [x] Broker-sourced market data: Saxo chart bars replace Yahoo as the primary price feed for backtests (Yahoo kept as fallback)
 - [x] Live dashboard prices holdings from Saxo live quotes instead of the cached daily tape
+- [x] Trade page order ticket wired to Saxo: manual buys/sells route through the live executor and confirm from broker fills
+- [x] Historical Saxo price backfill for the backtest window (broker daily bars into the price cache, both symbol spellings)
+- [x] Live risk dashboard: position weights, concentration, cash at risk and FX legs (/portfolio/$id/risk)
+- [ ] Place a small real trade and confirm it in holdings and P&L against live Saxo prices (needs the owner to confirm the ticket — two-factor required)
