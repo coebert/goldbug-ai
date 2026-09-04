@@ -273,21 +273,58 @@ Return:
 If no action is warranted, return an empty orders array.`;
 
 
-  const timeoutRaw = Number(process.env.AI_DECISION_TIMEOUT_MS ?? 15_000);
-  const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 15_000;
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+  // No artificial timeout: the gateway routinely needs 30-90s for a decision
+  // of this size, and a client-side abort throws away work that still bills.
+  // Streaming keeps bytes flowing so platform request timeouts never fire.
+  const attempts: Array<{ model: string; note: string }> = [
+    { model: PRIMARY_MODEL, note: "primary" },
+    { model: PRIMARY_MODEL, note: "retry" },
+    { model: BACKUP_MODEL, note: "backup" },
+  ];
 
-  try {
-    const { output } = await generateText({
-      model,
-      system,
-      prompt: user,
-      output: Output.object({ schema: DecisionSchema }),
-      abortSignal: abortController.signal,
-    });
-    return output;
-  } catch (error) {
+  let lastError: unknown = null;
+  for (const [i, attempt] of attempts.entries()) {
+    try {
+      const result = streamText({
+        model: gateway(attempt.model),
+        system,
+        prompt: user,
+        output: Output.object({ schema: DecisionSchema }),
+        maxOutputTokens: 16_000,
+        maxRetries: 0,
+      });
+      const output = await result.output;
+      if (i > 0) {
+        console.warn(`AI decision succeeded on ${attempt.note} attempt (${attempt.model})`);
+      }
+      return output;
+    } catch (error) {
+      lastError = error;
+      const status = (error as { statusCode?: number } | null)?.statusCode;
+      // Terminal states (bad request, auth, credits, policy) never recover on
+      // a retry — go straight to the protective heuristic.
+      if (status === 400 || status === 401 || status === 402 || status === 403) break;
+      const isLast = i === attempts.length - 1;
+      if (isLast) break;
+      const retryAfter = Number(
+        (error as { responseHeaders?: Record<string, string> } | null)?.responseHeaders?.[
+          "retry-after"
+        ],
+      );
+      const delayMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 30_000)
+          : 2_000 * (i + 1);
+      console.warn(
+        `AI decision attempt ${i + 1} failed (${attempt.model}${status ? ` ${status}` : ""}) — retrying in ${Math.round(delayMs / 1000)}s`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  {
+    const error = lastError;
+
     // AI gateway failures (403 Forbidden, 429 rate-limit, 402 credits,
     // network) and unparseable outputs must NEVER abort the tick — the
     // engine's downstream guardrail exits (stop-loss, take-profit, ATR
