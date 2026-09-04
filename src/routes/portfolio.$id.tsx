@@ -517,8 +517,17 @@ function PortfolioPage() {
   >(null);
   const [backtestRunToken, setBacktestRunToken] = useState(0);
   const [lastBtDays, setLastBtDays] = useState<number | null>(null);
+  // A broker-linked book must never be replayed in place: the normal backtest
+  // clears holdings/trades and re-runs the engine on the portfolio itself.
+  // Live books use the shadow replay (throwaway clone, real AI model, no
+  // broker routing) and the run is still saved against this portfolio.
+  const isLiveBook =
+    q.data?.portfolio?.mode === "live_prod" || q.data?.portfolio?.mode === "live_sim";
   const runBt = useMutation({
-    mutationFn: () => runBtFn({ data: { portfolio_id: id, days } }),
+    mutationFn: () =>
+      isLiveBook
+        ? runShadowBtFn({ data: { portfolio_id: id, days: Math.max(3, days) } })
+        : runBtFn({ data: { portfolio_id: id, days } }),
     onSuccess: async (r) => {
       const m = r.metrics;
       setLastBtMetrics(m ?? null);
