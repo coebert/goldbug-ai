@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildHeuristicSells, buildHeuristicDecision } from "../heuristic-decision";
+import {
+  buildHeuristicSells,
+  buildHeuristicBuys,
+  buildHeuristicDecision,
+  FALLBACK_MAX_NAME_WEIGHT_PCT,
+} from "../heuristic-decision";
 
 describe("heuristic-decision", () => {
   const holdings = [
