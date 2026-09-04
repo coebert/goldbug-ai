@@ -28,9 +28,9 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
-import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as MarketSymbolRouteImport } from './routes/market.$symbol'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
+import { Route as PortfolioIdIndexRouteImport } from './routes/portfolio.$id.index'
 import { Route as PortfolioIdTradeRouteImport } from './routes/portfolio.$id.trade'
 import { Route as PortfolioIdSummaryRouteImport } from './routes/portfolio.$id.summary'
 import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
@@ -164,11 +164,6 @@ const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
   path: '/walk-forward/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioIdRoute = PortfolioIdRouteImport.update({
-  id: '/portfolio/$id',
-  path: '/portfolio/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MarketSymbolRoute = MarketSymbolRouteImport.update({
   id: '/market/$symbol',
   path: '/market/$symbol',
@@ -179,60 +174,65 @@ const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
   path: '/long-horizon/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortfolioIdIndexRoute = PortfolioIdIndexRouteImport.update({
+  id: '/portfolio/$id/',
+  path: '/portfolio/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PortfolioIdTradeRoute = PortfolioIdTradeRouteImport.update({
-  id: '/trade',
-  path: '/trade',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/trade',
+  path: '/portfolio/$id/trade',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdSummaryRoute = PortfolioIdSummaryRouteImport.update({
-  id: '/summary',
-  path: '/summary',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/summary',
+  path: '/portfolio/$id/summary',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdSmaReportRoute = PortfolioIdSmaReportRouteImport.update({
-  id: '/sma-report',
-  path: '/sma-report',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/sma-report',
+  path: '/portfolio/$id/sma-report',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdRiskRoute = PortfolioIdRiskRouteImport.update({
-  id: '/risk',
-  path: '/risk',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/risk',
+  path: '/portfolio/$id/risk',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
-  id: '/report',
-  path: '/report',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/report',
+  path: '/portfolio/$id/report',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdPerformanceRoute = PortfolioIdPerformanceRouteImport.update({
-  id: '/performance',
-  path: '/performance',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/performance',
+  path: '/portfolio/$id/performance',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdOptimizerRoute = PortfolioIdOptimizerRouteImport.update({
-  id: '/optimizer',
-  path: '/optimizer',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/optimizer',
+  path: '/portfolio/$id/optimizer',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdFxRiskRoute = PortfolioIdFxRiskRouteImport.update({
-  id: '/fx-risk',
-  path: '/fx-risk',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/fx-risk',
+  path: '/portfolio/$id/fx-risk',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdDailyPnlRoute = PortfolioIdDailyPnlRouteImport.update({
-  id: '/daily-pnl',
-  path: '/daily-pnl',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/daily-pnl',
+  path: '/portfolio/$id/daily-pnl',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
-  id: '/attribution',
-  path: '/attribution',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/attribution',
+  path: '/portfolio/$id/attribution',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdAnalyticsRoute = PortfolioIdAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => PortfolioIdRoute,
+  id: '/portfolio/$id/analytics',
+  path: '/portfolio/$id/analytics',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicSetupScanCronRoute = ApiPublicSetupScanCronRouteImport.update({
   id: '/api/public/setup-scan-cron',
@@ -406,7 +406,6 @@ export interface FileRoutesByFullPath {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
-  '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
@@ -423,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/portfolio/$id/summary': typeof PortfolioIdSummaryRoute
   '/portfolio/$id/trade': typeof PortfolioIdTradeRoute
+  '/portfolio/$id/': typeof PortfolioIdIndexRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -467,7 +467,6 @@ export interface FileRoutesByTo {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
-  '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
@@ -484,6 +483,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/portfolio/$id/summary': typeof PortfolioIdSummaryRoute
   '/portfolio/$id/trade': typeof PortfolioIdTradeRoute
+  '/portfolio/$id': typeof PortfolioIdIndexRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -529,7 +529,6 @@ export interface FileRoutesById {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
-  '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
@@ -546,6 +545,7 @@ export interface FileRoutesById {
   '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/portfolio/$id/summary': typeof PortfolioIdSummaryRoute
   '/portfolio/$id/trade': typeof PortfolioIdTradeRoute
+  '/portfolio/$id/': typeof PortfolioIdIndexRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -592,7 +592,6 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/market/$symbol'
-    | '/portfolio/$id'
     | '/walk-forward/$id'
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
@@ -609,6 +608,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/sma-report'
     | '/portfolio/$id/summary'
     | '/portfolio/$id/trade'
+    | '/portfolio/$id/'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
@@ -653,7 +653,6 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/market/$symbol'
-    | '/portfolio/$id'
     | '/walk-forward/$id'
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
@@ -670,6 +669,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/sma-report'
     | '/portfolio/$id/summary'
     | '/portfolio/$id/trade'
+    | '/portfolio/$id'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
@@ -714,7 +714,6 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/market/$symbol'
-    | '/portfolio/$id'
     | '/walk-forward/$id'
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
@@ -731,6 +730,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/sma-report'
     | '/portfolio/$id/summary'
     | '/portfolio/$id/trade'
+    | '/portfolio/$id/'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
@@ -776,12 +776,23 @@ export interface RootRouteChildren {
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   MarketSymbolRoute: typeof MarketSymbolRoute
-  PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   WalkForwardIdRoute: typeof WalkForwardIdRoute
   ApiBrokerBlocksClearRoute: typeof ApiBrokerBlocksClearRoute
   ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
   ApiPublicSetupScanCronRoute: typeof ApiPublicSetupScanCronRoute
+  PortfolioIdAnalyticsRoute: typeof PortfolioIdAnalyticsRoute
+  PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
+  PortfolioIdDailyPnlRoute: typeof PortfolioIdDailyPnlRoute
+  PortfolioIdFxRiskRoute: typeof PortfolioIdFxRiskRoute
+  PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
+  PortfolioIdPerformanceRoute: typeof PortfolioIdPerformanceRoute
+  PortfolioIdReportRoute: typeof PortfolioIdReportRoute
+  PortfolioIdRiskRoute: typeof PortfolioIdRiskRoute
+  PortfolioIdSmaReportRoute: typeof PortfolioIdSmaReportRoute
+  PortfolioIdSummaryRoute: typeof PortfolioIdSummaryRoute
+  PortfolioIdTradeRoute: typeof PortfolioIdTradeRoute
+  PortfolioIdIndexRoute: typeof PortfolioIdIndexRoute
   ApiPublicHooksAiGatewayHealthRoute: typeof ApiPublicHooksAiGatewayHealthRoute
   ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   ApiPublicHooksBackfillIntradayEquityRoute: typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -941,13 +952,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WalkForwardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portfolio/$id': {
-      id: '/portfolio/$id'
-      path: '/portfolio/$id'
-      fullPath: '/portfolio/$id'
-      preLoaderRoute: typeof PortfolioIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/market/$symbol': {
       id: '/market/$symbol'
       path: '/market/$symbol'
@@ -962,82 +966,89 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LongHorizonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portfolio/$id/': {
+      id: '/portfolio/$id/'
+      path: '/portfolio/$id'
+      fullPath: '/portfolio/$id/'
+      preLoaderRoute: typeof PortfolioIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portfolio/$id/trade': {
       id: '/portfolio/$id/trade'
-      path: '/trade'
+      path: '/portfolio/$id/trade'
       fullPath: '/portfolio/$id/trade'
       preLoaderRoute: typeof PortfolioIdTradeRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/summary': {
       id: '/portfolio/$id/summary'
-      path: '/summary'
+      path: '/portfolio/$id/summary'
       fullPath: '/portfolio/$id/summary'
       preLoaderRoute: typeof PortfolioIdSummaryRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/sma-report': {
       id: '/portfolio/$id/sma-report'
-      path: '/sma-report'
+      path: '/portfolio/$id/sma-report'
       fullPath: '/portfolio/$id/sma-report'
       preLoaderRoute: typeof PortfolioIdSmaReportRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/risk': {
       id: '/portfolio/$id/risk'
-      path: '/risk'
+      path: '/portfolio/$id/risk'
       fullPath: '/portfolio/$id/risk'
       preLoaderRoute: typeof PortfolioIdRiskRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/report': {
       id: '/portfolio/$id/report'
-      path: '/report'
+      path: '/portfolio/$id/report'
       fullPath: '/portfolio/$id/report'
       preLoaderRoute: typeof PortfolioIdReportRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/performance': {
       id: '/portfolio/$id/performance'
-      path: '/performance'
+      path: '/portfolio/$id/performance'
       fullPath: '/portfolio/$id/performance'
       preLoaderRoute: typeof PortfolioIdPerformanceRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/optimizer': {
       id: '/portfolio/$id/optimizer'
-      path: '/optimizer'
+      path: '/portfolio/$id/optimizer'
       fullPath: '/portfolio/$id/optimizer'
       preLoaderRoute: typeof PortfolioIdOptimizerRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/fx-risk': {
       id: '/portfolio/$id/fx-risk'
-      path: '/fx-risk'
+      path: '/portfolio/$id/fx-risk'
       fullPath: '/portfolio/$id/fx-risk'
       preLoaderRoute: typeof PortfolioIdFxRiskRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/daily-pnl': {
       id: '/portfolio/$id/daily-pnl'
-      path: '/daily-pnl'
+      path: '/portfolio/$id/daily-pnl'
       fullPath: '/portfolio/$id/daily-pnl'
       preLoaderRoute: typeof PortfolioIdDailyPnlRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/attribution': {
       id: '/portfolio/$id/attribution'
-      path: '/attribution'
+      path: '/portfolio/$id/attribution'
       fullPath: '/portfolio/$id/attribution'
       preLoaderRoute: typeof PortfolioIdAttributionRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id/analytics': {
       id: '/portfolio/$id/analytics'
-      path: '/analytics'
+      path: '/portfolio/$id/analytics'
       fullPath: '/portfolio/$id/analytics'
       preLoaderRoute: typeof PortfolioIdAnalyticsRouteImport
-      parentRoute: typeof PortfolioIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/setup-scan-cron': {
       id: '/api/public/setup-scan-cron'
@@ -1224,38 +1235,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface PortfolioIdRouteChildren {
-  PortfolioIdAnalyticsRoute: typeof PortfolioIdAnalyticsRoute
-  PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
-  PortfolioIdDailyPnlRoute: typeof PortfolioIdDailyPnlRoute
-  PortfolioIdFxRiskRoute: typeof PortfolioIdFxRiskRoute
-  PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
-  PortfolioIdPerformanceRoute: typeof PortfolioIdPerformanceRoute
-  PortfolioIdReportRoute: typeof PortfolioIdReportRoute
-  PortfolioIdRiskRoute: typeof PortfolioIdRiskRoute
-  PortfolioIdSmaReportRoute: typeof PortfolioIdSmaReportRoute
-  PortfolioIdSummaryRoute: typeof PortfolioIdSummaryRoute
-  PortfolioIdTradeRoute: typeof PortfolioIdTradeRoute
-}
-
-const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
-  PortfolioIdAnalyticsRoute: PortfolioIdAnalyticsRoute,
-  PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
-  PortfolioIdDailyPnlRoute: PortfolioIdDailyPnlRoute,
-  PortfolioIdFxRiskRoute: PortfolioIdFxRiskRoute,
-  PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
-  PortfolioIdPerformanceRoute: PortfolioIdPerformanceRoute,
-  PortfolioIdReportRoute: PortfolioIdReportRoute,
-  PortfolioIdRiskRoute: PortfolioIdRiskRoute,
-  PortfolioIdSmaReportRoute: PortfolioIdSmaReportRoute,
-  PortfolioIdSummaryRoute: PortfolioIdSummaryRoute,
-  PortfolioIdTradeRoute: PortfolioIdTradeRoute,
-}
-
-const PortfolioIdRouteWithChildren = PortfolioIdRoute._addFileChildren(
-  PortfolioIdRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -1277,12 +1256,23 @@ const rootRouteChildren: RootRouteChildren = {
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   MarketSymbolRoute: MarketSymbolRoute,
-  PortfolioIdRoute: PortfolioIdRouteWithChildren,
   WalkForwardIdRoute: WalkForwardIdRoute,
   ApiBrokerBlocksClearRoute: ApiBrokerBlocksClearRoute,
   ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
   ApiPublicSetupScanCronRoute: ApiPublicSetupScanCronRoute,
+  PortfolioIdAnalyticsRoute: PortfolioIdAnalyticsRoute,
+  PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
+  PortfolioIdDailyPnlRoute: PortfolioIdDailyPnlRoute,
+  PortfolioIdFxRiskRoute: PortfolioIdFxRiskRoute,
+  PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
+  PortfolioIdPerformanceRoute: PortfolioIdPerformanceRoute,
+  PortfolioIdReportRoute: PortfolioIdReportRoute,
+  PortfolioIdRiskRoute: PortfolioIdRiskRoute,
+  PortfolioIdSmaReportRoute: PortfolioIdSmaReportRoute,
+  PortfolioIdSummaryRoute: PortfolioIdSummaryRoute,
+  PortfolioIdTradeRoute: PortfolioIdTradeRoute,
+  PortfolioIdIndexRoute: PortfolioIdIndexRoute,
   ApiPublicHooksAiGatewayHealthRoute: ApiPublicHooksAiGatewayHealthRoute,
   ApiPublicHooksBackfillDailyEquityChangesRoute:
     ApiPublicHooksBackfillDailyEquityChangesRoute,
