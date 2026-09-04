@@ -87,7 +87,7 @@ function OptimizerPage() {
       <div className="mx-auto max-w-6xl 2xl:max-w-7xl px-4 py-5 sm:py-8">
         <div className="mb-4 flex items-center gap-3 flex-wrap">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/portfolio/$id/" params={{ id }}>
+            <Link to="/portfolio/$id" params={{ id }}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Link>
           </Button>

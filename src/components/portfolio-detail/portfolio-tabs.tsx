@@ -6,7 +6,7 @@ import { Link } from "@tanstack/react-router";
  * so every tab stays reachable without wrapping the row.
  */
 const TABS = [
-  { to: "/portfolio/$id/", label: "Overview", exact: true },
+  { to: "/portfolio/$id", label: "Overview", exact: true },
   { to: "/portfolio/$id/summary", label: "Summary" },
   { to: "/portfolio/$id/trade", label: "Trade" },
   { to: "/portfolio/$id/risk", label: "Risk" },

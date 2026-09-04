@@ -195,7 +195,7 @@ function TradePage() {
       <main className="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
         <PortfolioTabs id={id} />
         <Link
-          to="/portfolio/$id/"
+          to="/portfolio/$id"
           params={{ id }}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >

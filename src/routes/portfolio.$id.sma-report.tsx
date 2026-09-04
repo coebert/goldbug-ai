@@ -113,7 +113,7 @@ function SmaReportPage() {
         <PortfolioTabs id={id} />
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm">
-            <Link to="/portfolio/$id/" params={{ id }}>
+            <Link to="/portfolio/$id" params={{ id }}>
               <ArrowLeft className="mr-1 h-4 w-4" /> Back
             </Link>
           </Button>

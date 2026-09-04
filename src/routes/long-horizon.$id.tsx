@@ -193,7 +193,7 @@ function LongHorizonPage() {
               )}
             </p>
           </div>
-          <Link to="/portfolio/$id/" params={{ id }}>
+          <Link to="/portfolio/$id" params={{ id }}>
             <Button variant="outline" size="sm">
               Back to portfolio
             </Button>

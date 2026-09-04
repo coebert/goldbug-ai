@@ -177,7 +177,7 @@ function Home() {
     const list = q.data ?? [];
     const first = list.find((p) => p.mode === "live_prod") ?? list[0];
     return [
-      ...(first ? [{ to: "/portfolio/$id/", params: { id: first.id } }] : []),
+      ...(first ? [{ to: "/portfolio/$id", params: { id: first.id } }] : []),
       { to: "/trades" },
       { to: "/learn" },
       { to: "/compare" },

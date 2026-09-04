@@ -168,7 +168,7 @@ export function CreatePortfolioCard() {
             : "Portfolio created.",
       );
       qc.invalidateQueries({ queryKey: qk.portfolios.all() });
-      navigate({ to: "/portfolio/$id/", params: { id: r.id } });
+      navigate({ to: "/portfolio/$id", params: { id: r.id } });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });

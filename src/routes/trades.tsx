@@ -501,7 +501,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
             {row.order.client_order_id && <div>Client ID: <span className="font-mono text-foreground">{row.order.client_order_id}</span></div>}
             {row.portfolio && (
               <div>
-                <Link to="/portfolio/$id/" params={{ id: row.portfolio.id }} className="text-primary underline-offset-2 hover:underline">
+                <Link to="/portfolio/$id" params={{ id: row.portfolio.id }} className="text-primary underline-offset-2 hover:underline">
                   Open portfolio →
                 </Link>
               </div>

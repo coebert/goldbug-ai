@@ -107,7 +107,7 @@ function ReportPage() {
         <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/portfolio/$id/" params={{ id }}>
+              <Link to="/portfolio/$id" params={{ id }}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Back
               </Link>
             </Button>

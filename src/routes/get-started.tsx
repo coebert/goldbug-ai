@@ -162,7 +162,7 @@ function GetStarted() {
     },
     onSuccess: (id) => {
       toast.success("Demo portfolio ready — here are your first trades");
-      navigate({ to: "/portfolio/$id/", params: { id } });
+      navigate({ to: "/portfolio/$id", params: { id } });
     },
     onError: (e) =>
       toast.error(e instanceof Error ? e.message : "Something went wrong"),

@@ -46,7 +46,7 @@ function AnalyticsPage() {
       <main className="mx-auto max-w-7xl p-4 md:p-6 space-y-4">
         <PortfolioTabs id={id} />
         <Link
-          to="/portfolio/$id/"
+          to="/portfolio/$id"
           params={{ id }}
           className="text-xs text-muted-foreground hover:underline inline-flex items-center gap-1"
         >
