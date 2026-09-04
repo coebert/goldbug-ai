@@ -172,7 +172,7 @@ export function PortfolioRow({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                to="/portfolio/$id"
+                to="/portfolio/$id/"
                 params={{ id: portfolio.id }}
                 className="truncate text-base font-semibold hover:underline"
               >
@@ -192,7 +192,7 @@ export function PortfolioRow({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+            <Link to="/portfolio/$id/" params={{ id: portfolio.id }}>
               <Button size="sm" variant="outline" className="h-10">
                 <PlayCircle className="mr-1 h-4 w-4" /> Open
               </Button>
@@ -210,7 +210,7 @@ export function PortfolioRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+                  <Link to="/portfolio/$id/" params={{ id: portfolio.id }}>
                     Open portfolio
                   </Link>
                 </DropdownMenuItem>

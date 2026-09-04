@@ -188,7 +188,7 @@ function WalkForwardPage() {
                 Long-horizon backtest
               </Button>
             </Link>
-            <Link to="/portfolio/$id" params={{ id }}>
+            <Link to="/portfolio/$id/" params={{ id }}>
               <Button variant="outline" size="sm">
                 Back to portfolio
               </Button>

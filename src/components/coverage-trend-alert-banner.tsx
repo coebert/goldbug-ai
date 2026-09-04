@@ -107,7 +107,7 @@ export function CoverageTrendAlertBanner({
       </AlertTitle>
       <AlertDescription className="text-xs">
         <Link
-          to="/portfolio/$id"
+          to="/portfolio/$id/"
           params={{ id: portfolioId }}
           hash="coverage-trend"
           className="block rounded-sm outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-current"

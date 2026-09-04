@@ -285,7 +285,7 @@ function PortfolioPage() {
     advancedLevel || SIMPLE_TABS.includes(rawTab) ? rawTab : "overview";
   const navigate = useNavigate();
   const setTab = (next: PortfolioTab) =>
-    navigate({ to: "/portfolio/$id", params: { id }, search: { tab: next }, replace: true });
+    navigate({ to: "/portfolio/$id/", params: { id }, search: { tab: next }, replace: true });
 
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);

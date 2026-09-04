@@ -193,7 +193,7 @@ export function CommandPalette({
                     value={`portfolio ${p.name} ${p.mode}`}
                     onSelect={() =>
                       go(() =>
-                        navigate({ to: "/portfolio/$id", params: { id: p.id } }),
+                        navigate({ to: "/portfolio/$id/", params: { id: p.id } }),
                       )
                     }
                   >

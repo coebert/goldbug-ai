@@ -619,7 +619,7 @@ function ComparePage() {
                                 style={{ background: COLORS[i % COLORS.length] }}
                               />
                               <Link
-                                to="/portfolio/$id"
+                                to="/portfolio/$id/"
                                 params={{ id: r.portfolio.id }}
                                 className="hover:underline"
                               >

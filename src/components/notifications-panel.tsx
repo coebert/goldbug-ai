@@ -138,7 +138,7 @@ export function NotificationsPanel() {
                           {n.portfolio_id && (
                             // Take me to the thing the alert is about, not just its id.
                             <Link
-                              to="/portfolio/$id"
+                              to="/portfolio/$id/"
                               params={{ id: n.portfolio_id }}
                               hash={
                                 n.category === "broker_cost_coverage_trend"

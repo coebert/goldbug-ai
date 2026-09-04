@@ -100,7 +100,7 @@ function AttributionPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <Link
-              to="/portfolio/$id"
+              to="/portfolio/$id/"
               params={{ id }}
               className="text-xs text-muted-foreground hover:underline inline-flex items-center gap-1"
             >

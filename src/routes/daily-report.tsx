@@ -79,7 +79,7 @@ function FxLegSection({ legs, portfolioId }: { legs: DailyReportFxLeg[]; portfol
           Currency (FX) funding legs
         </h3>
         <Link
-          to="/portfolio/$id"
+          to="/portfolio/$id/"
           params={{ id: portfolioId }}
           hash="holdings"
           className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
