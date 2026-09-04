@@ -335,7 +335,7 @@ If no action is warranted, return an empty orders array.`;
     const parseFail = NoObjectGeneratedError.isInstance(error);
     const aborted = error instanceof Error && error.name === "AbortError";
     const msg = aborted
-      ? `AI decision timed out after ${Math.round(timeoutMs / 1000)}s`
+      ? "AI decision request aborted"
       : parseFail
       ? (error.text?.slice(0, 300) ?? "structured output parse error")
       : (error instanceof Error ? error.message : String(error));
