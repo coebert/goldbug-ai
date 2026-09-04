@@ -1,5 +1,5 @@
 // AI decision call (Lovable AI Gateway) for the trading engine — extracted verbatim.
-import { generateText, Output, NoObjectGeneratedError } from "ai";
+import { streamText, Output, NoObjectGeneratedError } from "ai";
 import { createLovableAiGatewayProvider } from "../ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "../historical-playbook.server";
 import { HEDGE_FUND_PLAYBOOK } from "../hedge-fund-playbook.server";
@@ -69,9 +69,11 @@ export async function callAiForDecision(args: {
 
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
-  const gateway = createLovableAiGatewayProvider(key);
-  const MODEL_ID = "google/gemini-2.5-flash";
-  const model = gateway(MODEL_ID);
+  const gateway = createLovableAiGatewayProvider(key, { structuredOutputs: true });
+  // Current-generation decision model; the deprecated 2.5-flash stays only as
+  // a last-resort backup so a primary outage still gets a real AI decision.
+  const PRIMARY_MODEL = process.env.AI_DECISION_MODEL || "google/gemini-3.6-flash";
+  const BACKUP_MODEL = "google/gemini-2.5-flash";
 
   const risk = riskProfile(args.portfolio.risk_level);
   const cfg = parseRiskConfig(args.portfolio.risk_config);
@@ -273,21 +275,58 @@ Return:
 If no action is warranted, return an empty orders array.`;
 
 
-  const timeoutRaw = Number(process.env.AI_DECISION_TIMEOUT_MS ?? 15_000);
-  const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 15_000;
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+  // No artificial timeout: the gateway routinely needs 30-90s for a decision
+  // of this size, and a client-side abort throws away work that still bills.
+  // Streaming keeps bytes flowing so platform request timeouts never fire.
+  const attempts: Array<{ model: string; note: string }> = [
+    { model: PRIMARY_MODEL, note: "primary" },
+    { model: PRIMARY_MODEL, note: "retry" },
+    { model: BACKUP_MODEL, note: "backup" },
+  ];
 
-  try {
-    const { output } = await generateText({
-      model,
-      system,
-      prompt: user,
-      output: Output.object({ schema: DecisionSchema }),
-      abortSignal: abortController.signal,
-    });
-    return output;
-  } catch (error) {
+  let lastError: unknown = null;
+  for (const [i, attempt] of attempts.entries()) {
+    try {
+      const result = streamText({
+        model: gateway(attempt.model),
+        system,
+        prompt: user,
+        output: Output.object({ schema: DecisionSchema }),
+        maxOutputTokens: 16_000,
+        maxRetries: 0,
+      });
+      const output = await result.output;
+      if (i > 0) {
+        console.warn(`AI decision succeeded on ${attempt.note} attempt (${attempt.model})`);
+      }
+      return output;
+    } catch (error) {
+      lastError = error;
+      const status = (error as { statusCode?: number } | null)?.statusCode;
+      // Terminal states (bad request, auth, credits, policy) never recover on
+      // a retry — go straight to the protective heuristic.
+      if (status === 400 || status === 401 || status === 402 || status === 403) break;
+      const isLast = i === attempts.length - 1;
+      if (isLast) break;
+      const retryAfter = Number(
+        (error as { responseHeaders?: Record<string, string> } | null)?.responseHeaders?.[
+          "retry-after"
+        ],
+      );
+      const delayMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 30_000)
+          : 2_000 * (i + 1);
+      console.warn(
+        `AI decision attempt ${i + 1} failed (${attempt.model}${status ? ` ${status}` : ""}) — retrying in ${Math.round(delayMs / 1000)}s`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  {
+    const error = lastError;
+
     // AI gateway failures (403 Forbidden, 429 rate-limit, 402 credits,
     // network) and unparseable outputs must NEVER abort the tick — the
     // engine's downstream guardrail exits (stop-loss, take-profit, ATR
@@ -298,7 +337,7 @@ If no action is warranted, return an empty orders array.`;
     const parseFail = NoObjectGeneratedError.isInstance(error);
     const aborted = error instanceof Error && error.name === "AbortError";
     const msg = aborted
-      ? `AI decision timed out after ${Math.round(timeoutMs / 1000)}s`
+      ? "AI decision request aborted"
       : parseFail
       ? (error.text?.slice(0, 300) ?? "structured output parse error")
       : (error instanceof Error ? error.message : String(error));
@@ -384,7 +423,6 @@ If no action is warranted, return an empty orders array.`;
         orders: [],
       };
     }
-  } finally {
-    clearTimeout(timeout);
   }
 }
+
