@@ -131,11 +131,20 @@ function LiveDashboardPage() {
   const brokerQuotes = (quotesQ.data ?? null) as BrokerQuoteResult | null;
   const priceBySymbol = useMemo(() => {
     const map = new Map(history.map((item) => [item.symbol, item.currentPrice]));
+    const assetClassBySymbol = new Map(holdings.map((h) => [h.symbol, h.asset_class ?? null]));
     for (const [symbol, quote] of Object.entries(brokerQuotes?.quotes ?? {})) {
-      if (Number.isFinite(quote.price) && quote.price > 0) map.set(symbol, quote.price);
+      // Broker quotes arrive in native units (GBX on most LSE lines); the rest
+      // of this page works in base major units, as `history.currentPrice` does.
+      const px = normalizeLseDisplayPriceToBase(
+        symbol,
+        Number(quote.price),
+        assetClassBySymbol.get(symbol) ?? null,
+      );
+      if (Number.isFinite(px) && px > 0) map.set(symbol, px);
     }
     return map;
-  }, [history, brokerQuotes]);
+  }, [history, brokerQuotes, holdings]);
+
   const quoteSourceBySymbol = useMemo(
     () => new Set(Object.keys(brokerQuotes?.quotes ?? {})),
     [brokerQuotes],
