@@ -1635,7 +1635,134 @@ export class SaxoAdapter implements BrokerAdapter {
     });
     return (res.Data ?? []).filter((a) => !!a?.AccountKey);
   }
+
+  /**
+   * Open a streaming price context.
+   *
+   * Polling `/trade/v1/infoprices` every 60s meant the dashboard was always up
+   * to a minute stale. Saxo pushes tick updates over its streaming socket
+   * instead: we create one info-price subscription per instrument against a
+   * shared `contextId`, then the browser holds the socket open and applies the
+   * deltas as they arrive.
+   *
+   * The socket has to be held by a long-lived process, and the Worker that
+   * serves this app is request-scoped, so the browser is the only place that
+   * can keep it. That means the connect URL carries the broker token — it is
+   * returned only to the authenticated owner of the account and kept in memory
+   * on the page (never persisted).
+   */
+  async openInfoPriceStream(
+    symbols: string[],
+    opts?: { refreshRateMs?: number },
+  ): Promise<{
+    contextId: string;
+    wsUrl: string;
+    env: BrokerEnv;
+    inactivityTimeoutSec: number;
+    subscriptions: Array<{
+      referenceId: string;
+      symbol: string;
+      uic: number;
+      assetType: string;
+      currency: string;
+      price: number | null;
+      bid: number | null;
+      ask: number | null;
+      at: string;
+    }>;
+  }> {
+    const contextId = `aegis${Math.random().toString(36).slice(2, 10)}${Date.now() % 1_000_000}`;
+    const accountKey = await this.getDefaultAccountKey();
+    const refreshRate = Math.max(500, Math.min(60_000, opts?.refreshRateMs ?? 1000));
+    const subscriptions: Array<{
+      referenceId: string; symbol: string; uic: number; assetType: string;
+      currency: string; price: number | null; bid: number | null; ask: number | null; at: string;
+    }> = [];
+    let inactivityTimeoutSec = 30;
+
+    let index = 0;
+    for (const symbol of symbols) {
+      index += 1;
+      const referenceId = `P${index}`;
+      try {
+        const inst = await this.lookupUic(symbol);
+        const res = await this.req<{
+          InactivityTimeout?: number;
+          Snapshot?: {
+            Quote?: { Bid?: number; Ask?: number; Mid?: number };
+            PriceInfoDetails?: { LastTraded?: number; LastClose?: number };
+            DisplayAndFormat?: { Currency?: string };
+            LastUpdated?: string;
+          };
+        }>("POST", "/trade/v1/infoprices/subscriptions", {
+          body: {
+            ContextId: contextId,
+            ReferenceId: referenceId,
+            RefreshRate: refreshRate,
+            Arguments: {
+              Uic: inst.uic,
+              AssetType: inst.assetType,
+              ...(accountKey ? { AccountKey: accountKey } : {}),
+              FieldGroups: ["Quote", "PriceInfo", "PriceInfoDetails", "DisplayAndFormat"],
+            },
+          },
+        });
+        inactivityTimeoutSec = Number(res.InactivityTimeout) > 0
+          ? Number(res.InactivityTimeout)
+          : inactivityTimeoutSec;
+        const snap = res.Snapshot ?? {};
+        const ccy = String(snap.DisplayAndFormat?.Currency ?? inst.currency ?? "GBP");
+        const bid = firstPositiveNumber(snap.Quote?.Bid) || null;
+        const ask = firstPositiveNumber(snap.Quote?.Ask) || null;
+        const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
+        const raw = firstPositiveNumber(
+          snap.Quote?.Mid,
+          mid ?? undefined,
+          snap.PriceInfoDetails?.LastTraded,
+          snap.PriceInfoDetails?.LastClose,
+        );
+        subscriptions.push({
+          referenceId,
+          symbol,
+          uic: inst.uic,
+          assetType: inst.assetType,
+          currency: ccy,
+          price: raw > 0 ? nativeQuotePrice(symbol, raw, ccy) : null,
+          bid: bid == null ? null : nativeQuotePrice(symbol, bid, ccy),
+          ask: ask == null ? null : nativeQuotePrice(symbol, ask, ccy),
+          at: snap.LastUpdated ?? new Date().toISOString(),
+        });
+      } catch (err) {
+        // One unquotable line must not sink the whole stream; the dashboard
+        // keeps pricing it off the cached tape.
+        console.warn(`saxo: no price subscription for ${symbol}`, err);
+      }
+    }
+
+    const ws = new URL(STREAMING_BASE[this.env] + "/streamingws/connect");
+    ws.searchParams.set("authorization", `Bearer ${this.token}`);
+    ws.searchParams.set("contextId", contextId);
+    return {
+      contextId,
+      wsUrl: ws.toString(),
+      env: this.env,
+      inactivityTimeoutSec,
+      subscriptions,
+    };
+  }
+
+  /** Drop every subscription on a streaming context (best effort). */
+  async closeStreamingContext(contextId: string): Promise<void> {
+    try {
+      await this.req("DELETE", `/trade/v1/infoprices/subscriptions/${encodeURIComponent(contextId)}`, {
+        maxAttempts: 1,
+      });
+    } catch (err) {
+      console.warn("saxo: streaming context teardown failed", err);
+    }
+  }
 }
+
 
 
 function safeJson(text: string): unknown {
