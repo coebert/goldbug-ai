@@ -1073,6 +1073,7 @@ export async function runDailyTick(
         execPostLessons: execLessons?.lessons?.slice(0, 12) ?? [],
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
+        fearLabel: fearIndex.label,
         crossSectional: formatCrossSectionalBlock(rankMap),
         marketEvents: `${
           macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
@@ -3342,6 +3343,8 @@ export async function runDailyTick(
             })),
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
+            fearLabel: fearIndex.label,
+        fearLabel: fearIndex.label,
             crossSectional: formatCrossSectionalBlock(rankMap),
             marketEvents: `${
               macroPlaybookBlock
