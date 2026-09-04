@@ -1,5 +1,5 @@
 // AI decision call (Lovable AI Gateway) for the trading engine — extracted verbatim.
-import { generateText, Output, NoObjectGeneratedError } from "ai";
+import { streamText, Output, NoObjectGeneratedError } from "ai";
 import { createLovableAiGatewayProvider } from "../ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "../historical-playbook.server";
 import { HEDGE_FUND_PLAYBOOK } from "../hedge-fund-playbook.server";
