@@ -2123,6 +2123,16 @@ export async function runDailyTick(
             ? Math.min(1, fearIndex.sizeMultiplier)
             : fearIndex.sizeMultiplier,
         },
+        // Blanket size-down while the model is down: the rule-set has no view
+        // on why a tape is moving, so every offline buy is half size, and a
+        // third of that again on a greedy tape (extreme greed stands aside
+        // entirely in buildHeuristicBuys).
+        aiUnavailable
+          ? {
+              label: "aioffline",
+              mult: fearIndex.label === "greed" ? 0.35 : 0.5,
+            }
+          : null,
         { label: "dd", mult: ddSizing.size_multiplier },
         { label: "sector", mult: secMult.mult },
         phaseMult.mult < 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
