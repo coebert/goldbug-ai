@@ -348,6 +348,7 @@ If no action is warranted, return an empty orders array.`;
       return {
         briefing: heuristic.briefing,
         rationale: heuristic.rationale,
+        ai_unavailable: true,
         orders: heuristic.orders.map((o) =>
           o.side === "sell"
             ? {
@@ -374,6 +375,7 @@ If no action is warranted, return an empty orders array.`;
       const hMsg = heuristicErr instanceof Error ? heuristicErr.message : String(heuristicErr);
       console.warn(`Heuristic fallback failed — ${hMsg}`);
       return {
+        ai_unavailable: true,
         briefing: `AI provider unavailable (${msg.slice(0, 120)}); heuristic fallback errored. Guardrail exits still applied.`,
         rationale: `AI gateway error: ${msg.slice(0, 200)}. Heuristic error: ${hMsg.slice(0, 200)}.`,
         orders: [],
