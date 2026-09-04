@@ -154,6 +154,11 @@ export function useBrokerPriceStream(portfolioId: string | null, enabled = true)
     const start = async () => {
       if (stoppedRef.current || cancelled) return;
       setStatus((s) => (s === "live" ? s : attemptRef.current > 0 ? "reconnecting" : "connecting"));
+      // Never leave an orphaned context behind on a retry: Saxo keeps
+      // subscriptions alive until the socket connects or they time out.
+      const stale = contextRef.current;
+      contextRef.current = null;
+      if (stale) void close({ data: { portfolioId, contextId: stale } }).catch(() => {});
       let session: BrokerStreamSession;
       try {
         session = (await open({ data: { portfolioId } })) as BrokerStreamSession;
