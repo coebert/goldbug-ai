@@ -1687,19 +1687,37 @@ export class SaxoAdapter implements BrokerAdapter {
     }> = [];
     let inactivityTimeoutSec = 30;
 
-    let index = 0;
+    // The list endpoint takes a comma-separated `Uics` for ONE asset type, so
+    // group the basket and open one subscription per type.
+    const byAssetType = new Map<string, Array<{ symbol: string; uic: number; currency: string }>>();
     for (const symbol of symbols) {
+      try {
+        const inst = await this.lookupUic(symbol);
+        const list = byAssetType.get(inst.assetType) ?? [];
+        list.push({ symbol, uic: inst.uic, currency: inst.currency });
+        byAssetType.set(inst.assetType, list);
+      } catch (err) {
+        // One unresolvable line must not sink the whole stream; the dashboard
+        // keeps pricing it off the cached tape.
+        console.warn(`saxo: no price subscription for ${symbol}`, err);
+      }
+    }
+
+    let index = 0;
+    for (const [assetType, group] of byAssetType) {
       index += 1;
       const referenceId = `P${index}`;
       try {
-        const inst = await this.lookupUic(symbol);
         const res = await this.req<{
           InactivityTimeout?: number;
           Snapshot?: {
-            Quote?: { Bid?: number; Ask?: number; Mid?: number };
-            PriceInfoDetails?: { LastTraded?: number; LastClose?: number };
-            DisplayAndFormat?: { Currency?: string };
-            LastUpdated?: string;
+            Data?: Array<{
+              Uic?: number;
+              Quote?: { Bid?: number; Ask?: number; Mid?: number };
+              PriceInfoDetails?: { LastTraded?: number; LastClose?: number };
+              DisplayAndFormat?: { Currency?: string };
+              LastUpdated?: string;
+            }>;
           };
         }>("POST", "/trade/v1/infoprices/subscriptions", {
           body: {
@@ -1707,8 +1725,8 @@ export class SaxoAdapter implements BrokerAdapter {
             ReferenceId: referenceId,
             RefreshRate: refreshRate,
             Arguments: {
-              Uic: inst.uic,
-              AssetType: inst.assetType,
+              Uics: group.map((g) => g.uic).join(","),
+              AssetType: assetType,
               ...(accountKey ? { AccountKey: accountKey } : {}),
               FieldGroups: ["Quote", "PriceInfo", "PriceInfoDetails", "DisplayAndFormat"],
             },
@@ -1717,34 +1735,38 @@ export class SaxoAdapter implements BrokerAdapter {
         inactivityTimeoutSec = Number(res.InactivityTimeout) > 0
           ? Number(res.InactivityTimeout)
           : inactivityTimeoutSec;
-        const snap = res.Snapshot ?? {};
-        const ccy = String(snap.DisplayAndFormat?.Currency ?? inst.currency ?? "GBP");
-        const bid = firstPositiveNumber(snap.Quote?.Bid) || null;
-        const ask = firstPositiveNumber(snap.Quote?.Ask) || null;
-        const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
-        const raw = firstPositiveNumber(
-          snap.Quote?.Mid,
-          mid ?? undefined,
-          snap.PriceInfoDetails?.LastTraded,
-          snap.PriceInfoDetails?.LastClose,
+        const snapByUic = new Map(
+          (res.Snapshot?.Data ?? []).map((row) => [Number(row?.Uic), row]),
         );
-        subscriptions.push({
-          referenceId,
-          symbol,
-          uic: inst.uic,
-          assetType: inst.assetType,
-          currency: ccy,
-          price: raw > 0 ? nativeQuotePrice(symbol, raw, ccy) : null,
-          bid: bid == null ? null : nativeQuotePrice(symbol, bid, ccy),
-          ask: ask == null ? null : nativeQuotePrice(symbol, ask, ccy),
-          at: snap.LastUpdated ?? new Date().toISOString(),
-        });
+        for (const g of group) {
+          const snap = snapByUic.get(g.uic) ?? {};
+          const ccy = String(snap.DisplayAndFormat?.Currency ?? g.currency ?? "GBP");
+          const bid = firstPositiveNumber(snap.Quote?.Bid) || null;
+          const ask = firstPositiveNumber(snap.Quote?.Ask) || null;
+          const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
+          const raw = firstPositiveNumber(
+            snap.Quote?.Mid,
+            mid ?? undefined,
+            snap.PriceInfoDetails?.LastTraded,
+            snap.PriceInfoDetails?.LastClose,
+          );
+          subscriptions.push({
+            referenceId,
+            symbol: g.symbol,
+            uic: g.uic,
+            assetType,
+            currency: ccy,
+            price: raw > 0 ? nativeQuotePrice(g.symbol, raw, ccy) : null,
+            bid: bid == null ? null : nativeQuotePrice(g.symbol, bid, ccy),
+            ask: ask == null ? null : nativeQuotePrice(g.symbol, ask, ccy),
+            at: snap.LastUpdated ?? new Date().toISOString(),
+          });
+        }
       } catch (err) {
-        // One unquotable line must not sink the whole stream; the dashboard
-        // keeps pricing it off the cached tape.
-        console.warn(`saxo: no price subscription for ${symbol}`, err);
+        console.warn(`saxo: price subscription failed for ${assetType}`, err);
       }
     }
+
 
     const ws = new URL(STREAMING_BASE[this.env] + "/streamingws/connect");
     ws.searchParams.set("authorization", `Bearer ${this.token}`);
