@@ -13,6 +13,8 @@ export type TodayMoversResult = DayAttribution & {
   prevEquity: number;
   currEquity: number;
   portfolioCount: number;
+  /** Real-money portfolio ids behind these numbers (for the daily rollup). */
+  portfolioIds: string[];
   /** True when the real-money portfolios do not share one base currency. */
   mixedCurrency: boolean;
   warnings: string[];
@@ -32,6 +34,7 @@ const EMPTY: TodayMoversResult = {
   prevEquity: 0,
   currEquity: 0,
   portfolioCount: 0,
+  portfolioIds: [],
   mixedCurrency: false,
   warnings: [],
 };
@@ -209,6 +212,7 @@ export const getTodayMovers = createServerFn({ method: "POST" })
       prevEquity,
       currEquity,
       portfolioCount: usable.length,
+      portfolioIds: usable.map((p) => String(p.id)),
       mixedCurrency: currencies.length > 1,
       warnings,
     };

@@ -1,8 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown } from "lucide-react";
 import { getTodayMovers } from "@/lib/day-attribution.functions";
+import { getDailyPnl } from "@/lib/daily-pnl.functions";
+
+/** Days of history shown under the breakdown. */
+const SUMMARY_DAYS = 7;
 
 /**
  * Additive breakdown of the day's equity change: each position's move, the
@@ -13,6 +17,7 @@ import { getTodayMovers } from "@/lib/day-attribution.functions";
 export function WhatMovedToday() {
   const [open, setOpen] = useState(false);
   const fn = useServerFn(getTodayMovers);
+  const dailyFn = useServerFn(getDailyPnl);
   const query = useQuery({
     queryKey: ["today-movers", "live_prod"],
     queryFn: () => fn({ data: {} }),
@@ -20,7 +25,20 @@ export function WhatMovedToday() {
   });
 
   const data = query.data;
+  const portfolioIds = data?.portfolioIds ?? [];
+  // One read per real-money book; only fetched once the panel is opened so
+  // the tile stays cheap on first paint.
+  const dailyQueries = useQueries({
+    queries: portfolioIds.map((id) => ({
+      queryKey: ["daily-pnl", id, SUMMARY_DAYS],
+      queryFn: () => dailyFn({ data: { portfolioId: id, days: 7 } }),
+      enabled: open,
+      staleTime: 60_000,
+    })),
+  });
+
   if (!data || data.portfolioCount === 0 || (!data.lines.length && !data.fees)) return null;
+
 
   const money = (n: number) =>
     new Intl.NumberFormat("en-GB", {
@@ -60,6 +78,35 @@ export function WhatMovedToday() {
         }]
       : []),
   ];
+
+  // Recent days, summed across every real-money book so one row per date.
+  const dailyLoading = dailyQueries.some((q) => q.isLoading);
+  const byDate = new Map<
+    string,
+    { date: string; netPnl: number; positions: number; fxLegs: number; fees: number }
+  >();
+  for (const q of dailyQueries) {
+    for (const d of q.data?.days ?? []) {
+      const row = byDate.get(d.date) ?? {
+        date: d.date, netPnl: 0, positions: 0, fxLegs: 0, fees: 0,
+      };
+      row.netPnl += d.netPnl;
+      row.positions += d.positions;
+      row.fxLegs += d.fxLegs;
+      row.fees += d.fees;
+      byDate.set(d.date, row);
+    }
+  }
+  const dailyDays = [...byDate.values()]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, SUMMARY_DAYS);
+  const dailyTotal = dailyDays.reduce((s, d) => s + d.netPnl, 0);
+  const dayLabel = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
+      weekday: "short", day: "numeric", month: "short", timeZone: "UTC",
+    });
+
+
 
   return (
     <div className="mt-3" data-testid="what-moved-today">
@@ -103,6 +150,49 @@ export function WhatMovedToday() {
               {signed(data.totalChange)}
             </span>
           </div>
+
+          <div className="mt-2 border-t border-border/60 pt-2" data-testid="daily-pnl-summary">
+            <p className="text-[11px] font-medium text-foreground">Last {SUMMARY_DAYS} days</p>
+            {dailyLoading && dailyDays.length === 0 ? (
+              <p className="mt-1 text-[10px] text-muted-foreground">Loading daily totals…</p>
+            ) : dailyDays.length === 0 ? (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                No daily totals recorded yet.
+              </p>
+            ) : (
+              <>
+                <ul className="mt-1 space-y-1" data-testid="daily-pnl-summary-list">
+                  {dailyDays.map((d) => (
+                    <li
+                      key={d.date}
+                      className="flex items-baseline justify-between gap-3 text-[11px]"
+                      data-testid={`daily-${d.date}`}
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium text-foreground">{dayLabel(d.date)}</span>{" "}
+                        <span className="text-muted-foreground">
+                          positions {signed(d.positions)} · fx {signed(d.fxLegs)} · costs{" "}
+                          {signed(-d.fees)}
+                        </span>
+                      </span>
+                      <span className={`shrink-0 tabular-nums font-semibold ${tone(d.netPnl)}`}>
+                        {signed(d.netPnl)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px]">
+                  <span className="text-muted-foreground">
+                    {dailyDays.length}-day net
+                  </span>
+                  <span className={`tabular-nums font-semibold ${tone(dailyTotal)}`}>
+                    {signed(dailyTotal)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
           {data.unpricedCount > 0 && (
             <p className="mt-1.5 text-[10px] text-muted-foreground">
               {data.unpricedCount} holding{data.unpricedCount === 1 ? "" : "s"} could not be priced
