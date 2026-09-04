@@ -421,7 +421,6 @@ If no action is warranted, return an empty orders array.`;
         orders: [],
       };
     }
-  } finally {
-    clearTimeout(timeout);
   }
 }
+
