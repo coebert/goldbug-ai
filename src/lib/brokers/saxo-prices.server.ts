@@ -123,7 +123,13 @@ async function getPriceAdapter(portfolioId?: string): Promise<SaxoAdapter | null
   return built;
 }
 
+/** The adapter the price feed uses, for callers that need broker streaming. */
+export async function getBrokerPriceAdapter(portfolioId?: string): Promise<SaxoAdapter | null> {
+  return getPriceAdapter(portfolioId);
+}
+
 /** Test/hot-reload seam: drop memoised adapters and negative caches. */
+
 export function resetBrokerPriceCaches(): void {
   adapterCache.clear();
   unroutable.clear();
