@@ -70,8 +70,10 @@ export async function callAiForDecision(args: {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
   const gateway = createLovableAiGatewayProvider(key);
-  const MODEL_ID = "google/gemini-2.5-flash";
-  const model = gateway(MODEL_ID);
+  // Current-generation decision model; the deprecated 2.5-flash stays only as
+  // a last-resort backup so a primary outage still gets a real AI decision.
+  const PRIMARY_MODEL = process.env.AI_DECISION_MODEL || "google/gemini-3.6-flash";
+  const BACKUP_MODEL = "google/gemini-2.5-flash";
 
   const risk = riskProfile(args.portfolio.risk_level);
   const cfg = parseRiskConfig(args.portfolio.risk_config);
