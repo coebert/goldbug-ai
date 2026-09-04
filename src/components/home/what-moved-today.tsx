@@ -150,6 +150,49 @@ export function WhatMovedToday() {
               {signed(data.totalChange)}
             </span>
           </div>
+
+          <div className="mt-2 border-t border-border/60 pt-2" data-testid="daily-pnl-summary">
+            <p className="text-[11px] font-medium text-foreground">Last {SUMMARY_DAYS} days</p>
+            {dailyLoading && dailyDays.length === 0 ? (
+              <p className="mt-1 text-[10px] text-muted-foreground">Loading daily totals…</p>
+            ) : dailyDays.length === 0 ? (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                No daily totals recorded yet.
+              </p>
+            ) : (
+              <>
+                <ul className="mt-1 space-y-1" data-testid="daily-pnl-summary-list">
+                  {dailyDays.map((d) => (
+                    <li
+                      key={d.date}
+                      className="flex items-baseline justify-between gap-3 text-[11px]"
+                      data-testid={`daily-${d.date}`}
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium text-foreground">{dayLabel(d.date)}</span>{" "}
+                        <span className="text-muted-foreground">
+                          positions {signed(d.positions)} · fx {signed(d.fxLegs)} · costs{" "}
+                          {signed(-d.fees)}
+                        </span>
+                      </span>
+                      <span className={`shrink-0 tabular-nums font-semibold ${tone(d.netPnl)}`}>
+                        {signed(d.netPnl)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px]">
+                  <span className="text-muted-foreground">
+                    {dailyDays.length}-day net
+                  </span>
+                  <span className={`tabular-nums font-semibold ${tone(dailyTotal)}`}>
+                    {signed(dailyTotal)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
           {data.unpricedCount > 0 && (
             <p className="mt-1.5 text-[10px] text-muted-foreground">
               {data.unpricedCount} holding{data.unpricedCount === 1 ? "" : "s"} could not be priced
