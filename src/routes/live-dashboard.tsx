@@ -22,6 +22,8 @@ const BacktestVsRealCard = lazy(() =>
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 import { holdingNativeValue } from "@/lib/fx-leg-value";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+
 import { POLL, qk } from "@/lib/query-keys";
 import { supabase } from "@/integrations/supabase/client";
 
