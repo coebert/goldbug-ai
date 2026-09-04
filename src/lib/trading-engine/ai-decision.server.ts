@@ -57,6 +57,8 @@ export async function callAiForDecision(args: {
   sectorCycleBlock?: string | null;
   /** Explicit target-exposure block from the cash-allocation policy. */
   cashPolicyBlock?: string | null;
+  /** Composite fear/greed label — used to tighten the non-AI fallback. */
+  fearLabel?: string | null;
   /** Cash-funded short sleeve (inverse ETFs) and its live room. */
   shortSleeveBlock?: string | null;
 
@@ -322,6 +324,7 @@ If no action is warranted, return an empty orders array.`;
         reason: msg,
         cashValue: args.cashValue,
         riskLevel: args.portfolio.risk_level,
+        fearLabel: args.fearLabel ?? null,
       });
       // Log any retail-mania guardrail hits (blocks + trims) as counterfactuals
       // so they surface in the decision-summary card with the full per-component
@@ -348,6 +351,7 @@ If no action is warranted, return an empty orders array.`;
       return {
         briefing: heuristic.briefing,
         rationale: heuristic.rationale,
+        ai_unavailable: true,
         orders: heuristic.orders.map((o) =>
           o.side === "sell"
             ? {
@@ -374,6 +378,7 @@ If no action is warranted, return an empty orders array.`;
       const hMsg = heuristicErr instanceof Error ? heuristicErr.message : String(heuristicErr);
       console.warn(`Heuristic fallback failed — ${hMsg}`);
       return {
+        ai_unavailable: true,
         briefing: `AI provider unavailable (${msg.slice(0, 120)}); heuristic fallback errored. Guardrail exits still applied.`,
         rationale: `AI gateway error: ${msg.slice(0, 200)}. Heuristic error: ${hMsg.slice(0, 200)}.`,
         orders: [],

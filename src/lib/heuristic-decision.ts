@@ -172,6 +172,22 @@ export const HEURISTIC_BUY_SLEEVE: Record<
   aggressive: { maxBuys: 3, perNamePct: 10 },
 };
 
+/**
+ * Hard ceiling (as a % of account value) on any single name opened while the
+ * AI model is unavailable. Enforced by the trading engine's sizing pipeline —
+ * the rule-set must never be able to build a 45%-of-book single-stock bet.
+ */
+export const FALLBACK_MAX_NAME_WEIGHT_PCT = 8;
+
+/** Market-sentiment labels the fallback reacts to (see `fear-index.ts`). */
+export type HeuristicFearLabel =
+  | "extreme_greed"
+  | "greed"
+  | "neutral"
+  | "fear"
+  | "extreme_fear"
+  | string;
+
 export function buildHeuristicBuys(
   holdings: HeuristicHolding[],
   features: HeuristicFeature[],
@@ -179,10 +195,16 @@ export function buildHeuristicBuys(
     cashValue: number;
     riskLevel?: HeuristicRiskLevelInput;
     algoRegime?: AlgoRegimeSnapshot | null;
+    /** Composite fear/greed label at decision time. */
+    fearLabel?: HeuristicFearLabel | null;
   },
 ): Array<{ symbol: string; side: "buy"; percent: number; reason: string }> {
   if (process.env.HEURISTIC_BUYS_ENABLED === "false") return [];
   if (!(opts.cashValue > 0)) return [];
+  // Extreme greed / complacency: the rule-set has no way to judge whether a
+  // stretched tape is worth chasing, so it stands aside rather than treating
+  // froth as momentum. Ordinary greed halves the sleeve (below).
+  if (opts.fearLabel === "extreme_greed") return [];
   // Suppress under adverse microstructure — the AI's view matters most here.
   if (opts.algoRegime?.tier === "elevated" || opts.algoRegime?.tier === "extreme") return [];
 
@@ -226,10 +248,11 @@ export function buildHeuristicBuys(
 
   const { maxBuys, perNamePct } =
     HEURISTIC_BUY_SLEEVE[normalizeHeuristicRiskLevel(opts.riskLevel)];
+  const greedScale = opts.fearLabel === "greed" ? 0.5 : 1;
   return scored.slice(0, maxBuys).map((s) => ({
     symbol: s.symbol,
     side: "buy" as const,
-    percent: perNamePct, // % of available cash to spend on this name
+    percent: perNamePct * greedScale, // % of available cash to spend on this name
     reason: s.reason,
   }));
 }
@@ -285,6 +308,7 @@ export function buildHeuristicDecision(args: {
   algoRegime?: AlgoRegimeSnapshot | null;
   cashValue?: number;
   riskLevel?: HeuristicRiskLevelInput;
+  fearLabel?: HeuristicFearLabel | null;
 }): HeuristicDecision {
   const maxSells = args.algoRegime?.tier === "extreme" ? 6
     : args.algoRegime?.tier === "elevated" ? 4
@@ -295,6 +319,7 @@ export function buildHeuristicDecision(args: {
         cashValue: args.cashValue,
         riskLevel: args.riskLevel,
         algoRegime: args.algoRegime,
+        fearLabel: args.fearLabel ?? null,
       })
     : [];
   const maniaBlocks = collectHeuristicManiaBlocks(args.holdings, args.features);
@@ -312,6 +337,12 @@ export function buildHeuristicDecision(args: {
       `AI gateway error: ${args.reason.slice(0, 200)}. ` +
       `Fallback rule-set: sell holdings with 30d ≤ -10%, 5d ≤ -5%, RSI ≥ 75, or MACD- + 5d-. ` +
       `Buy up to ${buys.length ? buys.length : "0"} unheld name(s) with 30d ≥ 2%, 5d ≥ 0.5%, RSI 45–65, MACD+; ` +
+      `capped at ${FALLBACK_MAX_NAME_WEIGHT_PCT}% of account value per name and ` +
+      (args.fearLabel === "extreme_greed"
+        ? "suppressed entirely (extreme greed — froth is not treated as momentum); "
+        : args.fearLabel === "greed"
+        ? "halved (greedy tape); "
+        : "") +
       `suppressed in elevated/extreme algo regimes. Stop-loss / take-profit / ATR ` +
       `trailing / hedging reconciliation run independently of this decision.` +
       (args.algoRegime && args.algoRegime.tier !== "normal"

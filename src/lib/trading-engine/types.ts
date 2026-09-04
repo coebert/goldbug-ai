@@ -30,6 +30,11 @@ export const DecisionSchema = z.object({
   briefing: z.string(),
   rationale: z.string(),
   orders: z.array(OrderSchema),
+  /**
+   * True when this decision came from the non-AI heuristic fallback (the AI
+   * gateway was unreachable). Sizing downstream is deliberately tightened.
+   */
+  ai_unavailable: z.boolean().optional(),
   fx_conversions: z.array(FxConversionOrderSchema).optional(),
   fx_intents: z.array(FxIntentSchema).optional(),
 });

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildHeuristicSells, buildHeuristicDecision } from "../heuristic-decision";
+import {
+  buildHeuristicSells,
+  buildHeuristicBuys,
+  buildHeuristicDecision,
+  FALLBACK_MAX_NAME_WEIGHT_PCT,
+} from "../heuristic-decision";
 
 describe("heuristic-decision", () => {
   const holdings = [
@@ -58,5 +63,27 @@ describe("heuristic-decision", () => {
     });
     expect(d.orders).toEqual([]);
     expect(d.briefing).toMatch(/heuristic found no signals/);
+  });
+});
+
+describe("fallback sizing when the AI is down", () => {
+  const feats = [
+    { symbol: "AAA", rsi14: 60, change5d: 0.03, change30d: 0.1, macd_hist: 0.4, assetClass: "stock" },
+  ];
+
+  it("stands aside in extreme greed", () => {
+    expect(
+      buildHeuristicBuys([], feats, { cashValue: 10_000, riskLevel: "aggressive", fearLabel: "extreme_greed" }),
+    ).toEqual([]);
+  });
+
+  it("halves the sleeve in ordinary greed", () => {
+    const greedy = buildHeuristicBuys([], feats, { cashValue: 10_000, riskLevel: "balanced", fearLabel: "greed" });
+    const neutral = buildHeuristicBuys([], feats, { cashValue: 10_000, riskLevel: "balanced", fearLabel: "neutral" });
+    expect(greedy[0]!.percent).toBeCloseTo(neutral[0]!.percent / 2);
+  });
+
+  it("keeps the single-name ceiling well under a concentrated bet", () => {
+    expect(FALLBACK_MAX_NAME_WEIGHT_PCT).toBeLessThanOrEqual(10);
   });
 });

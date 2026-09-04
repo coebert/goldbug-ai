@@ -44,6 +44,7 @@ import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.serv
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
 import { classifyPanicSell } from "./fear-sell-guard";
 import { computeFearIndex, formatFearIndexBlock } from "./fear-index";
+import { FALLBACK_MAX_NAME_WEIGHT_PCT } from "./heuristic-decision";
 import {
   computeCrossSectionalRanks,
   formatCrossSectionalBlock,
@@ -1073,6 +1074,7 @@ export async function runDailyTick(
         execPostLessons: execLessons?.lessons?.slice(0, 12) ?? [],
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
+        fearLabel: fearIndex.label,
         crossSectional: formatCrossSectionalBlock(rankMap),
         marketEvents: `${
           macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
@@ -1112,6 +1114,9 @@ export async function runDailyTick(
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
   // not just in the prompt. If the regime bucket is risk_off, strip any AI
   // crypto BUY orders (X6) — sells / trims are always allowed to fire.
+  // True when the decision came from the non-AI heuristic fallback.
+  const aiUnavailable = (decision as { ai_unavailable?: boolean }).ai_unavailable === true;
+
   if (cryptoDecision?.decision?.hard_veto) {
     const { classifyCryptoSymbol } = await import("./crypto-groups");
     const before = decision.orders.length;
@@ -2110,7 +2115,14 @@ export async function runDailyTick(
         { label: "calib", mult: calibration.global_size_mult },
         { label: "systematic", mult: systematic.mult },
         isSymbolCooling(cooldowns, meta.symbol, asOf) ? { label: "cooldown", mult: 0.5 } : null,
-        { label: `fear${fearIndex.score.toFixed(0)}`, mult: fearIndex.sizeMultiplier },
+        {
+          label: `fear${fearIndex.score.toFixed(0)}`,
+          // With the model down we take the fear index's caution but never its
+          // encouragement: a greedy tape must not size a rule-set buy UP.
+          mult: aiUnavailable
+            ? Math.min(1, fearIndex.sizeMultiplier)
+            : fearIndex.sizeMultiplier,
+        },
         { label: "dd", mult: ddSizing.size_multiplier },
         { label: "sector", mult: secMult.mult },
         phaseMult.mult < 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
@@ -2273,7 +2285,16 @@ export async function runDailyTick(
       const existingVal = holdingsByS.get(meta.symbol)
         ? Number(holdingsByS.get(meta.symbol)!.quantity) * price
         : 0;
-      const roomInPosition = Math.max(0, maxPosVal - existingVal);
+      // When the AI model is unavailable the rule-set fallback is driving.
+      // Hard-cap any single name at FALLBACK_MAX_NAME_WEIGHT_PCT of account
+      // value so an offline tick can never build a concentrated bet.
+      const effMaxPosVal = aiUnavailable
+        ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
+        : maxPosVal;
+      if (aiUnavailable && effMaxPosVal < maxPosVal) {
+        sizingNotes.push(`AI offline · single name ≤${FALLBACK_MAX_NAME_WEIGHT_PCT}% NAV`);
+      }
+      const roomInPosition = Math.max(0, effMaxPosVal - existingVal);
       spend = Math.min(spend, roomInPosition);
 
       // Target-weight sizing. Rather than letting "cash × pct" nibble the same
@@ -2281,8 +2302,8 @@ export async function runDailyTick(
       // actually want and buy only the gap to it. Sub-scale gaps are skipped
       // outright, so a position can never be walked into the cap inch by inch.
       let targetWeightRejected: string | null = null;
-      if (totalValue > 0 && maxPosVal > 0) {
-        const maxWeight = maxPosVal / totalValue;
+      if (totalValue > 0 && effMaxPosVal > 0) {
+        const maxWeight = effMaxPosVal / totalValue;
         const tw = desiredWeight({
           baseWeight: maxWeight * 0.5,
           maxWeight,
@@ -3342,6 +3363,7 @@ export async function runDailyTick(
             })),
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
+            fearLabel: fearIndex.label,
             crossSectional: formatCrossSectionalBlock(rankMap),
             marketEvents: `${
               macroPlaybookBlock
