@@ -15,10 +15,10 @@ import {
   getPortfolio,
   runOneDay,
   runBacktest,
-
   resetPortfolio,
   getBenchmarkSeries,
 } from "@/lib/trading.functions";
+import { runShadowBacktest } from "@/lib/shadow-backtest.functions";
 import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explanations.functions";
 import { reconcilePortfolio } from "@/lib/live.functions";
 import { getCurrentRegime } from "@/lib/regime.functions";
