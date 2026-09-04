@@ -15,6 +15,7 @@ import { OrderFillsCard } from "@/components/order-fills-card";
 import { getPortfolio, listPortfolios } from "@/lib/portfolios.functions";
 import { previewBrokerBalance } from "@/lib/live.functions";
 import { getBrokerQuotes, type BrokerQuoteResult } from "@/lib/broker-quotes.functions";
+import { useBrokerPriceStream } from "@/hooks/use-broker-price-stream";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
@@ -123,18 +124,27 @@ function LiveDashboardPage() {
   // Broker quotes are the venue's own prices; the cached daily tape is only a
   // fallback for instruments Saxo cannot quote.
   const quotes = useServerFn(getBrokerQuotes);
+  // Saxo pushes ticks over its streaming socket; the poll below is only the
+  // safety net for when the socket is down or an instrument has no feed.
+  const stream = useBrokerPriceStream(portfolioId, Boolean(portfolioId));
+  const streamLive = stream.status === "live" && Object.keys(stream.quotes).length > 0;
   const quotesQ = useQuery({
     queryKey: ["live-dashboard-broker-quotes", portfolioId],
     queryFn: () => quotes({ data: { portfolioId: portfolioId as string } }),
     enabled: Boolean(portfolioId),
-    refetchInterval: POLL.SEMI_LIVE,
+    refetchInterval: streamLive ? POLL.SLOW : POLL.SEMI_LIVE,
     retry: false,
   });
   const brokerQuotes = (quotesQ.data ?? null) as BrokerQuoteResult | null;
   const priceBySymbol = useMemo(() => {
     const map = new Map(history.map((item) => [item.symbol, item.currentPrice]));
     const assetClassBySymbol = new Map(holdings.map((h) => [h.symbol, h.asset_class ?? null]));
-    for (const [symbol, quote] of Object.entries(brokerQuotes?.quotes ?? {})) {
+    // Streamed ticks win over the polled snapshot for the same symbol.
+    const merged: Record<string, { price: number }> = {
+      ...(brokerQuotes?.quotes ?? {}),
+      ...stream.quotes,
+    };
+    for (const [symbol, quote] of Object.entries(merged)) {
       // Broker quotes arrive in native units (GBX on most LSE lines); the rest
       // of this page works in base major units, as `history.currentPrice` does.
       const px = normalizeLseDisplayPriceToBase(
@@ -145,12 +155,14 @@ function LiveDashboardPage() {
       if (Number.isFinite(px) && px > 0) map.set(symbol, px);
     }
     return map;
-  }, [history, brokerQuotes, holdings]);
+  }, [history, brokerQuotes, stream.quotes, holdings]);
 
   const quoteSourceBySymbol = useMemo(
-    () => new Set(Object.keys(brokerQuotes?.quotes ?? {})),
-    [brokerQuotes],
+    () => new Set([...Object.keys(brokerQuotes?.quotes ?? {}), ...Object.keys(stream.quotes)]),
+    [brokerQuotes, stream.quotes],
   );
+  const streamedSymbols = useMemo(() => new Set(Object.keys(stream.quotes)), [stream.quotes]);
+
   const positions = useMemo(() => holdings.filter((h) => Number(h.quantity) !== 0).map((h) => {
     const quantity = Number(h.quantity);
     const avgCost = Number(h.avg_cost);
@@ -199,13 +211,24 @@ function LiveDashboardPage() {
                     <LiveHoldingsCard holdings={holdings} currency={currency} cash={metrics.cash} cashByCcy={portfolio.cash_by_ccy ?? null} totalValue={metrics.totalValue} invested={metrics.invested} mode={portfolio.mode ?? "paper"} series={Object.fromEntries(history.map((item) => [item.symbol, item]))} portfolioId={portfolio.id} />
                     <Card>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Position details</CardTitle>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CardTitle className="text-base">Position details</CardTitle>
+                          {streamLive && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-500">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                              Streaming
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-muted-foreground">
-                          {brokerQuotes && brokerQuotes.covered > 0
+                          {streamLive
+                            ? `Prices stream straight from Saxo on ${streamedSymbols.size} of ${positions.length} positions${stream.lastTickAt ? ` — last update ${new Date(stream.lastTickAt).toLocaleTimeString("en-GB")}` : ""}.`
+                            : brokerQuotes && brokerQuotes.covered > 0
                             ? `Live Saxo quotes on ${brokerQuotes.covered} of ${brokerQuotes.requested} positions${brokerQuotes.covered < brokerQuotes.requested ? " — the rest fall back to the cached daily close" : ""}.`
                             : "Broker quotes unavailable — prices shown are the cached daily close."}
                         </p>
                       </CardHeader>
+
                       <CardContent>
                         {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}{quoteSourceBySymbol.has(p.symbol) ? <span className="ml-1 text-[10px] text-muted-foreground">live</span> : null}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
                       </CardContent>

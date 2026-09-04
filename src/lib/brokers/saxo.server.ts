@@ -47,6 +47,13 @@ const BASE = {
   live: "https://gateway.saxobank.com/openapi",
 } as const;
 
+/** Saxo's push feed lives on a separate host from the REST gateway. */
+const STREAMING_BASE = {
+  sim: "wss://streaming.saxobank.com/sim/openapi",
+  live: "wss://streaming.saxobank.com/openapi",
+} as const;
+
+
 const ALLOWED_ASSET_TYPES = ["Stock", "Etf", "Etc", "Fund", "Bond"] as const;
 
 async function log(args: {
@@ -1635,7 +1642,158 @@ export class SaxoAdapter implements BrokerAdapter {
     });
     return (res.Data ?? []).filter((a) => !!a?.AccountKey);
   }
+
+  /**
+   * Open a streaming price context.
+   *
+   * Polling `/trade/v1/infoprices` every 60s meant the dashboard was always up
+   * to a minute stale. Saxo pushes tick updates over its streaming socket
+   * instead: we create one info-price subscription per instrument against a
+   * shared `contextId`, then the browser holds the socket open and applies the
+   * deltas as they arrive.
+   *
+   * The socket has to be held by a long-lived process, and the Worker that
+   * serves this app is request-scoped, so the browser is the only place that
+   * can keep it. That means the connect URL carries the broker token — it is
+   * returned only to the authenticated owner of the account and kept in memory
+   * on the page (never persisted).
+   */
+  async openInfoPriceStream(
+    symbols: string[],
+    opts?: { refreshRateMs?: number },
+  ): Promise<{
+    contextId: string;
+    wsUrl: string;
+    env: BrokerEnv;
+    inactivityTimeoutSec: number;
+    subscriptions: Array<{
+      referenceId: string;
+      symbol: string;
+      uic: number;
+      assetType: string;
+      currency: string;
+      price: number | null;
+      bid: number | null;
+      ask: number | null;
+      at: string;
+    }>;
+  }> {
+    const contextId = `aegis${Math.random().toString(36).slice(2, 10)}${Date.now() % 1_000_000}`;
+    const accountKey = await this.getDefaultAccountKey();
+    const refreshRate = Math.max(500, Math.min(60_000, opts?.refreshRateMs ?? 1000));
+    const subscriptions: Array<{
+      referenceId: string; symbol: string; uic: number; assetType: string;
+      currency: string; price: number | null; bid: number | null; ask: number | null; at: string;
+    }> = [];
+    let inactivityTimeoutSec = 30;
+
+    // The list endpoint takes a comma-separated `Uics` for ONE asset type, so
+    // group the basket and open one subscription per type.
+    const byAssetType = new Map<string, Array<{ symbol: string; uic: number; currency: string }>>();
+    for (const symbol of symbols) {
+      try {
+        const inst = await this.lookupUic(symbol);
+        const list = byAssetType.get(inst.assetType) ?? [];
+        list.push({ symbol, uic: inst.uic, currency: inst.currency });
+        byAssetType.set(inst.assetType, list);
+      } catch (err) {
+        // One unresolvable line must not sink the whole stream; the dashboard
+        // keeps pricing it off the cached tape.
+        console.warn(`saxo: no price subscription for ${symbol}`, err);
+      }
+    }
+
+    let index = 0;
+    for (const [assetType, group] of byAssetType) {
+      index += 1;
+      const referenceId = `P${index}`;
+      try {
+        const res = await this.req<{
+          InactivityTimeout?: number;
+          Snapshot?: {
+            Data?: Array<{
+              Uic?: number;
+              Quote?: { Bid?: number; Ask?: number; Mid?: number };
+              PriceInfoDetails?: { LastTraded?: number; LastClose?: number };
+              DisplayAndFormat?: { Currency?: string };
+              LastUpdated?: string;
+            }>;
+          };
+        }>("POST", "/trade/v1/infoprices/subscriptions", {
+          body: {
+            ContextId: contextId,
+            ReferenceId: referenceId,
+            RefreshRate: refreshRate,
+            Arguments: {
+              Uics: group.map((g) => g.uic).join(","),
+              AssetType: assetType,
+              ...(accountKey ? { AccountKey: accountKey } : {}),
+              FieldGroups: ["Quote", "PriceInfo", "PriceInfoDetails", "DisplayAndFormat"],
+            },
+          },
+        });
+        inactivityTimeoutSec = Number(res.InactivityTimeout) > 0
+          ? Number(res.InactivityTimeout)
+          : inactivityTimeoutSec;
+        const snapByUic = new Map(
+          (res.Snapshot?.Data ?? []).map((row) => [Number(row?.Uic), row]),
+        );
+        for (const g of group) {
+          const snap = snapByUic.get(g.uic) ?? {};
+          const ccy = String(snap.DisplayAndFormat?.Currency ?? g.currency ?? "GBP");
+          const bid = firstPositiveNumber(snap.Quote?.Bid) || null;
+          const ask = firstPositiveNumber(snap.Quote?.Ask) || null;
+          const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
+          const raw = firstPositiveNumber(
+            snap.Quote?.Mid,
+            mid ?? undefined,
+            snap.PriceInfoDetails?.LastTraded,
+            snap.PriceInfoDetails?.LastClose,
+          );
+          subscriptions.push({
+            referenceId,
+            symbol: g.symbol,
+            uic: g.uic,
+            assetType,
+            currency: ccy,
+            price: raw > 0 ? nativeQuotePrice(g.symbol, raw, ccy) : null,
+            bid: bid == null ? null : nativeQuotePrice(g.symbol, bid, ccy),
+            ask: ask == null ? null : nativeQuotePrice(g.symbol, ask, ccy),
+            at: snap.LastUpdated ?? new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.warn(`saxo: price subscription failed for ${assetType}`, err);
+      }
+    }
+
+
+    // Saxo rejects the `+`-for-space form URLSearchParams produces, so encode
+    // the bearer value by hand.
+    const wsUrl = `${STREAMING_BASE[this.env]}/streamingws/connect`
+      + `?authorization=${encodeURIComponent(`Bearer ${this.token}`)}`
+      + `&contextId=${encodeURIComponent(contextId)}`;
+    return {
+      contextId,
+      wsUrl,
+      env: this.env,
+      inactivityTimeoutSec,
+      subscriptions,
+    };
+  }
+
+  /** Drop every subscription on a streaming context (best effort). */
+  async closeStreamingContext(contextId: string): Promise<void> {
+    try {
+      await this.req("DELETE", `/trade/v1/infoprices/subscriptions/${encodeURIComponent(contextId)}`, {
+        maxAttempts: 1,
+      });
+    } catch (err) {
+      console.warn("saxo: streaming context teardown failed", err);
+    }
+  }
 }
+
 
 
 function safeJson(text: string): unknown {
