@@ -249,7 +249,7 @@ const PORTFOLIO_TABS: PortfolioTab[] = [
   "reports",
 ];
 
-export const Route = createFileRoute("/portfolio/$id")({
+export const Route = createFileRoute("/portfolio/$id/")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>): { tab?: PortfolioTab } => {
     const t = String(search.tab ?? "overview") as PortfolioTab;
