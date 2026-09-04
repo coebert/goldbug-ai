@@ -79,6 +79,35 @@ export function WhatMovedToday() {
       : []),
   ];
 
+  // Recent days, summed across every real-money book so one row per date.
+  const dailyLoading = dailyQueries.some((q) => q.isLoading);
+  const byDate = new Map<
+    string,
+    { date: string; netPnl: number; positions: number; fxLegs: number; fees: number }
+  >();
+  for (const q of dailyQueries) {
+    for (const d of q.data?.days ?? []) {
+      const row = byDate.get(d.date) ?? {
+        date: d.date, netPnl: 0, positions: 0, fxLegs: 0, fees: 0,
+      };
+      row.netPnl += d.netPnl;
+      row.positions += d.positions;
+      row.fxLegs += d.fxLegs;
+      row.fees += d.fees;
+      byDate.set(d.date, row);
+    }
+  }
+  const dailyDays = [...byDate.values()]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, SUMMARY_DAYS);
+  const dailyTotal = dailyDays.reduce((s, d) => s + d.netPnl, 0);
+  const dayLabel = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
+      weekday: "short", day: "numeric", month: "short", timeZone: "UTC",
+    });
+
+
+
   return (
     <div className="mt-3" data-testid="what-moved-today">
       <button
