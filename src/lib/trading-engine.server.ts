@@ -3344,7 +3344,6 @@ export async function runDailyTick(
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             fearLabel: fearIndex.label,
-        fearLabel: fearIndex.label,
             crossSectional: formatCrossSectionalBlock(rankMap),
             marketEvents: `${
               macroPlaybookBlock
