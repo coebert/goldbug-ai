@@ -86,16 +86,20 @@ export function useBrokerPriceStream(portfolioId: string | null, enabled = true)
   const [reason, setReason] = useState<string | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const metaRef = useRef<Map<string, Meta>>(new Map());
+  // Keyed by Saxo UIC: list subscriptions push one frame per reference id
+  // carrying rows for many instruments.
+  const metaRef = useRef<Map<number, Meta>>(new Map());
   const contextRef = useRef<string | null>(null);
   const attemptRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
 
-  const applyTick = useCallback((referenceId: string, payload: unknown) => {
-    const meta = metaRef.current.get(referenceId);
-    if (!meta || !payload || typeof payload !== "object") return;
-    const p = payload as {
+  const applyOne = useCallback((row: unknown) => {
+    if (!row || typeof row !== "object") return;
+    const uic = Number((row as { Uic?: number }).Uic);
+    const meta = metaRef.current.get(uic);
+    if (!meta) return;
+    const p = row as {
       Quote?: { Bid?: number; Ask?: number; Mid?: number };
       PriceInfoDetails?: { LastTraded?: number; LastClose?: number };
       DisplayAndFormat?: { Currency?: string };
@@ -120,6 +124,12 @@ export function useBrokerPriceStream(portfolioId: string | null, enabled = true)
     }));
     setLastTickAt(Date.now());
   }, []);
+
+  /** One delta frame carries either a single price row or a list of them. */
+  const applyTick = useCallback((payload: unknown) => {
+    if (Array.isArray(payload)) for (const row of payload) applyOne(row);
+    else applyOne(payload);
+  }, [applyOne]);
 
   useEffect(() => {
     if (!portfolioId || !enabled || typeof window === "undefined") {
@@ -162,7 +172,7 @@ export function useBrokerPriceStream(portfolioId: string | null, enabled = true)
       setReason(null);
       contextRef.current = session.contextId;
       metaRef.current = new Map(
-        session.subscriptions.map((s) => [s.referenceId, { symbol: s.symbol, currency: s.currency }]),
+        session.subscriptions.map((s) => [s.uic, { symbol: s.symbol, currency: s.currency }]),
       );
       // Seed with the subscription snapshots so the page is correct before the
       // first tick lands.
@@ -202,7 +212,7 @@ export function useBrokerPriceStream(portfolioId: string | null, enabled = true)
             try { ws.close(); } catch { /* already closing */ }
             return;
           }
-          applyTick(frame.referenceId, frame.payload);
+          applyTick(frame.payload);
         }
       };
       ws.onerror = () => { /* close handler drives the retry */ };
