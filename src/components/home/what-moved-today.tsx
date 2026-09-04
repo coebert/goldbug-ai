@@ -1,8 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown } from "lucide-react";
 import { getTodayMovers } from "@/lib/day-attribution.functions";
+import { getDailyPnl } from "@/lib/daily-pnl.functions";
+
+/** Days of history shown under the breakdown. */
+const SUMMARY_DAYS = 7;
 
 /**
  * Additive breakdown of the day's equity change: each position's move, the
@@ -13,6 +17,7 @@ import { getTodayMovers } from "@/lib/day-attribution.functions";
 export function WhatMovedToday() {
   const [open, setOpen] = useState(false);
   const fn = useServerFn(getTodayMovers);
+  const dailyFn = useServerFn(getDailyPnl);
   const query = useQuery({
     queryKey: ["today-movers", "live_prod"],
     queryFn: () => fn({ data: {} }),
@@ -20,7 +25,20 @@ export function WhatMovedToday() {
   });
 
   const data = query.data;
+  const portfolioIds = data?.portfolioIds ?? [];
+  // One read per real-money book; only fetched once the panel is opened so
+  // the tile stays cheap on first paint.
+  const dailyQueries = useQueries({
+    queries: portfolioIds.map((id) => ({
+      queryKey: ["daily-pnl", id, SUMMARY_DAYS],
+      queryFn: () => dailyFn({ data: { portfolioId: id, days: 7 } }),
+      enabled: open,
+      staleTime: 60_000,
+    })),
+  });
+
   if (!data || data.portfolioCount === 0 || (!data.lines.length && !data.fees)) return null;
+
 
   const money = (n: number) =>
     new Intl.NumberFormat("en-GB", {
