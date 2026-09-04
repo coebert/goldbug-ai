@@ -47,6 +47,13 @@ const BASE = {
   live: "https://gateway.saxobank.com/openapi",
 } as const;
 
+/** Saxo's push feed lives on a separate host from the REST gateway. */
+const STREAMING_BASE = {
+  sim: "wss://streaming.saxobank.com/sim/openapi",
+  live: "wss://streaming.saxobank.com/openapi",
+} as const;
+
+
 const ALLOWED_ASSET_TYPES = ["Stock", "Etf", "Etc", "Fund", "Bond"] as const;
 
 async function log(args: {
