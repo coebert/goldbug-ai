@@ -165,7 +165,7 @@ function LiveDashboardPage() {
     () => new Set([...Object.keys(brokerQuotes?.quotes ?? {}), ...Object.keys(stream.quotes)]),
     [brokerQuotes, stream.quotes],
   );
-  const streamedSymbols = useMemo(() => new Set(Object.keys(stream.quotes)), [stream.quotes]);
+  const streamedSymbols = useMemo(() => new Set(stream.streamedSymbols), [stream.streamedSymbols]);
 
   const positions = useMemo(() => holdings.filter((h) => Number(h.quantity) !== 0).map((h) => {
     const quantity = Number(h.quantity);
