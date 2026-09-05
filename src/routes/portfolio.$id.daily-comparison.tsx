@@ -197,6 +197,7 @@ function DailyComparisonPage() {
                   <thead className="text-left text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="py-2 pr-3">Instrument</th>
+                      <th className="py-2 pr-3">Market</th>
                       <th className="py-2 pr-3">Track record</th>
                       <th className="py-2 pr-3">Right</th>
                       <th className="py-2 pr-3">Avg result</th>
@@ -214,6 +215,12 @@ function DailyComparisonPage() {
                         <td className="py-2 pr-3">
                           <div className="font-medium">{r.symbol}</div>
                           <div className="text-xs text-muted-foreground">{r.name}</div>
+                        </td>
+                        <td className="py-2 pr-3">
+                          <div>{marketLabel(r.market)}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            score ×{r.marketWeight.toFixed(2)}
+                          </div>
                         </td>
                         <td className="py-2 pr-3">
                           <Badge variant={strengthTone(r.strengthLabel)} className="capitalize">
