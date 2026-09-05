@@ -3568,6 +3568,63 @@ export type Database = {
           },
         ]
       }
+      symbol_signal_strength: {
+        Row: {
+          computed_at: string
+          dates: number
+          from_date: string | null
+          hit_rate: number | null
+          horizon_days: number
+          ic: number | null
+          id: string
+          mean_net_bps: number | null
+          samples: number
+          strength: number
+          symbol: string
+          symbol_key: string
+          t_stat: number | null
+          to_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          computed_at?: string
+          dates?: number
+          from_date?: string | null
+          hit_rate?: number | null
+          horizon_days?: number
+          ic?: number | null
+          id?: string
+          mean_net_bps?: number | null
+          samples?: number
+          strength?: number
+          symbol: string
+          symbol_key: string
+          t_stat?: number | null
+          to_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          computed_at?: string
+          dates?: number
+          from_date?: string | null
+          hit_rate?: number | null
+          horizon_days?: number
+          ic?: number | null
+          id?: string
+          mean_net_bps?: number | null
+          samples?: number
+          strength?: number
+          symbol?: string
+          symbol_key?: string
+          t_stat?: number | null
+          to_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ticker_watch_alerts: {
         Row: {
           alert_date: string
