@@ -260,6 +260,59 @@ export function BacktestVsRealCard({
               </ResponsiveContainer>
             </div>
 
+            {/* The gap itself: how much money live execution is behind the
+                strategy's own path, day by day. Below zero = live is behind. */}
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="btGapFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#D55E00" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#D55E00" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10 }}
+                    minTickGap={32}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    width={62}
+                    tick={{ fontSize: 10 }}
+                    domain={["auto", "auto"]}
+                    tickFormatter={(v: number) => v.toFixed(0)}
+                    tickLine={false}
+                    axisLine={false}
+                    label={{
+                      value: "Gap (money)",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fontSize: 10 },
+                    }}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => [money(v, currency), "Live minus backtest"]}
+                    contentStyle={{ fontSize: 12 }}
+                  />
+                  <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.4} />
+                  <Area
+                    type="monotone"
+                    dataKey="MoneyGap"
+                    name="Live minus backtest"
+                    stroke="#D55E00"
+                    strokeWidth={2}
+                    fill="url(#btGapFill)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+
             <div className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
               <Stat
                 label="Backtest max drawdown"
