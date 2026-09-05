@@ -8,24 +8,23 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { fitDecisionModel, getDecisionModel } from "@/lib/decision-model.functions";
+import { getDecisionPlaybook, trainDecisionPlaybook } from "@/lib/decision-playbook.functions";
 
 export const Route = createFileRoute("/decision-model")({
   component: DecisionModelPage,
   head: () => ({
     meta: [
-      { title: "Learned decision model — fitted on your trading history" },
+      { title: "Trading playbook — written from your own account history" },
       {
         name: "description",
         content:
-          "See the trading model fitted from your own past decisions: which signals actually made money, how well it holds up out of sample, and today's ranking.",
+          "The rules the AI derived from your account's recorded decisions and realised, cost-adjusted results — the same playbook it applies when picking stocks each day.",
       },
-      { property: "og:title", content: "Learned decision model" },
+      { property: "og:title", content: "Trading playbook from your account history" },
       {
         property: "og:description",
         content:
-          "The signal weights measured from your own trading history, with an out-of-sample check on whether the edge is real.",
+          "Entry and exit rules, sizing and cost discipline, each traced to what this book actually banked.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -33,45 +32,58 @@ export const Route = createFileRoute("/decision-model")({
   }),
 });
 
-const BUCKET_LABELS: Record<string, string> = {
-  sma_trend: "Trend",
-  rsi: "Overbought / oversold",
-  price_change: "Recent price move",
-  news_sentiment: "News",
-  volatility: "Volatility",
-};
+type Confidence = "high" | "medium" | "low";
 
-function pct(v: number | null | undefined, digits = 1): string {
-  return v == null || !Number.isFinite(v) ? "—" : `${v.toFixed(digits)}%`;
+function confidenceVariant(c: Confidence): "default" | "secondary" | "outline" {
+  return c === "high" ? "default" : c === "medium" ? "secondary" : "outline";
 }
-function num(v: number | null | undefined, digits = 3): string {
-  return v == null || !Number.isFinite(v) ? "—" : v.toFixed(digits);
+
+function RuleList({
+  rules,
+}: {
+  rules: Array<{ rule: string; evidence: string; confidence: Confidence }>;
+}) {
+  return (
+    <ul className="space-y-3">
+      {rules.map((r, i) => (
+        <li key={i} className="rounded-md border p-3">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium leading-snug">{r.rule}</p>
+            <Badge variant={confidenceVariant(r.confidence)} className="shrink-0 capitalize">
+              {r.confidence}
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{r.evidence}</p>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function DecisionModelPage() {
-  const load = useServerFn(getDecisionModel);
-  const fit = useServerFn(fitDecisionModel);
+  const load = useServerFn(getDecisionPlaybook);
+  const train = useServerFn(trainDecisionPlaybook);
   const qc = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["decision-model"],
+    queryKey: ["decision-playbook"],
     queryFn: () => load(),
   });
 
-  const refit = useMutation({
-    mutationFn: (realMoneyOnly: boolean) => fit({ data: { horizonDays: 5, realMoneyOnly } }),
+  const rewrite = useMutation({
+    mutationFn: (realMoneyOnly: boolean) =>
+      train({ data: { horizonDays: 5, realMoneyOnly } }),
     onSuccess: (res) => {
-      setMessage(res.ok ? res.model.note : res.error);
-      void qc.invalidateQueries({ queryKey: ["decision-model"] });
+      setMessage(res.ok ? "Playbook rewritten from your latest history." : res.error);
+      void qc.invalidateQueries({ queryKey: ["decision-playbook"] });
     },
     onError: (e: unknown) => setMessage(e instanceof Error ? e.message : String(e)),
   });
 
-  const model = data?.model ?? null;
-  const features = data?.features ?? [];
-  const test = model?.metrics?.test;
-  const baseline = model?.metrics?.baseline_test;
+  const stored = data?.stored ?? null;
+  const pb = stored?.playbook ?? null;
+  const cov = stored?.coverage ?? null;
 
   return (
     <>
@@ -80,180 +92,139 @@ function DecisionModelPage() {
         title={
           <span className="flex items-center gap-2">
             <Brain className="h-6 w-6 text-primary" aria-hidden />
-            Learned decision model
+            Trading playbook
           </span>
         }
-        purpose="Built from your own history: every signal snapshot the AI was shown on a past day, matched against what the price actually did next. The weights below are measured, not assumed."
+        purpose="Written by the AI from your account's own record: every signal snapshot it was shown on a past day, matched against what you actually banked after costs. These are the rules it applies when it picks stocks."
         actions={
           <>
-            <Button variant="outline" onClick={() => refit.mutate(true)} disabled={refit.isPending}>
-              Refit on real trades only
+            <Button
+              variant="outline"
+              onClick={() => rewrite.mutate(true)}
+              disabled={rewrite.isPending}
+            >
+              Rewrite from real trades only
             </Button>
-            <Button onClick={() => refit.mutate(false)} disabled={refit.isPending}>
+            <Button onClick={() => rewrite.mutate(false)} disabled={rewrite.isPending}>
               <RefreshCw
-                className={`mr-2 h-4 w-4 ${refit.isPending ? "animate-spin" : ""}`}
+                className={`mr-2 h-4 w-4 ${rewrite.isPending ? "animate-spin" : ""}`}
                 aria-hidden
               />
-              {refit.isPending ? "Fitting…" : "Refit on all history"}
+              {rewrite.isPending ? "Studying your history…" : "Rewrite playbook"}
             </Button>
           </>
         }
       >
-
-
         {message ? (
-          <Card className="mt-4 border-primary/30">
-            <CardContent className="py-3 text-sm">{message}</CardContent>
-          </Card>
+          <p className="mb-4 text-sm text-muted-foreground" data-testid="playbook-message">
+            {message}
+          </p>
         ) : null}
 
         {isLoading ? (
-          <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
-        ) : !model ? (
-          <Card className="mt-6">
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : !pb || !stored || !cov ? (
+          <Card>
             <CardHeader>
-              <CardTitle>No model fitted yet</CardTitle>
+              <CardTitle>No playbook yet</CardTitle>
               <CardDescription>
-                Press “Refit on all history” to build the first one from your recorded decisions.
+                Press “Rewrite playbook” and the AI will read your recorded decisions and results,
+                then write the rules your own history supports. It needs at least 150 recorded
+                observations.
               </CardDescription>
             </CardHeader>
           </Card>
         ) : (
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="space-y-6" data-testid="playbook">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle>Does it actually work?</CardTitle>
-                  <Badge variant={model.usable ? "default" : "secondary"}>
-                    {model.usable ? "Edge confirmed" : "Too weak to trade on"}
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle>What your record says</CardTitle>
+                  <Badge variant={confidenceVariant(pb.overall_confidence)} className="capitalize">
+                    {pb.overall_confidence} confidence
                   </Badge>
                 </div>
                 <CardDescription>
-                  Measured on {test?.dates ?? 0} days that were never used to build it.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-3">
-                  <Stat label="Ranking accuracy" value={num(test?.mean_ic)} hint="0 = no skill" />
-                  <Stat label="Confidence (t)" value={num(test?.ic_t_stat, 2)} hint="above 2 is solid" />
-                  <Stat
-                    label="Right on"
-                    value={test?.ic_hit_rate == null ? "—" : `${(test.ic_hit_rate * 100).toFixed(0)}% of days`}
-                  />
-                  <Stat
-                    label="Best minus worst pick"
-                    value={pct(test?.top_bottom_spread_pct, 2)}
-                    hint={`per ${model.horizon_days} days`}
-                  />
-                </div>
-                <p className="text-muted-foreground">
-                  Naive equal-weighting of the same signals scored {num(baseline?.mean_ic)} over the same
-                  days, so the fitted weights add{" "}
-                  {num((test?.mean_ic ?? 0) - (baseline?.mean_ic ?? 0))}.
-                </p>
-                <p className="text-muted-foreground">{model.note}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>What has actually paid</CardTitle>
-                <CardDescription>
-                  Share of the decision each signal family earns, from your results.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {Object.entries(model.bucket_weights)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([k, v]) => (
-                    <div key={k}>
-                      <div className="mb-1 flex justify-between text-sm">
-                        <span>{BUCKET_LABELS[k] ?? k}</span>
-                        <span className="tabular-nums text-muted-foreground">{v.toFixed(1)}%</span>
-                      </div>
-                      <Progress value={v} />
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Individual signals</CardTitle>
-                <CardDescription>
-                  A positive number means more of that signal has been followed by a better{" "}
-                  {model.horizon_days}-day return than the rest of the list that day.
+                  {cov.samples} observations of {cov.symbols} instruments over {cov.dates} trading
+                  days ({cov.from ?? "?"} → {cov.to ?? "?"}), outcomes measured{" "}
+                  {cov.horizonDays} days forward and net of the{" "}
+                  {Math.round(cov.roundTripCostBps)}bps round trip this account pays. Last written{" "}
+                  {stored.created_at.slice(0, 10)}.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {[...features]
-                    .sort((a, b) => Math.abs(b.coefficient) - Math.abs(a.coefficient))
-                    .map((f) => (
-                      <div
-                        key={f.key}
-                        className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
-                      >
-                        <span>{f.label}</span>
-                        <span
-                          className={`tabular-nums ${f.coefficient >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
-                        >
-                          {f.coefficient >= 0 ? "+" : ""}
-                          {f.coefficient.toFixed(4)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
+                <p className="text-sm leading-relaxed">{pb.summary}</p>
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>History used</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 text-sm sm:grid-cols-4">
-                <Stat label="Observations" value={String(model.coverage.samples)} />
-                <Stat label="Trading days" value={String(model.coverage.dates)} />
-                <Stat label="Instruments" value={String(model.coverage.symbols)} />
-                <Stat
-                  label="Period"
-                  value={`${model.coverage.from ?? "—"} → ${model.coverage.to ?? "—"}`}
-                />
-                <Stat
-                  label="Days you dealt the name"
-                  value={String(model.coverage.traded_samples ?? 0)}
-                  hint="Weighted more heavily than days the name was only screened"
-                />
-                <Stat
-                  label="Already-held observations"
-                  value={String(model.coverage.held_samples ?? 0)}
-                />
-                <Stat
-                  label="Dealing cost in the target"
-                  value={
-                    model.coverage.label_mode === "price"
-                      ? "None (raw price)"
-                      : `${(model.coverage.round_trip_cost_bps ?? 0).toFixed(1)} bps round trip`
-                  }
-                  hint={`From your own fills on ${model.coverage.cost_calibrated_symbols ?? 0} instruments`}
-                />
-                <Stat label="Trades replayed" value={String(model.coverage.trades_scanned ?? 0)} />
-              </CardContent>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>When to buy</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RuleList rules={pb.entry_rules} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>When to sell</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RuleList rules={pb.exit_rules} />
+                </CardContent>
+              </Card>
+            </div>
 
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>How big, and how often</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm leading-relaxed">
+                  <p>{pb.sizing}</p>
+                  <p className="text-muted-foreground">{pb.cost_discipline}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Favour and avoid</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div>
+                    <p className="font-medium">Favour</p>
+                    <p className="text-muted-foreground">{pb.favour.join("; ") || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Avoid</p>
+                    <p className="text-muted-foreground">{pb.avoid.join("; ") || "—"}</p>
+                  </div>
+                  {pb.unknowns.length ? (
+                    <div>
+                      <p className="font-medium">Still unproven</p>
+                      <p className="text-muted-foreground">{pb.unknowns.join("; ")}</p>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>The evidence it was written from</CardTitle>
+                <CardDescription>
+                  Measured straight from your history — no model, no assumptions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="whitespace-pre-wrap text-xs text-muted-foreground">
+                  {stored.brief}
+                </pre>
+              </CardContent>
             </Card>
           </div>
         )}
       </PageShell>
     </>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-lg font-semibold tabular-nums">{value}</div>
-      {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
-    </div>
   );
 }
