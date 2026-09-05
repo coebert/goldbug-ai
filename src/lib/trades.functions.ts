@@ -29,10 +29,26 @@ export type TradeRow = {
     quantity: number;
     fill_price: number;
     fee: number;
+    commission: number;
+    exchangeFee: number;
+    tax: number;
+    otherFee: number;
+    feeSource: string | null;
     currency: string;
     filled_at: string;
     broker_fill_id: string | null;
   }>;
+  /** Broker charges on this order, split by kind. */
+  charges: {
+    total: number;
+    commission: number;
+    exchange: number;
+    tax: number;
+    other: number;
+    /** True when at least one fill carries the broker's invoiced figures. */
+    invoiced: boolean;
+    currency: string;
+  };
   filledQty: number;
   avgFillPrice: number | null;
   notional: number | null;
@@ -91,6 +107,8 @@ export const getTradesDashboard = createServerFn({ method: "POST" })
       id: string; order_id: string; portfolio_id: string; quantity: number;
       fill_price: number; fee: number; currency: string; filled_at: string;
       broker_fill_id: string | null;
+      fee_commission: number | null; fee_exchange: number | null;
+      fee_tax: number | null; fee_other: number | null; fee_source: string | null;
     };
     type HoldingRow = {
       portfolio_id: string; symbol: string; quantity: number; avg_cost: number; updated_at: string;
@@ -137,6 +155,33 @@ export const getTradesDashboard = createServerFn({ method: "POST" })
       const avgFillPrice = filledQty > 0 ? notionalSum / filledQty : null;
       const holding = holdingByKey.get(`${o.portfolio_id}::${o.symbol}`) ?? null;
 
+      // Broker charges: prefer the invoiced split when the charge report has
+      // been matched to the fill, otherwise fall back to the booked `fee`.
+      const sumFee = (pick: (f: FillRow) => number | null) =>
+        orderFills.reduce((s, f) => s + Number(pick(f) ?? 0), 0);
+      const commission = sumFee((f) => f.fee_commission);
+      const exchange = sumFee((f) => f.fee_exchange);
+      const tax = sumFee((f) => f.fee_tax);
+      const otherSplit = sumFee((f) => f.fee_other);
+      const bookedFee = sumFee((f) => f.fee);
+      const splitTotal = commission + exchange + tax + otherSplit;
+      const invoiced = orderFills.some(
+        (f) => (f.fee_source ?? "") !== "" && (f.fee_source ?? "") !== "modelled",
+      );
+      const charges = {
+        total: splitTotal > 0 ? splitTotal : bookedFee,
+        commission,
+        exchange,
+        tax,
+        // Anything booked but not itemised still has to show up somewhere.
+        other:
+          splitTotal > 0
+            ? otherSplit
+            : Math.max(0, bookedFee - commission - exchange - tax),
+        invoiced,
+        currency: orderFills[0]?.currency ?? "",
+      };
+
       const status = (o.status ?? "").toLowerCase();
       if (status === "filled") summary.filled++;
       else if (status === "partial" || status === "partially_filled") summary.partial++;
@@ -170,10 +215,16 @@ export const getTradesDashboard = createServerFn({ method: "POST" })
           quantity: Number(f.quantity ?? 0),
           fill_price: Number(f.fill_price ?? 0),
           fee: Number(f.fee ?? 0),
+          commission: Number(f.fee_commission ?? 0),
+          exchangeFee: Number(f.fee_exchange ?? 0),
+          tax: Number(f.fee_tax ?? 0),
+          otherFee: Number(f.fee_other ?? 0),
+          feeSource: f.fee_source ?? null,
           currency: f.currency,
           filled_at: f.filled_at,
           broker_fill_id: f.broker_fill_id,
         })),
+        charges,
         filledQty,
         avgFillPrice,
         notional: filledQty > 0 ? notionalSum : null,
