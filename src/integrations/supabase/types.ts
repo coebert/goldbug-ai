@@ -1921,6 +1921,7 @@ export type Database = {
           broker: string
           broker_order_id: string | null
           client_order_id: string | null
+          conviction: number | null
           created_at: string
           decision_id: string | null
           id: string
@@ -1941,6 +1942,7 @@ export type Database = {
           broker?: string
           broker_order_id?: string | null
           client_order_id?: string | null
+          conviction?: number | null
           created_at?: string
           decision_id?: string | null
           id?: string
@@ -1961,6 +1963,7 @@ export type Database = {
           broker?: string
           broker_order_id?: string | null
           client_order_id?: string | null
+          conviction?: number | null
           created_at?: string
           decision_id?: string | null
           id?: string
@@ -3734,6 +3737,7 @@ export type Database = {
       trades: {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]
+          conviction: number | null
           executed_at: string
           id: string
           instrument_ccy: string
@@ -3748,6 +3752,7 @@ export type Database = {
         }
         Insert: {
           asset_class: Database["public"]["Enums"]["asset_class"]
+          conviction?: number | null
           executed_at?: string
           id?: string
           instrument_ccy?: string
@@ -3762,6 +3767,7 @@ export type Database = {
         }
         Update: {
           asset_class?: Database["public"]["Enums"]["asset_class"]
+          conviction?: number | null
           executed_at?: string
           id?: string
           instrument_ccy?: string
