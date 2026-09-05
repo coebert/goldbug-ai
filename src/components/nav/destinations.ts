@@ -8,6 +8,7 @@ import {
   GitCompare,
   Network,
   BookOpen,
+  Brain,
   Sparkles,
   Plug,
   RefreshCw,
@@ -122,6 +123,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     primary: true,
     keywords: "backtest scanner reclaim setup insider batching",
   },
+  {
+    to: "/decision-model",
+    label: "Decision model",
+    hint: "The signal weights fitted from your own trading history.",
+    icon: Brain,
+    area: "research",
+    keywords: "learned model weights fit signals edge",
+  },
+
   {
     to: "/simulation-report",
     label: "Simulation report",

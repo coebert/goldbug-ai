@@ -61,6 +61,9 @@ export async function callAiForDecision(args: {
   fearLabel?: string | null;
   /** Cash-funded short sleeve (inverse ETFs) and its live room. */
   shortSleeveBlock?: string | null;
+  /** Weights fitted on this account's own history + today's model ranking. */
+  learnedModelBlock?: string | null;
+
 
 
 
@@ -181,6 +184,9 @@ ${args.cashPolicyBlock ?? ""}
 
 ${args.shortSleeveBlock ?? ""}
 
+${args.learnedModelBlock ?? ""}
+
+
 
 ${HISTORICAL_PLAYBOOK}
 
@@ -299,7 +305,8 @@ If no action is warranted, return an empty orders array.`;
       if (i > 0) {
         console.warn(`AI decision succeeded on ${attempt.note} attempt (${attempt.model})`);
       }
-      return output;
+      return { ...output, model_used: attempt.model };
+
     } catch (error) {
       lastError = error;
       const status = (error as { statusCode?: number } | null)?.statusCode;
@@ -342,8 +349,40 @@ If no action is warranted, return an empty orders array.`;
       ? (error.text?.slice(0, 300) ?? "structured output parse error")
       : (error instanceof Error ? error.message : String(error));
     console.warn(
-      `AI decision unavailable — falling back to heuristic (${parseFail ? "parse" : "gateway"}: ${msg.slice(0, 160)})`,
+      `AI decision unavailable — falling back (${parseFail ? "parse" : "gateway"}: ${msg.slice(0, 160)})`,
     );
+
+    // FIRST fallback: the model fitted on this account's own history. Only
+    // used when it passed its out-of-sample test; otherwise we carry on to
+    // the hand-written heuristic below.
+    try {
+      const { buildLearnedFallback } = await import("../decision-model/fallback.server");
+      const learned = await buildLearnedFallback({
+        userId: (args.portfolio as { user_id?: string | null }).user_id ?? null,
+        rows: args.features as unknown as Array<Record<string, unknown>>,
+        holdings: args.holdings.map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
+        fearLabel: args.fearLabel ?? null,
+        reason: msg,
+      });
+      if (learned) {
+        console.warn(
+          `[decision-model] learned fallback used — ${learned.orders.length} orders from model ${learned.model.id.slice(0, 8)}`,
+        );
+        return {
+          briefing: learned.briefing,
+          rationale: learned.rationale,
+          ai_unavailable: true,
+          model_used: "learned-model",
+          orders: learned.orders as DecisionOutput["orders"],
+        };
+      }
+    } catch (learnedErr) {
+      console.warn(
+        `[decision-model] learned fallback unavailable — ${learnedErr instanceof Error ? learnedErr.message : String(learnedErr)}`,
+      );
+    }
+
+
     try {
       const { buildHeuristicDecision } = await import("../heuristic-decision");
       const heuristic = buildHeuristicDecision({
@@ -391,6 +430,7 @@ If no action is warranted, return an empty orders array.`;
         briefing: heuristic.briefing,
         rationale: heuristic.rationale,
         ai_unavailable: true,
+        model_used: "heuristic",
         orders: heuristic.orders.map((o) =>
           o.side === "sell"
             ? {
@@ -418,6 +458,7 @@ If no action is warranted, return an empty orders array.`;
       console.warn(`Heuristic fallback failed — ${hMsg}`);
       return {
         ai_unavailable: true,
+        model_used: "none",
         briefing: `AI provider unavailable (${msg.slice(0, 120)}); heuristic fallback errored. Guardrail exits still applied.`,
         rationale: `AI gateway error: ${msg.slice(0, 200)}. Heuristic error: ${hMsg.slice(0, 200)}.`,
         orders: [],

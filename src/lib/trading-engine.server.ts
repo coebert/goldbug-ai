@@ -1037,7 +1037,28 @@ export async function runDailyTick(
     srvLog.info(`[trading-engine] AI decision skipped — ${materiality!.reason}`);
   }
 
+  // Weights fitted on this account's own decision history, plus today's
+  // candidates pre-scored by that model. Best-effort: never break the tick.
+  const learnedModelBlock = await (async () => {
+    if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
+    try {
+      const { loadLatestModel, scoreCandidates, formatModelBlock } = await import(
+        "./decision-model/model.server"
+      );
+      const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
+      if (!userId) return null;
+      const model = await loadLatestModel(userId);
+      if (!model) return null;
+      const scores = scoreCandidates(model, features as unknown as Array<Record<string, unknown>>);
+      return formatModelBlock(model, scores);
+    } catch (e) {
+      srvLog.warn("learned decision model unavailable for prompt", e);
+      return null;
+    }
+  })();
+
   const decision: DecisionOutput = breakerTripped
+
     ? {
         briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
@@ -1100,7 +1121,9 @@ export async function runDailyTick(
         cashPolicyBlock: cashPolicy.enabled
           ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
           : null,
+        learnedModelBlock,
         shortSleeveBlock: formatShortSleeveBlock({
+
           enabled: cfg.shorts_enabled,
           nav: totalValue,
           exposure: exposureSplit,
@@ -1109,6 +1132,23 @@ export async function runDailyTick(
         }),
 
       });
+
+  /**
+   * What actually produced this decision — a gateway model id, the learned
+   * model, or the heuristic. Previously hardcoded, which made the history
+   * claim a model that may never have run.
+   */
+  const decisionModelLabel =
+    (decision as { model_used?: string }).model_used ??
+    (breakerTripped
+      ? "circuit-breaker"
+      : allVenuesClosed
+      ? "venues-closed"
+      : skipAiForQuietTick
+      ? "skipped-quiet-tick"
+      : "unknown");
+
+
 
 
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
@@ -3201,7 +3241,7 @@ export async function runDailyTick(
     run_date: asOf,
     briefing: decision.briefing,
     rationale: decision.rationale,
-    model: "google/gemini-2.5-flash",
+    model: decisionModelLabel,
     portfolio_value: newTotal,
     raw: asJson({
       orders: decision.orders,
@@ -3469,7 +3509,7 @@ export async function runDailyTick(
       userId: portfolio.user_id,
       decisionId,
       runDate: asOf,
-      model: "google/gemini-2.5-flash",
+      model: decisionModelLabel,
       mode: (portfolio.mode as string | null) ?? null,
 
       executed: executed.map((t) => ({
