@@ -569,6 +569,23 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
 
       const raw = d.raw as { signals?: unknown } | null;
       const signals = Array.isArray(raw?.signals) ? (raw!.signals as AnyRow[]) : [];
+
+      const mx = macroOn(d.run_date);
+      const standings = sectorStandingsOn(d.run_date);
+      // Sector exposure of the book that day, priced off the same snapshot.
+      const priceBySymbol = new Map<string, number>();
+      for (const s of signals) {
+        const sym = typeof s?.["symbol"] === "string" ? baseSymbol(s["symbol"] as string) : null;
+        const px = Number(s?.["price"]) || 0;
+        if (sym && px > 0) priceBySymbol.set(sym, px);
+      }
+      const sectorValue = new Map<string, number>();
+      for (const [sym, pos] of state.positions) {
+        const px = priceBySymbol.get(sym) ?? 0;
+        const sector = symbolSector(sym);
+        if (!sector || !(px > 0) || !(pos.qty > 0)) continue;
+        sectorValue.set(sector, (sectorValue.get(sector) ?? 0) + pos.qty * px);
+      }
       for (const s of signals) {
         const symbol = typeof s?.["symbol"] === "string" ? (s["symbol"] as string) : null;
         if (!symbol) continue;
