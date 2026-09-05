@@ -664,21 +664,66 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     }
   }
 
-  const symbols = Array.from(new Set(Array.from(byKey.values()).map((v) => v.symbol)));
-  const prices = await loadPriceSeries(symbols, firstDate);
+  // Symbols worth carrying long history for: everything the engine has looked
+  // at, plus everything this account has actually traded.
+  const symbols = Array.from(
+    new Set([
+      ...Array.from(byKey.values()).map((v) => v.symbol),
+      ...trades.map((t) => t.symbol),
+    ]),
+  );
+
+  const historyYears = Math.max(0, Math.min(25, opts.historyYears ?? DEFAULT_HISTORY_YEARS));
+  const historyFrom =
+    historyYears > 0
+      ? new Date(Date.parse(firstDate) - historyYears * 365.25 * 86_400_000)
+          .toISOString()
+          .slice(0, 10)
+      : firstDate;
+
+  const prices = await loadPriceSeries(symbols, historyFrom);
+
+  // Rebuild the same technical snapshot on every Nth bar before the engine's
+  // first recorded decision, so the fit sees years of behaviour, not weeks.
+  const historyCandidates: Candidate[] = [];
+  if (historyYears > 0) {
+    const candlesBySymbol = new Map<string, Candle[]>();
+    for (const [symbol, series] of prices) {
+      if (series.candles.length >= 120) candlesBySymbol.set(symbol, series.candles);
+    }
+    const { buildHistoricalCandidates } = await import("./history-extension.server");
+    for (const h of buildHistoricalCandidates({
+      candlesBySymbol,
+      from: historyFrom,
+      before: firstDate,
+      strideDays: Math.max(1, opts.historyStrideDays ?? DEFAULT_HISTORY_STRIDE),
+    })) {
+      historyCandidates.push({
+        date: h.date,
+        symbol: h.symbol,
+        row: h.row,
+        priority: 0,
+        weight: HISTORY_SAMPLE_WEIGHT,
+        traded: false,
+        held: false,
+      });
+    }
+  }
 
   const samples: Sample[] = [];
   let skippedNoForwardPrice = 0;
   let tradedSamples = 0;
   let heldSamples = 0;
   let weightSum = 0;
+  let historySamples = 0;
 
-  for (const c of byKey.values()) {
+  for (const c of [...byKey.values(), ...historyCandidates]) {
     const series = prices.get(c.symbol);
     if (!series) {
       skippedNoForwardPrice++;
       continue;
     }
+
     const i0 = indexOnOrAfter(series, c.date);
     const i1 = i0 < 0 ? -1 : i0 + horizonDays;
     if (i0 < 0 || i1 >= series.dates.length) {
