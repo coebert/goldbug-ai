@@ -71,6 +71,17 @@ export function OverviewActions({
           <PlayCircle className="mr-1 h-4 w-4" />
           {runBtPending ? "Backtesting…" : `Run ${days}-day backtest`}
         </Button>
+        {onRunFullHistoryBacktest && (
+          <Button
+            variant="outline"
+            onClick={onRunFullHistoryBacktest}
+            disabled={runBtPending || runDayPending}
+          >
+            <CalendarClock className="mr-1 h-4 w-4" />
+            {runBtPending ? "Replaying…" : "Replay full history"}
+          </Button>
+        )}
+
         <Button variant="ghost" onClick={onReset} disabled={resetPending}>
           <RotateCcw className="mr-1 h-4 w-4" /> Reset
         </Button>
