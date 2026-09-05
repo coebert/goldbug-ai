@@ -68,6 +68,8 @@ export async function callAiForDecision(args: {
   riskProfileBlock?: string | null;
   /** Learned decision model: verdict, evidence strength, and today's mdl scores. */
   modelBlock?: string | null;
+  /** Real-time quote overlay: what the market is quoting right now. */
+  liveQuoteBlock?: string | null;
   /** This account's measured round-trip dealing cost (bps), from real fills. */
   measuredRoundTripBps?: number | null;
   /** Per-instrument round-trip costs measured live from this account's fills. */
@@ -164,6 +166,7 @@ ${tradingStylePrompt(cfg)}
 ${buildTradingCostBlock({
   currency: args.portfolio.currency,
   stampExemptPreference: cfg.stamp_exempt_preference,
+  liveQuoteBlock: args.liveQuoteBlock ?? null,
   measuredRoundTripBps: args.measuredRoundTripBps ?? null,
   symbolCosts: args.symbolCosts ?? null,
 })}

@@ -1270,6 +1270,7 @@ export async function runDailyTick(
         playbookBlock,
       riskProfileBlock,
       modelBlock,
+      liveQuoteBlock: liveOverlay?.block ?? null,
       measuredRoundTripBps,
       symbolCosts: symbolCosts
         ? Array.from(symbolCosts.values())
