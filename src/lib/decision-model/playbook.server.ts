@@ -127,9 +127,9 @@ export async function trainPlaybook(args: {
       user_id: args.userId,
       model: used,
       horizon_days: brief.coverage.horizonDays,
-      coverage: brief.coverage as unknown as Record<string, unknown>,
+      coverage: JSON.parse(JSON.stringify(brief.coverage)),
       brief: brief.text,
-      playbook: playbook as unknown as Record<string, unknown>,
+      playbook: JSON.parse(JSON.stringify(playbook)),
     })
     .select("id, created_at")
     .single();
