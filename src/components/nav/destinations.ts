@@ -170,6 +170,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     keywords: "live order book positions fills execution pnl",
   },
   {
+    to: "/pnl",
+    label: "P&L vs AI",
+    tabLabel: "P&L",
+    hint: "Your real profit and loss beside the AI's replay, with every fee and tax.",
+    icon: GitCompare,
+    area: "trades",
+    keywords: "profit loss shadow backtest gap fees stamp duty slippage comparison",
+  },
+  {
     to: "/daily-report",
     label: "Daily AI report",
     tabLabel: "Report",

@@ -16,6 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
 import { Route as ResearchRouteImport } from './routes/research'
+import { Route as PnlRouteImport } from './routes/pnl'
 import { Route as MarketsRouteImport } from './routes/markets'
 import { Route as LiveDashboardRouteImport } from './routes/live-dashboard'
 import { Route as LearnRouteImport } from './routes/learn'
@@ -106,6 +107,11 @@ const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
 const ResearchRoute = ResearchRouteImport.update({
   id: '/research',
   path: '/research',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PnlRoute = PnlRouteImport.update({
+  id: '/pnl',
+  path: '/pnl',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketsRoute = MarketsRouteImport.update({
@@ -423,6 +429,7 @@ export interface FileRoutesByFullPath {
   '/learn': typeof LearnRoute
   '/live-dashboard': typeof LiveDashboardRoute
   '/markets': typeof MarketsRoute
+  '/pnl': typeof PnlRoute
   '/research': typeof ResearchRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
@@ -488,6 +495,7 @@ export interface FileRoutesByTo {
   '/learn': typeof LearnRoute
   '/live-dashboard': typeof LiveDashboardRoute
   '/markets': typeof MarketsRoute
+  '/pnl': typeof PnlRoute
   '/research': typeof ResearchRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
@@ -554,6 +562,7 @@ export interface FileRoutesById {
   '/learn': typeof LearnRoute
   '/live-dashboard': typeof LiveDashboardRoute
   '/markets': typeof MarketsRoute
+  '/pnl': typeof PnlRoute
   '/research': typeof ResearchRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
@@ -621,6 +630,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/live-dashboard'
     | '/markets'
+    | '/pnl'
     | '/research'
     | '/saxo-reconnect'
     | '/saxo-status'
@@ -686,6 +696,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/live-dashboard'
     | '/markets'
+    | '/pnl'
     | '/research'
     | '/saxo-reconnect'
     | '/saxo-status'
@@ -751,6 +762,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/live-dashboard'
     | '/markets'
+    | '/pnl'
     | '/research'
     | '/saxo-reconnect'
     | '/saxo-status'
@@ -817,6 +829,7 @@ export interface RootRouteChildren {
   LearnRoute: typeof LearnRoute
   LiveDashboardRoute: typeof LiveDashboardRoute
   MarketsRoute: typeof MarketsRoute
+  PnlRoute: typeof PnlRoute
   ResearchRoute: typeof ResearchRoute
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
@@ -919,6 +932,13 @@ declare module '@tanstack/react-router' {
       path: '/research'
       fullPath: '/research'
       preLoaderRoute: typeof ResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pnl': {
+      id: '/pnl'
+      path: '/pnl'
+      fullPath: '/pnl'
+      preLoaderRoute: typeof PnlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/markets': {
@@ -1329,6 +1349,7 @@ const rootRouteChildren: RootRouteChildren = {
   LearnRoute: LearnRoute,
   LiveDashboardRoute: LiveDashboardRoute,
   MarketsRoute: MarketsRoute,
+  PnlRoute: PnlRoute,
   ResearchRoute: ResearchRoute,
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
