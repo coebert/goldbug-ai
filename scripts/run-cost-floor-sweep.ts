@@ -32,18 +32,19 @@ const assumptions = assumptionsFromFlags(argv);
 console.log(`Cost-floor sweep ${from} → ${to} | ${symbols.length} symbols | signal=${signal}`);
 console.log(`Assumptions: ${describeAssumptions(assumptions)}`);
 
-const history = await fetchUniverseHistory(symbols, from, to);
+const histories = await fetchUniverseHistory(symbols, { from, to });
 const byDate = new Map<string, Record<string, number>>();
-for (const [sym, rows] of Object.entries(history)) {
-  for (const r of rows as Array<{ date: string; close: number }>) {
-    if (!Number.isFinite(r.close)) continue;
-    const d = byDate.get(r.date) ?? {};
-    d[sym.toUpperCase()] = r.close;
-    byDate.set(r.date, d);
+for (const h of histories) {
+  for (const b of h.bars) {
+    if (!Number.isFinite(b.close) || b.close <= 0) continue;
+    const day = String(b.date).slice(0, 10);
+    const row = byDate.get(day) ?? {};
+    row[h.symbol] = b.close;
+    byDate.set(day, row);
   }
 }
 const bars: ReplayBar[] = Array.from(byDate.entries())
-  .sort(([a], [b]) => a.localeCompare(b))
+  .sort((a, b) => a[0].localeCompare(b[0]))
   .map(([date, closes]) => ({ date, closes }));
 console.log(`${bars.length} bars\n`);
 
