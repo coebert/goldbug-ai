@@ -279,6 +279,12 @@ export async function loadLatestModel(userId: string): Promise<StoredModel | nul
 // Scoring today's candidates
 // --------------------------------------------------------------------------
 
+import {
+  strengthAdjustedScore,
+  strengthLabel,
+  type SymbolStrength,
+} from "./symbol-strength";
+
 export type SymbolScore = {
   symbol: string;
   score: number;
@@ -490,16 +496,39 @@ export async function loadScoringContext(asOf?: string): Promise<ScoringContext>
 }
 
 /** Prompt block handed to the AI alongside the candidate table. */
-export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[]): string {
+export function formatModelBlock(
+  model: StoredModel | null,
+  scores: SymbolScore[],
+  /**
+   * Per-symbol historical signal strength, keyed by base symbol. When present
+   * the ranking is ordered by the strength-adjusted score, so names whose
+   * signals have actually predicted this book's results come first and the AI
+   * spends its risk budget on the strongest evidence rather than on whichever
+   * noisy instrument happened to top today's raw score.
+   */
+  strengths?: Map<string, SymbolStrength> | null,
+): string {
   if (!model) return "";
   const bw = Object.entries(model.bucket_weights)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `${k} ${v}%`)
     .join(", ");
-  const top = [...scores].sort((a, b) => b.score - a.score);
+  const strengthFor = (symbol: string): SymbolStrength | null =>
+    strengths?.get(strengthKey(symbol)) ?? null;
+  const top = [...scores].sort(
+    (a, b) =>
+      strengthAdjustedScore(b.score, strengthFor(b.symbol)?.strength) -
+      strengthAdjustedScore(a.score, strengthFor(a.symbol)?.strength),
+  );
   const table = top
     .slice(0, 12)
-    .map((s) => `- ${s.symbol}: mdl ${s.score.toFixed(2)} (pct ${(s.percentile * 100).toFixed(0)})`)
+    .map((s) => {
+      const h = strengthFor(s.symbol);
+      const hist = h
+        ? ` | track record ${strengthLabel(h.strength)} (${h.samples} obs, right ${h.hitRate == null ? "n/a" : (h.hitRate * 100).toFixed(0)}%, avg ${h.meanNetBps == null ? "n/a" : `${h.meanNetBps >= 0 ? "+" : ""}${h.meanNetBps.toFixed(0)}bps`} net)`
+        : " | track record unmeasured";
+      return `- ${s.symbol}: mdl ${s.score.toFixed(2)} (pct ${(s.percentile * 100).toFixed(0)})${hist}`;
+    })
     .join("\n");
   const worst = top
     .slice(-4)
@@ -528,5 +557,6 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
 - Signal weights measured from your results (this is what has actually paid): ${bw || "n/a"}. Where your instinctive weighting differs from these, justify the difference explicitly.
 - Strongest fitted drivers: ${drivers}.
 ${table ? `\nTODAY'S MODEL RANKING (higher = better expected ${model.horizon_days}d relative return):\n${table}\nWeakest: ${worst}.` : ""}
+${strengths && strengths.size > 0 ? "- The ranking above is ordered by TRACK RECORD FIRST: each name's mdl score is discounted by how reliably that instrument's signals have predicted this account's own cost-adjusted outcomes. Trade the strongest track records first; a high mdl score on an 'unproven' name is a weaker reason than a moderate score on a 'strong' one, and deserves a smaller stake." : ""}
 - A BUY on a bottom-quartile mdl score needs an explicit reason in the rationale for overriding the fitted evidence.`;
 }
