@@ -457,7 +457,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           .from("price_cache")
           .select("close")
           .eq("symbol", row.symbol as string)
-          .order("as_of", { ascending: false })
+          .order("price_date", { ascending: false })
           .limit(1)
           .maybeSingle();
         const resolved = resolveFillRecord({
@@ -584,7 +584,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           .from("price_cache")
           .select("close")
           .eq("symbol", row.symbol as string)
-          .order("as_of", { ascending: false })
+          .order("price_date", { ascending: false })
           .limit(1)
           .maybeSingle();
         const candidates: FillPriceCandidate[] = [
