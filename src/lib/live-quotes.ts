@@ -115,7 +115,7 @@ export function repriceQuote(quote: PulseQuote, live: LiveQuote): PulseQuote {
  * for, then recompute breadth and the risk tone off the refreshed numbers so
  * the headline can never disagree with the rows beneath it.
  */
-export function applyLiveQuotes(pulse: MarketPulse, live: LiveQuoteResult | null): MarketPulse {
+export function applyLiveQuotes<T extends MarketPulse>(pulse: T, live: LiveQuoteResult | null): T {
   if (!live || live.covered === 0) return pulse;
   const tick = (q: PulseQuote) => {
     const l = live.quotes[q.symbol];
