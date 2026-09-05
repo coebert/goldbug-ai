@@ -86,7 +86,7 @@ export async function buildDailyComparison(args: {
 
   const { data: decision } = await supabaseAdmin
     .from("decisions")
-    .select("created_at, decision_date, raw")
+    .select("created_at, run_date, raw")
     .eq("portfolio_id", args.portfolioId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -102,7 +102,7 @@ export async function buildDailyComparison(args: {
   }
 
   const asOf =
-    (decision?.decision_date as string | null) ??
+    (decision?.run_date as string | null) ??
     (decision?.created_at ? String(decision.created_at).slice(0, 10) : null);
 
   const { data: holdingRows } = await supabaseAdmin
