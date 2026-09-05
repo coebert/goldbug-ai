@@ -148,6 +148,7 @@ import {
   type PersistedRegime,
 } from "./regime-detector.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { symbolRoundTripFloor, type LiveSymbolCost } from "./execution-costs.server";
 import { cached } from "./market-context-cache.server";
 import { computePortfolioDrawdownSizing, grossExposureLimit } from "./portfolio-drawdown.server";
 import {
