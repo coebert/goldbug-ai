@@ -61,13 +61,32 @@ export async function buildLearnedFallback(args: {
   holdings: Array<{ symbol: string; quantity: number }>;
   fearLabel?: string | null;
   reason: string;
+  /** Today's book, so the account-state features match the training data. */
+  portfolioId?: string | null;
+  totalValue?: number | null;
+  cash?: number | null;
+  asOf?: string | null;
 }): Promise<LearnedFallback | null> {
   if (!args.userId) return null;
   const model = await loadLatestModel(args.userId);
   if (!model || !model.usable) return null;
 
-  const scores = scoreCandidates(model, args.rows);
+  const book =
+    args.portfolioId && (args.totalValue ?? 0) > 0
+      ? await (async () => {
+          const { loadBookSnapshot } = await import("./book-state.server");
+          return loadBookSnapshot({
+            portfolioId: args.portfolioId!,
+            totalValue: args.totalValue!,
+            cash: args.cash ?? 0,
+            asOf: args.asOf ?? undefined,
+          });
+        })().catch(() => null)
+      : null;
+
+  const scores = scoreCandidates(model, args.rows, book);
   if (scores.length < 5) return null;
+
 
   const byScore = [...scores].sort((a, b) => b.score - a.score);
   const held = new Set(args.holdings.filter((h) => Number(h.quantity) > 0).map((h) => h.symbol));
