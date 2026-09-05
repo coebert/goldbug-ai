@@ -239,6 +239,40 @@ export const BUCKETS: readonly SignalBucket[] = [
   "portfolio",
 ];
 
+/**
+ * The account-state block the portfolio features read. Built from history when
+ * fitting and from the live book when scoring, so both paths see the same shape.
+ */
+export type PfContext = {
+  /** Position value as a share of total book value (0 when not held). */
+  position_weight: number;
+  /** Unrealised P&L on the holding as a fraction of cost (0 when not held). */
+  unrealised_pct: number;
+  /** Calendar days the name has been held (0 when not held). */
+  hold_days: number;
+  /** Decayed realised loss on this name, as a fraction of book value (<= 0). */
+  loss_memory: number;
+  /** Cash share of the book on the day. */
+  cash_weight: number;
+  /** Book drawdown from its running peak (<= 0). */
+  book_drawdown: number;
+};
+
+export const NEUTRAL_PF: PfContext = {
+  position_weight: 0,
+  unrealised_pct: 0,
+  hold_days: 0,
+  loss_memory: 0,
+  cash_weight: 0,
+  book_drawdown: 0,
+};
+
+/** Attach an account-state block to a signal/candidate row. */
+export function withPf(row: AnyRow, pf: PfContext): AnyRow {
+  return { ...row, pf };
+}
+
+
 
 /** Raw (un-normalised) feature vector for one symbol on one date. */
 export function extractFeatureVector(row: AnyRow): Array<number | null> {
