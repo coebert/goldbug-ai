@@ -6,6 +6,11 @@ const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
 );
 
+const TradeRationalePanel = lazy(() =>
+  import("@/components/trade-rationale-panel").then((m) => ({ default: m.TradeRationalePanel })),
+);
+
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Drawer,
