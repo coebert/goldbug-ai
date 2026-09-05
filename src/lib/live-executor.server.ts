@@ -2143,6 +2143,22 @@ export async function routeOrdersToBroker(params: {
       } catch (e) {
         console.warn("[live-executor] block recording failed:", e);
       }
+
+      // Same visibility as a fill: alert the owner with the broker's reason.
+      const { notifyTradeRejected } = await import("./trade-open-notify.server");
+      notifyTradeRejected({
+        userId,
+        portfolioId: portfolio.id,
+        orderId: liveOrderId,
+        decisionId: decisionId ?? null,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        price: limitPlan ? limitPlan.limitPrice : (order.price ?? null),
+        currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
+        status: brokerRes.status,
+        rejectReason: brokerRes.reason ?? null,
+      });
     }
 
 
