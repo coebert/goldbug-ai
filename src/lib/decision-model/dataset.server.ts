@@ -52,6 +52,13 @@ export type DatasetOptions = {
   realMoneyOnly?: boolean;
   /** `risk_net` (default) = cost- and risk-adjusted; `price` = raw forward return. */
   labelMode?: LabelMode;
+  /**
+   * How many years of bar history to rebuild behind the first recorded
+   * decision. 0 = recorded decisions only (the old behaviour).
+   */
+  historyYears?: number;
+  /** Sampling stride, in trading days, for the rebuilt history. */
+  historyStrideDays?: number;
 };
 
 export type DatasetResult = {
@@ -75,11 +82,25 @@ export type DatasetResult = {
   costCalibratedSymbols: number;
   meanWeight: number;
   tradesScanned: number;
+  /** Rows rebuilt from bars before the first recorded decision. */
+  historySamples: number;
+  /** Earliest date the rebuilt history reaches. */
+  historyFrom: string | null;
 };
 
 const REAL_MONEY_MODES = new Set(["live_prod", "live_sim"]);
 const LOSS_MEMORY_HALFLIFE_DAYS = 30;
 const DEFAULT_ONE_WAY_COST_BPS = 15;
+const DEFAULT_HISTORY_YEARS = 10;
+const DEFAULT_HISTORY_STRIDE = 5;
+/**
+ * Weight of a rebuilt pre-engine row relative to a real recorded decision day.
+ * Low on purpose: these rows have no news, no book state and no macro context,
+ * so they inform the price/trend relationships without overruling how this
+ * account has actually behaved.
+ */
+const HISTORY_SAMPLE_WEIGHT = 0.35;
+
 
 /** Close prices for one symbol, ordered by date, keyed by the engine symbol. */
 type PriceSeries = { dates: string[]; closes: number[] };
