@@ -60,6 +60,7 @@ export async function computeAndStoreSymbolStrengths(args: {
     from: null,
     to: null,
     modelScored: false,
+    marketRows: [],
   };
 
   const ds = await buildDataset({
