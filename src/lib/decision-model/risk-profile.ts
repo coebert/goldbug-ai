@@ -183,23 +183,23 @@ function pct(v: number | null | undefined, digits = 2): string {
  */
 export function formatRiskProfileBlock(
   profile: BookRiskProfile,
-  opts: { currency: string; windowDays: number; positions: OpenPosition[] },
+  opts: { currency: string; windowDays: number; positions: OpenPosition[]; nav: number },
 ): string {
   const t = profile.trades;
   const b = profile.book;
-  const lines = profile.positions_line ?? null; // keep type-narrow friendly
-  void lines;
+  const nav = opts.nav > 0 ? opts.nav : 0;
   const holdings = opts.positions
     .filter((p) => p.value > 0)
     .sort((a, b2) => b2.value - a.value)
     .slice(0, 12)
-    .map(
-      (p) =>
-        `  - ${p.symbol}: ${pct(profile.book.positions > 0 && p.value > 0 ? (p.value / Math.max(1e-9, p.value / ((p.value / (p.value)) || 1))) * 0 : 0, 0) === "" ? "" : ""}${
-          p.unrealisedPct != null ? `${pct(p.unrealisedPct)} unrealised` : "unrealised n/a"
-        }, ${p.heldDays != null ? `${p.heldDays}d held` : "age n/a"}, ${opts.currency} ${p.value.toFixed(0)}`,
-    )
+    .map((p) => {
+      const weight = nav > 0 ? pct((p.value / nav) * 100, 1) : "n/a";
+      const unreal = p.unrealisedPct != null ? `${pct(p.unrealisedPct)} unrealised` : "unrealised n/a";
+      const age = p.heldDays != null ? `${p.heldDays}d held` : "age n/a";
+      return `  - ${p.symbol}: ${weight} of NAV, ${unreal}, ${age}, ${opts.currency} ${p.value.toFixed(0)}`;
+    })
     .join("\n");
+
 
   return `THIS BOOK'S OWN RISK PROFILE (measured from your real fills, holdings and equity curve — not a generic prior):
 - Equity curve, last ${profile.days} sessions: realised volatility ${pct(profile.volAnnualPct, 1)} annualised, max drawdown ${pct(profile.maxDrawdownPct)}, currently ${pct(profile.currentDrawdownPct)} below the peak. Worst day ${pct(profile.worstDayPct)}, best day ${pct(profile.bestDayPct)}.
