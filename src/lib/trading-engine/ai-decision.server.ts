@@ -162,6 +162,7 @@ ${tradingStylePrompt(cfg)}
 ${buildTradingCostBlock({
   currency: args.portfolio.currency,
   stampExemptPreference: cfg.stamp_exempt_preference,
+  measuredRoundTripBps: args.measuredRoundTripBps ?? null,
 })}
 
 

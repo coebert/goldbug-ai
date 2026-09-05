@@ -1090,6 +1090,9 @@ export async function runDailyTick(
   // real out-of-sample edge is tradeable at reduced size (edge_strength in the
   // block tells the AI how much); no edge at all keeps it a tie-breaker only.
   // Best-effort: never break the tick.
+  // This account's own measured round-trip dealing cost (bps), captured when
+  // the learned model loads so the cost brief can quote it verbatim.
+  let measuredRoundTripBps: number | null = null;
   const modelBlock = await (async () => {
     if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
     try {
@@ -1099,6 +1102,8 @@ export async function runDailyTick(
         await import("./decision-model/model.server");
       const model = await loadLatestModel(userId);
       if (!model || model.coefficients.length === 0) return null;
+      const rt = Number(model.coverage?.round_trip_cost_bps);
+      if (Number.isFinite(rt) && rt > 0) measuredRoundTripBps = rt;
       const ctx = await loadScoringContext(asOf);
       const lossMemoryLive: Record<string, number> = {};
       for (const [sym, pm] of lossMemory) lossMemoryLive[sym] = pm.penalty;
