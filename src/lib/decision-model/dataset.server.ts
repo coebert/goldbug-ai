@@ -290,7 +290,10 @@ function isPenceQuoted(
 }
 
 async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
-  type FillRow = {
+  // One ticket = one order. Partial fills are slices of the same instruction
+  // and share its commission, so they are aggregated before the ticket is
+  // priced — otherwise a 2-share slice looks like it paid the whole floor.
+  type Ticket = {
     symbol: string;
     side: "buy" | "sell";
     date: string;
@@ -299,13 +302,23 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
     /** Itemised broker charges in the instrument's currency, when invoiced. */
     invoicedCharge: number | null;
   };
-  const fills: FillRow[] = [];
+  type FillRow = {
+    orderKey: string;
+    symbol: string;
+    side: "buy" | "sell";
+    date: string;
+    quantity: number;
+    price: number;
+    /** Itemised broker charges in the instrument's currency, when invoiced. */
+    invoicedCharge: number | null;
+  };
+  const rawFills: FillRow[] = [];
 
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
       .from("live_fills")
       .select(
-        "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, filled_at",
+        "order_id, symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, filled_at",
       )
       .in("portfolio_id", portfolioIds)
       .range(page * 1000, page * 1000 + 999);
@@ -324,16 +337,44 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
       const charge = parts > 0 ? parts : Math.abs(Number(r.fee) || 0);
 
       const at = r.filled_at ? new Date(r.filled_at as string) : null;
-      fills.push({
-        symbol: baseSymbol(String(r.symbol ?? "")),
-        side: String(r.side ?? "").toLowerCase() === "sell" ? "sell" : "buy",
-        date: at && !Number.isNaN(at.getTime()) ? at.toISOString().slice(0, 10) : "",
+      const date = at && !Number.isNaN(at.getTime()) ? at.toISOString().slice(0, 10) : "";
+      const sym = baseSymbol(String(r.symbol ?? ""));
+      const side = String(r.side ?? "").toLowerCase() === "sell" ? "sell" : "buy";
+      rawFills.push({
+        orderKey: r.order_id ? String(r.order_id) : `${sym}|${side}|${date}`,
+        symbol: sym,
+        side,
+        date,
         quantity: qty,
         price: px,
         invoicedCharge: synced && charge > 0 ? charge : null,
       });
     }
     if ((data?.length ?? 0) < 1000) break;
+  }
+
+  // --- collapse partial fills into the ticket the broker actually charged --
+  const byOrder = new Map<string, Ticket & { notional: number; charged: number; anyInvoiced: boolean }>();
+  for (const f of rawFills) {
+    const cur = byOrder.get(f.orderKey) ?? {
+      symbol: f.symbol, side: f.side, date: f.date,
+      quantity: 0, price: 0, invoicedCharge: null,
+      notional: 0, charged: 0, anyInvoiced: false,
+    };
+    cur.quantity += f.quantity;
+    cur.notional += f.quantity * f.price;
+    if (f.invoicedCharge !== null) { cur.charged += f.invoicedCharge; cur.anyInvoiced = true; }
+    byOrder.set(f.orderKey, cur);
+  }
+  const fills: Ticket[] = [];
+  for (const t of byOrder.values()) {
+    if (!(t.quantity > 0) || !(t.notional > 0)) continue;
+    fills.push({
+      symbol: t.symbol, side: t.side, date: t.date,
+      quantity: t.quantity,
+      price: t.notional / t.quantity, // volume-weighted average fill price
+      invoicedCharge: t.anyInvoiced ? t.charged : null,
+    });
   }
 
   // --- the day's tape, to measure what the fill actually gave up -----------
@@ -451,7 +492,7 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
     feeBps: Math.round(accountCharge * 10) / 10,
     slippageBps: Math.round(accountSlip * 10) / 10,
     calibrated: bySymbol.size,
-    fills: fills.length,
+    fills: rawFills.length,
     invoicedFills,
     slippageFills,
   };
