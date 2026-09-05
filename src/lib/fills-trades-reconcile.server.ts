@@ -167,6 +167,7 @@ export async function reconcileFillsToTradesForPortfolio(
       executed_at: filledAtIso,
       trade_date: filledAtIso.slice(0, 10),
       reason: `[broker-fill] fill_id=${brokerFillId}`,
+      conviction: f.order_id ? convictionByOrder.get(String(f.order_id)) ?? null : null,
       ...(src?.currency ? { instrument_ccy: String(src.currency) } : {}),
     };
   });
