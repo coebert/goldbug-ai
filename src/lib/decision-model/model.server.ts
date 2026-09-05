@@ -75,6 +75,9 @@ export type StoredModel = {
 /** Out-of-sample bars a fit must clear before the engine is allowed to use it. */
 export const MIN_TEST_DATES = 8;
 export const MIN_MEAN_IC = 0.02;
+/** The out-of-sample IC must also be stable, not one lucky week. */
+export const MIN_IC_T = 1.5;
+
 
 export async function fitAndStoreModel(args: {
   userId: string;
