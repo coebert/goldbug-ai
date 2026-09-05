@@ -25,7 +25,21 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { priceSymbolVariants } from "../price-symbol";
-import { extractFeatureVector, FEATURE_KEYS, NEUTRAL_PF, withPf, type AnyRow, type PfContext } from "./features";
+import {
+  extractFeatureVector,
+  FEATURE_KEYS,
+  NEUTRAL_PF,
+  NEUTRAL_MX,
+  NEUTRAL_SX,
+  regimeRiskOn,
+  withContext,
+  withPf,
+  type AnyRow,
+  type MxContext,
+  type PfContext,
+  type SxContext,
+} from "./features";
+import { symbolSector } from "../sector-rotation.server";
 import type { Sample } from "./fit";
 
 export type LabelMode = "risk_net" | "price";
@@ -422,6 +436,96 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
 
   const costs = await loadCostModel(ids);
 
+  // --- market backdrop (macro) and sector standings, by day ---------------
+  const macroByDate: Array<{ date: string; mx: MxContext }> = [];
+  {
+    const { data } = await supabaseAdmin
+      .from("market_regimes")
+      .select("as_of, regime, signals")
+      .gte("as_of", firstDate)
+      .order("as_of", { ascending: true });
+    for (const r of data ?? []) {
+      const s = (r.signals ?? {}) as Record<string, unknown>;
+      const n = (k: string): number | null => {
+        const v = Number(s[k]);
+        return Number.isFinite(v) ? v : null;
+      };
+      macroByDate.push({
+        date: r.as_of as string,
+        mx: {
+          vix_level: n("vix_level"),
+          spy_drawdown_pct: n("spy_drawdown_pct"),
+          spy_price: n("spy_price"),
+          spy_sma200: n("spy_sma200"),
+          spy_return_30d: n("spy_return_30d"),
+          tlt_return_30d: n("tlt_return_30d"),
+          gld_return_30d: n("gld_return_30d"),
+          risk_on: regimeRiskOn(r.regime as string | null),
+        },
+      });
+    }
+  }
+  function macroOn(date: string): MxContext {
+    let lo = 0;
+    let hi = macroByDate.length - 1;
+    let ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (macroByDate[mid]!.date <= date) {
+        ans = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    return ans < 0 ? NEUTRAL_MX : macroByDate[ans]!.mx;
+  }
+
+  // sector standings: date -> sector -> momentum/rank
+  type SectorStanding = { momentum_30d: number | null; momentum_90d: number | null; rank_norm: number | null };
+  const sectorDates: string[] = [];
+  const sectorByDate = new Map<string, Map<string, SectorStanding>>();
+  {
+    const { data } = await supabaseAdmin
+      .from("sector_scores")
+      .select("as_of, sector, momentum_30d, momentum_90d, rank")
+      .gte("as_of", firstDate)
+      .order("as_of", { ascending: true });
+    const ranksPerDate = new Map<string, number>();
+    for (const r of data ?? []) {
+      const d = r.as_of as string;
+      ranksPerDate.set(d, Math.max(ranksPerDate.get(d) ?? 0, Number(r.rank) || 0));
+    }
+    for (const r of data ?? []) {
+      const d = r.as_of as string;
+      let m = sectorByDate.get(d);
+      if (!m) {
+        m = new Map();
+        sectorByDate.set(d, m);
+        sectorDates.push(d);
+      }
+      const maxRank = ranksPerDate.get(d) ?? 0;
+      const rank = Number(r.rank);
+      m.set(String(r.sector), {
+        momentum_30d: Number.isFinite(Number(r.momentum_30d)) ? Number(r.momentum_30d) : null,
+        momentum_90d: Number.isFinite(Number(r.momentum_90d)) ? Number(r.momentum_90d) : null,
+        rank_norm:
+          Number.isFinite(rank) && maxRank > 1 ? 1 - (2 * (rank - 1)) / (maxRank - 1) : null,
+      });
+    }
+  }
+  function sectorStandingsOn(date: string): Map<string, SectorStanding> {
+    let lo = 0;
+    let hi = sectorDates.length - 1;
+    let ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (sectorDates[mid]! <= date) {
+        ans = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    return ans < 0 ? new Map() : sectorByDate.get(sectorDates[ans]!) ?? new Map();
+  }
+
   // --- walk each portfolio's decisions forward, rebuilding the book -------
   type Candidate = {
     date: string;
@@ -465,6 +569,23 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
 
       const raw = d.raw as { signals?: unknown } | null;
       const signals = Array.isArray(raw?.signals) ? (raw!.signals as AnyRow[]) : [];
+
+      const mx = macroOn(d.run_date);
+      const standings = sectorStandingsOn(d.run_date);
+      // Sector exposure of the book that day, priced off the same snapshot.
+      const priceBySymbol = new Map<string, number>();
+      for (const s of signals) {
+        const sym = typeof s?.["symbol"] === "string" ? baseSymbol(s["symbol"] as string) : null;
+        const px = Number(s?.["price"]) || 0;
+        if (sym && px > 0) priceBySymbol.set(sym, px);
+      }
+      const sectorValue = new Map<string, number>();
+      for (const [sym, pos] of state.positions) {
+        const px = priceBySymbol.get(sym) ?? 0;
+        const sector = symbolSector(sym);
+        if (!sector || !(px > 0) || !(pos.qty > 0)) continue;
+        sectorValue.set(sector, (sectorValue.get(sector) ?? 0) + pos.qty * px);
+      }
       for (const s of signals) {
         const symbol = typeof s?.["symbol"] === "string" ? (s["symbol"] as string) : null;
         if (!symbol) continue;
@@ -492,6 +613,16 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
           book_drawdown: Math.max(-0.9, drawdown),
         };
 
+        const sector = symbolSector(base);
+        const standing = sector ? standings.get(sector) : undefined;
+        const sx: SxContext = {
+          ...NEUTRAL_SX,
+          momentum_30d: standing?.momentum_30d ?? null,
+          momentum_90d: standing?.momentum_90d ?? null,
+          rank_norm: standing?.rank_norm ?? null,
+          book_weight: sector && total > 0 ? Math.min(1, (sectorValue.get(sector) ?? 0) / total) : 0,
+        };
+
         const notional = tradedNotional.get(`${pid}|${d.run_date}|${base}`) ?? 0;
         const traded = notional > 0;
         let weight = bookWeight;
@@ -502,7 +633,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
         byKey.set(key, {
           date: d.run_date,
           symbol,
-          row: withPf(s, pf),
+          row: withContext(withPf(s, pf), { date: d.run_date, sx, mx }),
           priority,
           weight: Math.min(8, weight),
           traded,

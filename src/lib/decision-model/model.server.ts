@@ -13,12 +13,18 @@ import {
   FEATURE_KEYS,
   FEATURE_SPECS,
   NEUTRAL_PF,
+  NEUTRAL_MX,
+  NEUTRAL_SX,
+  regimeRiskOn,
+  withContext,
   bucketOf,
   extractFeatureVector,
   labelOf,
   withPf,
   type AnyRow,
+  type MxContext,
   type PfContext,
+  type SxContext,
 } from "./features";
 
 import {
@@ -278,10 +284,24 @@ export function pfFor(book: BookSnapshot | null | undefined, row: AnyRow): PfCon
  * training path exactly: z-scored across today's candidates, winsorised. Pass
  * `book` so the portfolio-state features are populated as they were in training.
  */
-export function scoreCandidates(model: StoredModel, rows: AnyRow[], book?: BookSnapshot | null): SymbolScore[] {
+export function scoreCandidates(
+  model: StoredModel,
+  rows: AnyRow[],
+  book?: BookSnapshot | null,
+  ctx?: ScoringContext | null,
+): SymbolScore[] {
   if (rows.length < 3 || model.coefficients.length !== FEATURE_KEYS.length) return [];
 
-  const vectors = rows.map((r) => extractFeatureVector(book ? withPf(r, pfFor(book, r)) : r));
+  const vectors = rows.map((r) => {
+    const withBook = book ? withPf(r, pfFor(book, r)) : r;
+    return extractFeatureVector(
+      withContext(withBook, {
+        date: ctx?.date ?? book?.asOf ?? null,
+        mx: ctx?.mx ?? NEUTRAL_MX,
+        sx: ctx?.sectorFor?.(String(r["symbol"] ?? ""), book ?? null) ?? NEUTRAL_SX,
+      }),
+    );
+  });
 
   const n = FEATURE_KEYS.length;
 
@@ -320,6 +340,94 @@ export function scoreCandidates(model: StoredModel, rows: AnyRow[], book?: BookS
     s.percentile = sorted.length > 1 ? i / (sorted.length - 1) : 0.5;
   });
   return scored;
+}
+
+/**
+ * Day-level market/sector context for live scoring. `loadScoringContext` builds
+ * it from the same tables the training set reads, so the fitted coefficients
+ * see the same inputs live as they did in the fit.
+ */
+export type ScoringContext = {
+  date: string;
+  mx: MxContext;
+  sectorFor: (symbol: string, book: BookSnapshot | null) => SxContext;
+};
+
+export async function loadScoringContext(asOf?: string): Promise<ScoringContext> {
+  const date = asOf ?? new Date().toISOString().slice(0, 10);
+  const { symbolSector } = await import("../sector-rotation.server");
+
+  const { data: reg } = await supabaseAdmin
+    .from("market_regimes")
+    .select("regime, signals")
+    .lte("as_of", date)
+    .order("as_of", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sig = (reg?.signals ?? {}) as Record<string, unknown>;
+  const n = (k: string): number | null => {
+    const v = Number(sig[k]);
+    return Number.isFinite(v) ? v : null;
+  };
+  const mx: MxContext = reg
+    ? {
+        vix_level: n("vix_level"),
+        spy_drawdown_pct: n("spy_drawdown_pct"),
+        spy_price: n("spy_price"),
+        spy_sma200: n("spy_sma200"),
+        spy_return_30d: n("spy_return_30d"),
+        tlt_return_30d: n("tlt_return_30d"),
+        gld_return_30d: n("gld_return_30d"),
+        risk_on: regimeRiskOn(reg.regime as string | null),
+      }
+    : NEUTRAL_MX;
+
+  const { data: secRows } = await supabaseAdmin
+    .from("sector_scores")
+    .select("as_of, sector, momentum_30d, momentum_90d, rank")
+    .lte("as_of", date)
+    .order("as_of", { ascending: false })
+    .limit(40);
+  const latest = secRows?.[0]?.as_of ?? null;
+  const standings = new Map<string, { m30: number | null; m90: number | null; rank: number | null }>();
+  let maxRank = 0;
+  for (const r of secRows ?? []) {
+    if (r.as_of !== latest) continue;
+    const rank = Number(r.rank);
+    if (Number.isFinite(rank)) maxRank = Math.max(maxRank, rank);
+    standings.set(String(r.sector), {
+      m30: Number.isFinite(Number(r.momentum_30d)) ? Number(r.momentum_30d) : null,
+      m90: Number.isFinite(Number(r.momentum_90d)) ? Number(r.momentum_90d) : null,
+      rank: Number.isFinite(rank) ? rank : null,
+    });
+  }
+
+  return {
+    date,
+    mx,
+    sectorFor: (symbol, book) => {
+      const sector = symbolSector(baseSymbol(symbol));
+      if (!sector) return NEUTRAL_SX;
+      const st = standings.get(sector);
+      let bookWeight = 0;
+      if (book && book.totalValue > 0) {
+        let value = 0;
+        for (const h of book.holdings) {
+          if (symbolSector(baseSymbol(h.symbol)) !== sector) continue;
+          const qty = Number(h.quantity) || 0;
+          const cost = Number(h.avg_cost) || 0;
+          if (qty > 0 && cost > 0) value += qty * cost;
+        }
+        bookWeight = Math.min(1, value / book.totalValue);
+      }
+      return {
+        momentum_30d: st?.m30 ?? null,
+        momentum_90d: st?.m90 ?? null,
+        rank_norm: st?.rank != null && maxRank > 1 ? 1 - (2 * (st.rank - 1)) / (maxRank - 1) : null,
+        book_weight: bookWeight,
+      };
+    },
+  };
 }
 
 /** Prompt block handed to the AI alongside the candidate table. */
