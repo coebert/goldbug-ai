@@ -65,7 +65,10 @@ const styles: TradingStyle[] = ["position", "swing"];
 const FRICTIONS = {
   commissionBps: 8,
   minCommission: 3,
-  buyTaxBps: 0, // US lines: no stamp duty. Set 50 for LSE-only universes.
+  // UK single stocks pay 50bps stamp on buys; ETFs and US lines pay none.
+  // `--stamp` sets the blended rate for a mixed book.
+  buyTaxBps: Number(arg("stamp", "0")),
+
   slippageBps: 5,
   impactPerUnit: 0.0002,
 };
