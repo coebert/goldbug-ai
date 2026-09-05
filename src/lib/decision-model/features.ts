@@ -22,7 +22,10 @@ export type SignalBucket =
   | "price_change"
   | "news_sentiment"
   | "volatility"
-  | "portfolio";
+  | "portfolio"
+  | "events"
+  | "sector"
+  | "macro";
 
 
 export type FeatureSpec = {
