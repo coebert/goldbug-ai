@@ -41,6 +41,22 @@ export interface TradingGate {
   remaining: number;
 }
 
+/**
+ * The user-set safety multiple for the net-of-cost edge gate (Costs page
+ * slider). Falls back to null when unreadable so the gate keeps its tuned
+ * default; a missing knob must never disable trading.
+ */
+export async function loadCostHurdleMultiple(): Promise<number | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("trading_controls")
+    .select("cost_hurdle_multiple")
+    .eq("id", true)
+    .maybeSingle();
+  const v = Number((data as { cost_hurdle_multiple?: number | null } | null)?.cost_hurdle_multiple);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
 /** Read the singleton controls row and today's routed BUY notional. */
 export async function loadTradingGate(): Promise<TradingGate> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
