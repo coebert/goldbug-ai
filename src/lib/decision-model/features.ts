@@ -10,13 +10,20 @@
  * and when scoring (today's candidate rows).
  */
 
-/** The five buckets the AI already attributes its own orders across. */
+/**
+ * The five buckets the AI already attributes its own orders across, plus a
+ * sixth for the state of THIS account (position size, cash, drawdown, past
+ * losses on the name) — the part that makes the fit portfolio-specific rather
+ * than a generic cross-sectional signal study.
+ */
 export type SignalBucket =
   | "sma_trend"
   | "rsi"
   | "price_change"
   | "news_sentiment"
-  | "volatility";
+  | "volatility"
+  | "portfolio";
+
 
 export type FeatureSpec = {
   key: string;
