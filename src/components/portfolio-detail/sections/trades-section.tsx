@@ -140,7 +140,7 @@ export function TradesSection({
                       : null;
                   const zoneUk =
                     executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
-                  const conviction = Number.isFinite(Number(t.conviction))
+                  const conviction = t.conviction !== null && t.conviction !== undefined && Number.isFinite(Number(t.conviction))
                     ? Number(t.conviction)
                     : null;
                   return (
@@ -205,7 +205,7 @@ export function TradesSection({
                   : null;
               const zoneUk =
                 executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
-              const conviction = Number.isFinite(Number(t.conviction))
+              const conviction = t.conviction !== null && t.conviction !== undefined && Number.isFinite(Number(t.conviction))
                 ? Number(t.conviction)
                 : null;
               return (
