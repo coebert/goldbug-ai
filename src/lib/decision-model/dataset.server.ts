@@ -274,12 +274,12 @@ function alignUnits(fill: number, close: number): number | null {
 async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
   type FillRow = {
     symbol: string;
-    side: string;
+    side: "buy" | "sell";
     date: string;
-    notional: number;
-    feeBps: number;
+    quantity: number;
     price: number;
-    invoiced: boolean;
+    /** Itemised broker charges in the instrument's currency, when invoiced. */
+    invoicedCharge: number | null;
   };
   const fills: FillRow[] = [];
 
@@ -295,26 +295,24 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
     for (const r of data ?? []) {
       const qty = Math.abs(Number(r.quantity) || 0);
       const px = Number(r.fill_price) || 0;
-      const notional = qty * px;
-      if (!(notional > 0)) continue;
+      if (!(qty > 0) || !(px > 0)) continue;
 
-      // Prefer the broker's itemised charges; fall back to the modelled fee.
+      // The broker's itemised contract note, when it has actually been synced.
       const parts = [r.fee_commission, r.fee_exchange, r.fee_tax, r.fee_other]
         .map((v) => Math.abs(Number(v) || 0))
         .reduce((a, b) => a + b, 0);
       const source = String(r.fee_source ?? "").toLowerCase();
-      const invoiced = parts > 0 && source !== "" && source !== "none" && source !== "modelled";
-      const fee = invoiced ? parts : Math.abs(Number(r.fee) || 0);
+      const synced = source !== "" && source !== "none" && source !== "modelled";
+      const charge = parts > 0 ? parts : Math.abs(Number(r.fee) || 0);
 
       const at = r.filled_at ? new Date(r.filled_at as string) : null;
       fills.push({
         symbol: baseSymbol(String(r.symbol ?? "")),
         side: String(r.side ?? "").toLowerCase() === "sell" ? "sell" : "buy",
         date: at && !Number.isNaN(at.getTime()) ? at.toISOString().slice(0, 10) : "",
-        notional,
-        feeBps: (fee / notional) * 10_000,
+        quantity: qty,
         price: px,
-        invoiced,
+        invoicedCharge: synced && charge > 0 ? charge : null,
       });
     }
     if ((data?.length ?? 0) < 1000) break;
@@ -344,22 +342,49 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
     }
   }
 
-  const bySide = new Map<string, SideCost & { feeW: number; slips: number[] }>();
-  const allFee: number[] = [];
+  const bySide = new Map<string, { fills: number; chargeW: number; chargeBps: number; slips: number[] }>();
+  const allCharge: number[] = [];
   const allSlip: number[] = [];
   let invoicedFills = 0;
   let slippageFills = 0;
 
   for (const f of fills) {
-    if (f.invoiced) invoicedFills++;
     const key = `${f.symbol}|${f.side}`;
-    const cur = bySide.get(key) ?? { feeBps: 0, slipBps: 0, fills: 0, feeW: 0, slips: [] };
+    const cur = bySide.get(key) ?? { fills: 0, chargeW: 0, chargeBps: 0, slips: [] };
     cur.fills++;
-    cur.feeW += f.notional;
-    cur.feeBps += f.feeBps * f.notional;
 
     const rawClose = f.date ? closeByKey.get(`${f.symbol}|${f.date}`) : undefined;
     const close = rawClose === undefined ? null : alignUnits(f.price, rawClose);
+
+    // Charges as a rate. Invoiced when the contract note is in; otherwise the
+    // same tiered commission / stamp duty / levy schedule the live gate prices
+    // every ticket with — applied to the real fill size, so a small ticket
+    // carries the fixed floor it genuinely pays.
+    const notionalNative = f.quantity * f.price;
+    let chargeBps: number;
+    if (f.invoicedCharge !== null) {
+      invoicedFills++;
+      chargeBps = (f.invoicedCharge / notionalNative) * 10_000;
+    } else {
+      // Commission floors are set in major currency units; LSE prices are in
+      // pence, so convert before pricing the ticket or the floor disappears.
+      const pence = isPenceQuoted(f.symbol, f.price, rawClose ?? null, close);
+      const priceMajor = pence ? f.price / 100 : f.price;
+      const modelled = estimateTradeCosts({
+        symbol: f.symbol,
+        side: f.side,
+        quantity: f.quantity,
+        price: priceMajor,
+        assetClass: null,
+      });
+      chargeBps = Number.isFinite(modelled.oneWayBps) ? modelled.oneWayBps : DEFAULT_ONE_WAY_COST_BPS;
+    }
+    if (Number.isFinite(chargeBps) && chargeBps >= 0 && chargeBps <= MAX_ONE_WAY_BPS) {
+      cur.chargeW += notionalNative;
+      cur.chargeBps += chargeBps * notionalNative;
+      allCharge.push(chargeBps);
+    }
+
     if (close !== null) {
       const signed = f.side === "buy" ? f.price - close : close - f.price;
       const bps = (signed / close) * 10_000;
@@ -370,21 +395,20 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
       }
     }
     bySide.set(key, cur);
-    if (Number.isFinite(f.feeBps) && f.feeBps >= 0 && f.feeBps < MAX_ONE_WAY_BPS) allFee.push(f.feeBps);
   }
 
-  const accountFee = median(allFee) ?? DEFAULT_ONE_WAY_COST_BPS;
+  const accountCharge = median(allCharge) ?? DEFAULT_ONE_WAY_COST_BPS;
   // Slippage is two-sided noise around a real average cost; the median keeps a
   // single bad print from setting the price of every future trade.
   const accountSlip = Math.max(0, median(allSlip) ?? 0);
-  const accountOneWay = Math.min(MAX_ONE_WAY_BPS, accountFee + accountSlip);
+  const accountOneWay = Math.min(MAX_ONE_WAY_BPS, accountCharge + accountSlip);
 
   const sideCost = (symbol: string, side: string): number => {
     const v = bySide.get(`${symbol}|${side}`);
     if (!v || v.fills === 0) return accountOneWay;
-    const fee = v.feeW > 0 ? v.feeBps / v.feeW : accountFee;
+    const charge = v.chargeW > 0 ? v.chargeBps / v.chargeW : accountCharge;
     const slip = Math.max(0, median(v.slips) ?? accountSlip);
-    const own = fee + slip;
+    const own = charge + slip;
     // Shrink a thin sample toward what the account pays on average.
     const w = v.fills / (v.fills + COST_SHRINK_FILLS);
     return Math.min(MAX_ONE_WAY_BPS, w * own + (1 - w) * accountOneWay);
@@ -401,6 +425,7 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
       fills: buys + sells,
     });
   }
+
 
   return {
     bySymbol,
