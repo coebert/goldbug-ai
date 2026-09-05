@@ -180,16 +180,44 @@ export function BacktestVsRealCard({
                 tone={c.moneyLost < 0 ? "down" : "up"}
               />
               <Stat
-                label="Broker fees paid"
-                value={money(c.fees, currency)}
-                sub={`${c.feesBps.toFixed(0)}bps of start${
+                label="Dealing cost paid"
+                value={money(c.costBreakdown.total, currency)}
+                sub={`${c.totalCostsBps.toFixed(0)}bps of start${
                   c.feeShareOfGap != null
                     ? ` · ${(c.feeShareOfGap * 100).toFixed(0)}% of the gap`
                     : ""
                 }`}
-                tone={c.fees > 0 ? "down" : "flat"}
+                tone={c.costBreakdown.total > 0 ? "down" : "flat"}
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat
+                label="Commission"
+                value={money(c.costBreakdown.commission, currency)}
+                sub={c.costBreakdown.invoiced ? "billed by the broker" : "modelled"}
+                tone={c.costBreakdown.commission > 0 ? "down" : "flat"}
+              />
+              <Stat
+                label="Stamp duty & levies"
+                value={money(c.costBreakdown.tax, currency)}
+                sub="transaction tax on buys"
+                tone={c.costBreakdown.tax > 0 ? "down" : "flat"}
+              />
+              <Stat
+                label="Exchange & other"
+                value={money(c.costBreakdown.exchange + c.costBreakdown.other, currency)}
+                sub="venue and unitemised charges"
+                tone={c.costBreakdown.exchange + c.costBreakdown.other > 0 ? "down" : "flat"}
+              />
+              <Stat
+                label="Slippage"
+                value={money(c.costBreakdown.slippage, currency)}
+                sub="filled worse than intended"
+                tone={c.costBreakdown.slippage > 0 ? "down" : "flat"}
+              />
+            </div>
+
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <Stat

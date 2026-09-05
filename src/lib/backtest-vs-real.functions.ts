@@ -132,7 +132,9 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
       };
     }
 
-    const [{ data: snaps, error: snapErr }, { data: funds }, { data: fills }] = await Promise.all([
+    const [{ data: snaps, error: snapErr }, { data: funds }, { data: fills }, { data: orders }] =
+      await Promise.all([
+
       supabase
         .from("equity_snapshots")
         .select("snapshot_date, total_value, cash, holdings_value")
@@ -144,8 +146,15 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
         .eq("portfolio_id", data.portfolioId),
       supabase
         .from("live_fills")
-        .select("filled_at, created_at, fee")
+        .select(
+          "order_id, symbol, side, quantity, fill_price, filled_at, created_at, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source",
+        )
         .eq("portfolio_id", data.portfolioId),
+      supabase
+        .from("live_orders")
+        .select("id, limit_price")
+        .eq("portfolio_id", data.portfolioId),
+
     ]);
     if (snapErr) throw new Error(snapErr.message);
 
@@ -169,10 +178,45 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
       value: r.adjusted,
     }));
 
-    const fees = (fills ?? []).map((f) => ({
-      date: String(f.filled_at ?? f.created_at ?? "").slice(0, 10),
-      amount: Number(f.fee ?? 0),
-    }));
+    // Intended price per order, so an adverse fill can be priced as slippage.
+    const intended = new Map<string, number>();
+    for (const o of orders ?? []) {
+      const want = Number(o.limit_price ?? 0);
+      if (Number.isFinite(want) && want > 0) intended.set(String(o.id), want);
+    }
+
+    const fees = (fills ?? []).map((f) => {
+      const commission = Number(f.fee_commission ?? 0);
+      const tax = Number(f.fee_tax ?? 0);
+      const exchange = Number(f.fee_exchange ?? 0);
+      const other = Number(f.fee_other ?? 0);
+      const itemised = commission + tax + exchange + other;
+      // `fee` is the broker's headline charge; when the itemised columns are
+      // richer (stamp duty synced separately) take whichever is larger so tax
+      // is never dropped from the total.
+      const amount = Math.max(Math.abs(Number(f.fee ?? 0)), Math.abs(itemised));
+
+      const want = intended.get(String(f.order_id ?? ""));
+      const got = Number(f.fill_price ?? 0);
+      const qty = Math.abs(Number(f.quantity ?? 0));
+      let slippage = 0;
+      if (want && Number.isFinite(got) && got > 0 && qty > 0) {
+        const adverse = String(f.side) === "sell" ? want - got : got - want;
+        if (adverse > 0) slippage = adverse * qty;
+      }
+
+      return {
+        date: String(f.filled_at ?? f.created_at ?? "").slice(0, 10),
+        amount,
+        commission,
+        tax,
+        exchange,
+        other,
+        slippage,
+        invoiced: Boolean(f.fee_source && f.fee_source !== "none" && f.fee_source !== "modelled"),
+      };
+    });
+
 
     const comparison = compareBacktestToReal({
       backtest: backtestCurve,

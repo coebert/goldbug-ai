@@ -77,8 +77,33 @@ export type BacktestVsReal = {
   fees: number;
   /** Fees as basis points of startEquity. */
   feesBps: number;
+  /**
+   * Realised cost of dealing inside the shared window, split out so the gap
+   * can be read against what the broker and HMRC actually took.
+   */
+  costBreakdown: {
+    /** Commission / brokerage. */
+    commission: number;
+    /** Stamp duty, PTM levy and any other transaction tax. */
+    tax: number;
+    /** Exchange and clearing charges. */
+    exchange: number;
+    /** Anything the broker charged that isn't one of the above. */
+    other: number;
+    /** Adverse price movement between the intended price and the fill. */
+    slippage: number;
+    /** commission + tax + exchange + other (i.e. `fees`). */
+    fees: number;
+    /** fees + slippage. */
+    total: number;
+    /** True when at least one fill carries an invoiced (not modelled) charge. */
+    invoiced: boolean;
+  };
+  /** costBreakdown.total as basis points of startEquity. */
+  totalCostsBps: number;
   /** How much of the return gap the fees explain, as a share 0..1 (null if no gap). */
   feeShareOfGap: number | null;
+
   /** Number of shared days compared. */
   days: number;
   /** Inclusive shared window. */
@@ -134,7 +159,19 @@ export const EMPTY_COMPARISON: BacktestVsReal = {
   startEquity: 0,
   fees: 0,
   feesBps: 0,
+  costBreakdown: {
+    commission: 0,
+    tax: 0,
+    exchange: 0,
+    other: 0,
+    slippage: 0,
+    fees: 0,
+    total: 0,
+    invoiced: false,
+  },
+  totalCostsBps: 0,
   feeShareOfGap: null,
+
   days: 0,
   from: null,
   to: null,
@@ -237,7 +274,17 @@ export function curveStats(values: number[]): CurveStats {
 export function compareBacktestToReal(input: {
   backtest: CurvePoint[];
   real: CurvePoint[];
-  fees?: Array<{ date: string; amount: number }>;
+  fees?: Array<{
+    date: string;
+    amount: number;
+    commission?: number | null;
+    tax?: number | null;
+    exchange?: number | null;
+    other?: number | null;
+    slippage?: number | null;
+    invoiced?: boolean;
+  }>;
+
 }): BacktestVsReal {
   const bt = byDay(input.backtest ?? []);
   const rl = byDay(input.real ?? []);
@@ -303,12 +350,33 @@ export function compareBacktestToReal(input: {
   }
 
 
-  const fees = (input.fees ?? [])
-    .filter((f) => {
-      const d = dayKey(f.date);
-      return d >= from && d <= to;
-    })
-    .reduce((s, f) => s + (Number.isFinite(f.amount) ? Math.abs(Number(f.amount)) : 0), 0);
+  const windowFees = (input.fees ?? []).filter((f) => {
+    const d = dayKey(f.date);
+    return d >= from && d <= to;
+  });
+  const abs = (v: unknown) => (Number.isFinite(Number(v)) ? Math.abs(Number(v)) : 0);
+  const commission = windowFees.reduce((s, f) => s + abs(f.commission), 0);
+  const tax = windowFees.reduce((s, f) => s + abs(f.tax), 0);
+  const exchange = windowFees.reduce((s, f) => s + abs(f.exchange), 0);
+  const other = windowFees.reduce((s, f) => s + abs(f.other), 0);
+  const slippage = windowFees.reduce((s, f) => s + abs(f.slippage), 0);
+  const fees = windowFees.reduce((s, f) => s + abs(f.amount), 0);
+  const invoiced = windowFees.some((f) => f.invoiced === true);
+  // When the broker hasn't itemised a ticket yet, the modelled total still
+  // counts — it just can't be split, so it lands in `other`.
+  const itemised = commission + tax + exchange + other;
+  const unitemised = Math.max(0, fees - itemised);
+  const costBreakdown = {
+    commission,
+    tax,
+    exchange,
+    other: other + unitemised,
+    slippage,
+    fees,
+    total: fees + slippage,
+    invoiced,
+  };
+
 
   const returnGapPct = realStats.totalReturnPct - backtestStats.totalReturnPct;
   const pnlGap = moneyLost;
@@ -330,7 +398,10 @@ export function compareBacktestToReal(input: {
     startEquity,
     fees,
     feesBps,
+    costBreakdown,
+    totalCostsBps: startEquity > 0 ? (costBreakdown.total / startEquity) * 10_000 : 0,
     feeShareOfGap,
+
     days: shared.length,
     from,
     to,
