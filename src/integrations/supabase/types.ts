@@ -3631,6 +3631,48 @@ export type Database = {
         }
         Relationships: []
       }
+      symbol_risk_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          max_position_pct: number | null
+          min_signal_strength: number | null
+          note: string | null
+          paused: boolean
+          stop_loss_pct: number | null
+          symbol: string
+          take_profit_pct: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_position_pct?: number | null
+          min_signal_strength?: number | null
+          note?: string | null
+          paused?: boolean
+          stop_loss_pct?: number | null
+          symbol: string
+          take_profit_pct?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_position_pct?: number | null
+          min_signal_strength?: number | null
+          note?: string | null
+          paused?: boolean
+          stop_loss_pct?: number | null
+          symbol?: string
+          take_profit_pct?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       symbol_signal_strength: {
         Row: {
           computed_at: string
