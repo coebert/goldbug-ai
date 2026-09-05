@@ -90,6 +90,8 @@ function evidenceFor(samples: Sample[], featureIndex: number): FeatureEvidence |
   }
 
   const cells: Array<{ ys: number[] }> = Array.from({ length: QUANTILES }, () => ({ ys: [] }));
+  let daysWithSpread = 0;
+  let daysSeen = 0;
 
   for (const rows of byDate.values()) {
     const usable = rows.filter((r) => {
@@ -97,6 +99,14 @@ function evidenceFor(samples: Sample[], featureIndex: number): FeatureEvidence |
       return x !== null && Number.isFinite(x) && Number.isFinite(r.y);
     });
     if (usable.length < QUANTILES) continue;
+    daysSeen++;
+    // Book-level features (cash share, drawdown) are identical for every
+    // candidate on a day. Ranking ties would hand the quintiles out by list
+    // order and manufacture an edge out of nothing, so those days are skipped
+    // and a feature that is flat on most days is dropped entirely below.
+    const distinct = new Set(usable.map((r) => r.x[featureIndex] as number));
+    if (distinct.size < QUANTILES) continue;
+    daysWithSpread++;
     const dayMean = mean(usable.map((r) => r.y));
     const ordered = [...usable].sort((a, b) => (a.x[featureIndex] as number) - (b.x[featureIndex] as number));
     ordered.forEach((r, i) => {
@@ -104,6 +114,9 @@ function evidenceFor(samples: Sample[], featureIndex: number): FeatureEvidence |
       cells[q]!.ys.push((r.y - dayMean) * 10_000);
     });
   }
+
+  if (!daysSeen || daysWithSpread / daysSeen < 0.5) return null;
+
 
   const filled = cells.map((c, i) => {
     const m = mean(c.ys);
