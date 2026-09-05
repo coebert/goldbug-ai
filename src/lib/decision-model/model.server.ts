@@ -335,7 +335,9 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
     .map((d) => `${labelOf(d.k)} ${d.c >= 0 ? "+" : ""}${d.c.toFixed(4)}`)
     .join("; ");
 
+  const m = model.metrics.test;
   const cov = model.coverage;
+
   const labelLine =
     cov.label_mode === "price"
       ? `the realised ${model.horizon_days}-day forward return`
