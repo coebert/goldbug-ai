@@ -420,6 +420,27 @@ export async function runDailyTick(
   );
   const priceMap = await currentPrices(universePriceSyms, asOf);
 
+  // Real-time overlay: replace the daily closes with live ticks (broker tape
+  // first) so valuation, sizing and the AI prompt all see what the market is
+  // quoting right now instead of the price our last trade printed at.
+  // Historical replays stay on the tape of the day being replayed.
+  const { applyLiveQuotesToPriceMap } = await import("./trading-engine/live-price-overlay.server");
+  const liveOverlay = await applyLiveQuotesToPriceMap({
+    priceMap,
+    symbols: universePriceSyms,
+    preferBrokerFor: [...heldSymbols, ...universePriceSyms],
+    portfolioId,
+    skip: isHistoricalRun,
+  }).catch((e) => {
+    srvLog.warn("live price overlay failed", e);
+    return null;
+  });
+  if (liveOverlay && liveOverlay.applied.length > 0) {
+    srvLog.info(
+      `[trading-engine] live prices: ${liveOverlay.applied.length}/${liveOverlay.requested} re-priced (${liveOverlay.fromBroker} broker) as of ${liveOverlay.asOf ?? "n/a"}`,
+    );
+  }
+
   const cash = Number(portfolio.current_cash);
   // Track how much of the book had no live quote and was valued off cost
   // basis. A large unpriced share means the NAV is a guess — risk halts must
