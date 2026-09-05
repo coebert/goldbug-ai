@@ -76,32 +76,30 @@ function DecisionModelPage() {
   return (
     <>
       <AppHeader />
-      <PageShell>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-              <Brain className="h-6 w-6 text-primary" aria-hidden />
-              Learned decision model
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Built from your own history: every signal snapshot the AI was shown on a past day, matched
-              against what the price actually did next. The weights below are measured, not assumed.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => refit.mutate(true)}
-              disabled={refit.isPending}
-            >
+      <PageShell
+        title={
+          <span className="flex items-center gap-2">
+            <Brain className="h-6 w-6 text-primary" aria-hidden />
+            Learned decision model
+          </span>
+        }
+        purpose="Built from your own history: every signal snapshot the AI was shown on a past day, matched against what the price actually did next. The weights below are measured, not assumed."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => refit.mutate(true)} disabled={refit.isPending}>
               Refit on real trades only
             </Button>
             <Button onClick={() => refit.mutate(false)} disabled={refit.isPending}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${refit.isPending ? "animate-spin" : ""}`} aria-hidden />
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${refit.isPending ? "animate-spin" : ""}`}
+                aria-hidden
+              />
               {refit.isPending ? "Fitting…" : "Refit on all history"}
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      >
+
 
         {message ? (
           <Card className="mt-4 border-primary/30">
