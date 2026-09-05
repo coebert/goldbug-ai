@@ -127,9 +127,17 @@ function PnlDashboard() {
     queryKey: ["pnl", "compare", selectedId, runId],
     queryFn: () => fetchCompare({ data: { portfolioId: selectedId!, runId } }),
     enabled: Boolean(selectedId),
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
   });
   const c = q.data;
+
+  // Refresh the comparison the moment the broker reports a new fill or an
+  // order changes state, so the chart tracks real money as it happens.
+  const stream = useLiveFillStream(selectedId, () => {
+    void q.refetch();
+  });
+  const updatedAt = q.dataUpdatedAt ? new Date(q.dataUpdatedAt) : null;
 
   const chart = useMemo(
     () =>
