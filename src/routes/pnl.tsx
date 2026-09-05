@@ -31,6 +31,7 @@ import { listPortfolios } from "@/lib/portfolios.functions";
 import { getBacktestVsReal } from "@/lib/backtest-vs-real.functions";
 import { verdictFor } from "@/lib/backtest-vs-real";
 import { formatUk } from "@/lib/uk-time";
+import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
@@ -127,9 +128,17 @@ function PnlDashboard() {
     queryKey: ["pnl", "compare", selectedId, runId],
     queryFn: () => fetchCompare({ data: { portfolioId: selectedId!, runId } }),
     enabled: Boolean(selectedId),
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
   });
   const c = q.data;
+
+  // Refresh the comparison the moment the broker reports a new fill or an
+  // order changes state, so the chart tracks real money as it happens.
+  const stream = useLiveFillStream(selectedId, () => {
+    void q.refetch();
+  });
+  const updatedAt = q.dataUpdatedAt ? new Date(q.dataUpdatedAt) : null;
 
   const chart = useMemo(
     () =>
@@ -196,6 +205,22 @@ function PnlDashboard() {
             {cost && (
               <Badge variant={cost.invoiced ? "default" : "outline"} className="text-[11px]">
                 {cost.invoiced ? "Charges invoiced by the broker" : "Charges estimated from the tariff"}
+              </Badge>
+            )}
+            {selectedId && (
+              <Badge variant="outline" className="gap-1.5 text-[11px]">
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${
+                    stream.connected ? "bg-emerald-500" : "bg-muted-foreground"
+                  } ${q.isFetching ? "animate-pulse" : ""}`}
+                />
+                {stream.connected ? "Live" : "Reconnecting"}
+                {updatedAt
+                  ? ` · updated ${formatUk(updatedAt.toISOString(), { timeStyle: "short" })}`
+                  : ""}
+                {stream.events > 0
+                  ? ` · ${stream.events} fill update${stream.events === 1 ? "" : "s"}`
+                  : ""}
               </Badge>
             )}
           </div>
