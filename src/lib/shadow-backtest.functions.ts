@@ -69,8 +69,38 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       .single();
     if (liveErr || !live) throw new Error("Portfolio not found");
 
-    const dates = businessDaysEndingYesterday(data.days);
+    let dates = businessDaysEndingYesterday(data.days);
+    if (data.full_history) {
+      // Earliest day the book has any recorded life.
+      const [{ data: snap0 }, { data: trade0 }] = await Promise.all([
+        supabase
+          .from("equity_snapshots")
+          .select("snapshot_date")
+          .eq("portfolio_id", data.portfolio_id)
+          .order("snapshot_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("trades")
+          .select("trade_date")
+          .eq("portfolio_id", data.portfolio_id)
+          .order("trade_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const candidates = [snap0?.snapshot_date, trade0?.trade_date]
+        .filter(Boolean)
+        .map((d) => String(d).slice(0, 10))
+        .sort();
+      const start = candidates[0];
+      if (start) {
+        const yesterday = businessDaysEndingYesterday(1)[0]!;
+        const full = businessDaysBetween(start, yesterday);
+        if (full.length >= 3) dates = full;
+      }
+    }
     const from = dates[0]!;
+
 
     // Start the shadow book on the live book's own equity at the window start,
     // so the two curves are measured on the same money.
