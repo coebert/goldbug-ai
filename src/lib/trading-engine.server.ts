@@ -3338,6 +3338,23 @@ export async function runDailyTick(
       })),
       signals: features,
       policy_regime: policyRegime,
+      // Which learned/historical inputs actually made it into this decision's
+      // prompt — the audit trail against silent forgetting. If the AI was
+      // called, every true here was in its context; a false means that input
+      // was unavailable (or the tick was too quiet to pay for an opinion).
+      learning_inputs: {
+        ai_called: !skipAiForQuietTick && !breakerTripped && !allVenuesClosed,
+        account_playbook: playbookBlock != null,
+        learned_model: modelBlock != null,
+        macro_history_playbook: macroPlaybookBlock != null,
+        book_risk_profile: riskProfileBlock != null,
+        loss_memory: lossMemoryBlock != null,
+        exec_post_lessons: (execLessons?.lessons?.length ?? 0) > 0,
+        insider_lessons: insiderBlock != null,
+        policy_remarks: policyBlock != null,
+        measured_round_trip_bps: measuredRoundTripBps,
+        attribution: attribution != null,
+      },
       materiality: materiality
         ? {
             fingerprint: materiality.fingerprint,
