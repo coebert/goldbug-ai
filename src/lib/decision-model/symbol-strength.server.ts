@@ -128,15 +128,74 @@ export async function computeAndStoreSymbolStrengths(args: {
     .from("symbol_signal_strength")
     .upsert([...deduped.values()], { onConflict: "user_id,symbol_key,horizon_days" });
 
+  // Same evidence, grouped by market and time of day: crypto, forex and
+  // equities each get their own track record, split into London-time
+  // sessions, so the AI can weight each market differently at different
+  // hours. Rebuilt history rows (no timestamp) feed the all-day cells only.
+  const assetClassBySymbol = new Map(
+    UNIVERSE.map((u) => [u.symbol.toUpperCase(), u.asset_class as string]),
+  );
+  const marketRows = summariseMarketStrengths({ observations: allObs, assetClassBySymbol });
+  const { error: marketError } = await supabaseAdmin.from("market_signal_strength").upsert(
+    marketRows.map((r) => ({
+      user_id: args.userId,
+      market: r.market,
+      session: r.session,
+      horizon_days: horizonDays,
+      samples: r.strength.samples,
+      dates: r.strength.dates,
+      hit_rate: r.strength.hitRate,
+      mean_net_bps: r.strength.meanNetBps,
+      ic: r.strength.ic,
+      t_stat: r.strength.tStat,
+      strength: r.strength.strength,
+      from_date: r.strength.from,
+      to_date: r.strength.to,
+      computed_at: now,
+      updated_at: now,
+    })),
+    { onConflict: "user_id,market,session,horizon_days" },
+  );
+
+  const firstError = error ?? marketError;
   return {
-    ok: !error,
-    ...(error ? { error: error.message } : {}),
+    ok: !firstError,
+    ...(firstError ? { error: firstError.message } : {}),
     horizonDays,
     rows,
     from: ds.from,
     to: ds.to,
     modelScored: Boolean(coefs),
+    marketRows,
   };
+}
+
+/** Stored market × session strengths, for cheap live lookups. */
+export async function loadMarketStrengths(
+  userId: string,
+  horizonDays = 5,
+): Promise<MarketStrength[]> {
+  const { data } = await supabaseAdmin
+    .from("market_signal_strength")
+    .select("market, session, samples, dates, hit_rate, mean_net_bps, ic, t_stat, strength, from_date, to_date")
+    .eq("user_id", userId)
+    .eq("horizon_days", horizonDays);
+  return (data ?? []).map((r) => ({
+    market: r.market as MarketStrength["market"],
+    session: r.session as MarketStrength["session"],
+    strength: {
+      symbol: `${r.market} ${r.session}`,
+      samples: Number(r.samples) || 0,
+      dates: Number(r.dates) || 0,
+      hitRate: r.hit_rate == null ? null : Number(r.hit_rate),
+      meanNetBps: r.mean_net_bps == null ? null : Number(r.mean_net_bps),
+      ic: r.ic == null ? null : Number(r.ic),
+      tStat: r.t_stat == null ? null : Number(r.t_stat),
+      strength: Number(r.strength) || 0,
+      from: r.from_date == null ? null : String(r.from_date),
+      to: r.to_date == null ? null : String(r.to_date),
+    },
+  }));
 }
 
 /** Stored strengths keyed by base symbol, for cheap live lookups. */
