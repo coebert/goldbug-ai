@@ -1133,7 +1133,18 @@ export async function runDailyTick(
         book,
         ctx,
       );
-      return formatModelBlock(model, scores);
+      // Per-symbol track record: how reliably each name's signals have
+      // predicted this book's own cost-adjusted results. Passing it in
+      // re-orders the ranking so the AI works the strongest evidence first.
+      let strengths: Map<string, import("./decision-model/symbol-strength").SymbolStrength> | null =
+        null;
+      try {
+        const { loadSymbolStrengths } = await import("./decision-model/symbol-strength.server");
+        strengths = await loadSymbolStrengths(userId, model.horizon_days);
+      } catch (e) {
+        srvLog.warn("symbol signal strengths unavailable for prompt", e);
+      }
+      return formatModelBlock(model, scores, strengths);
     } catch (e) {
       srvLog.warn("learned model scoring unavailable for prompt", e);
       return null;

@@ -45,7 +45,7 @@
 
 ## Open
 - Conviction-tiered sizing: small stake on strong signal, full stake on very strong signal.
-- Daily comparison: model's top picks vs rule set (names + sizes that differ).
+- [x] Daily comparison: model's top picks vs rule set (names + sizes that differ), ordered by each symbol's measured historical signal strength.
 - Per-symbol measured round-trip cost from fills/slippage, surfaced in the AI prompt.
 - P&L comparison chart: real vs shadow backtest, net of fees and taxes.
 - Shadow backtest must actually trade (currently zero new positions).

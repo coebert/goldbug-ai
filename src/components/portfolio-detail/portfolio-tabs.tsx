@@ -12,6 +12,7 @@ const TABS = [
   { to: "/portfolio/$id/risk", label: "Risk" },
   { to: "/portfolio/$id/performance", label: "Performance" },
   { to: "/portfolio/$id/daily-pnl", label: "Daily P&L" },
+  { to: "/portfolio/$id/daily-comparison", label: "Picks vs rules" },
   { to: "/portfolio/$id/attribution", label: "Attribution" },
   { to: "/portfolio/$id/analytics", label: "Analytics" },
   { to: "/portfolio/$id/optimizer", label: "Optimizer" },
