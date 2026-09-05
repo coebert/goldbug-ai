@@ -20,6 +20,7 @@
 // Pure and I/O-free: the caller supplies bars.
 
 import { planAdmissions, governorForNav, type GovernorCandidate } from "../cost-governor";
+import { assessNetEdge } from "../net-edge-gate";
 import {
   priceTicket,
   resolveAssumptions,
@@ -86,6 +87,16 @@ export type ReplayOptions = {
    * window's return, drawdown and friction.
    */
   tradeFromIndex?: number;
+  /**
+   * Measured round-trip cost floor (bps of notional) applied to every buy
+   * through the net-of-cost edge gate, exactly as the live engine applies the
+   * account's fill-measured cost. 0 / undefined = modelled friction only.
+   */
+  netEdgeFloorBps?: number;
+  /** Safety multiple the expected move must clear the floor by (default 1.5). */
+  edgeSafetyMultiple?: number;
+  /** Set false to bypass the net-edge gate entirely. */
+  netEdgeGate?: boolean;
 };
 
 export type ReplayTrade = {
@@ -152,6 +163,20 @@ function sma(values: number[], end: number, n: number): number | null {
   return s / n;
 }
 
+/** Mean absolute daily return over the last n bars, as a fraction of price. */
+function atrPct(values: number[], end: number, n = 14): number {
+  let sum = 0;
+  let k = 0;
+  for (let i = Math.max(1, end - n + 1); i <= end; i += 1) {
+    const a = values[i - 1];
+    const b = values[i];
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !a) continue;
+    sum += Math.abs(b! - a!) / a!;
+    k += 1;
+  }
+  return k > 0 ? sum / k : 0.015;
+}
+
 /** Simulate the FX funding leg for a foreign-currency buy. */
 export function simulateFxLeg(
   amountFrom: number,
@@ -213,6 +238,9 @@ export function runGovernorReplay(
   const assumptions = resolveAssumptions(opts.assumptions, DEFAULT_BACKTEST_PRESET);
   const tradeFrom = Math.max(0, Math.floor(opts.tradeFromIndex ?? 0));
   const foreign = new Set((opts.foreignSymbols ?? []).map((s) => s.toUpperCase()));
+  const gateOn = opts.netEdgeGate !== false;
+  const floorBps = Math.max(0, opts.netEdgeFloorBps ?? 0);
+  const safety = opts.edgeSafetyMultiple ?? 1.5;
 
   const symbols = Array.from(
     new Set(bars.flatMap((b) => Object.keys(b.closes))),
@@ -343,6 +371,34 @@ export function runGovernorReplay(
         assumptions,
       );
       const strength = slow > 0 ? Math.min(1, Math.max(0, (fast - slow) / slow) * 20) : 0;
+      if (gateOn) {
+        const edge = assessNetEdge({
+          symbol: s,
+          side: "buy",
+          quantity: qty,
+          price: px,
+          conviction: 0.55 + 0.4 * strength,
+          atrPct: atrPct(closes, i),
+          horizonDays: maxHold,
+          safetyMultiple: safety,
+          measuredRoundTripBps: floorBps > 0 ? floorBps : null,
+        });
+        if (!edge.pass) {
+          buysProposed += 1;
+          buysBlocked += 1;
+          const future = closes[Math.min(i + horizon, closes.length - 1)];
+          blocked.push({
+            date: bar.date,
+            symbol: s,
+            notional: realNotional,
+            reason: `net-edge gate: ${edge.reason ?? "blocked"}`,
+            forwardNetPnl: Number.isFinite(future)
+              ? qty * (future! - px) - (costs.roundTripBps / 10_000) * realNotional
+              : 0,
+          });
+          continue;
+        }
+      }
       candidates.push({
         symbol: s,
         side: "buy",
