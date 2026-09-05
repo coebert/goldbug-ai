@@ -28,6 +28,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Candle } from "../market-data.server";
 import { priceSymbolVariants } from "../price-symbol";
+import { estimateTradeCosts } from "../trade-viability-gate";
+import { inferSaxoCurrency } from "../saxo-fees";
 import {
   extractFeatureVector,
   FEATURE_KEYS,
@@ -271,6 +273,22 @@ function alignUnits(fill: number, close: number): number | null {
   return null; // too far apart to trust — skip this fill
 }
 
+/**
+ * True when the fill price is quoted in pence. UK closes are stored in pence,
+ * so when the fill agrees with the tape it is pence too; when the tape is a
+ * clean 100x above it, the fill was already booked in pounds.
+ */
+function isPenceQuoted(
+  symbol: string,
+  price: number,
+  rawClose: number | null,
+  alignedClose: number | null,
+): boolean {
+  if (inferSaxoCurrency(symbol) !== "GBP") return false;
+  if (rawClose !== null && alignedClose !== null) return Math.abs(alignedClose - rawClose) < 1e-9;
+  return price > 20; // no tape to compare with: UK pound prices above £20 are rare
+}
+
 async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
   type FillRow = {
     symbol: string;
@@ -430,7 +448,7 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
   return {
     bySymbol,
     medianBps: accountOneWay,
-    feeBps: Math.round(accountFee * 10) / 10,
+    feeBps: Math.round(accountCharge * 10) / 10,
     slippageBps: Math.round(accountSlip * 10) / 10,
     calibrated: bySymbol.size,
     fills: fills.length,
