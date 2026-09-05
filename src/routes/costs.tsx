@@ -81,7 +81,7 @@ function CostsDashboard() {
     rows.length > 0 ? rows.reduce((s, r) => s + r.roundTripBps, 0) / rows.length : null;
 
   return (
-    <PageShell>
+    <PageShell title="Dealing costs">
       <AppHeader />
       <main className="mx-auto w-full max-w-5xl space-y-6 px-4 pb-16">
         <header>
@@ -188,7 +188,7 @@ function CostsDashboard() {
                         )}
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {r.lastFillAt ? formatUk(r.lastFillAt, "d MMM") : "—"}
+                        {r.lastFillAt ? formatUk(r.lastFillAt, { day: "numeric", month: "short" }) : "—"}
                       </TableCell>
                     </TableRow>
                   ))}

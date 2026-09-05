@@ -24,6 +24,7 @@ import { Route as HedgeFallbacksRouteImport } from './routes/hedge-fallbacks'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as DecisionModelRouteImport } from './routes/decision-model'
 import { Route as DailyReportRouteImport } from './routes/daily-report'
+import { Route as CostsRouteImport } from './routes/costs'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -147,6 +148,11 @@ const DecisionModelRoute = DecisionModelRouteImport.update({
 const DailyReportRoute = DailyReportRouteImport.update({
   id: '/daily-report',
   path: '/daily-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CostsRoute = CostsRouteImport.update({
+  id: '/costs',
+  path: '/costs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompareRoute = CompareRouteImport.update({
@@ -422,6 +428,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
+  '/costs': typeof CostsRoute
   '/daily-report': typeof DailyReportRoute
   '/decision-model': typeof DecisionModelRoute
   '/get-started': typeof GetStartedRoute
@@ -488,6 +495,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
+  '/costs': typeof CostsRoute
   '/daily-report': typeof DailyReportRoute
   '/decision-model': typeof DecisionModelRoute
   '/get-started': typeof GetStartedRoute
@@ -555,6 +563,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
+  '/costs': typeof CostsRoute
   '/daily-report': typeof DailyReportRoute
   '/decision-model': typeof DecisionModelRoute
   '/get-started': typeof GetStartedRoute
@@ -623,6 +632,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/broker-blocks'
     | '/compare'
+    | '/costs'
     | '/daily-report'
     | '/decision-model'
     | '/get-started'
@@ -689,6 +699,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/broker-blocks'
     | '/compare'
+    | '/costs'
     | '/daily-report'
     | '/decision-model'
     | '/get-started'
@@ -755,6 +766,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/broker-blocks'
     | '/compare'
+    | '/costs'
     | '/daily-report'
     | '/decision-model'
     | '/get-started'
@@ -822,6 +834,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BrokerBlocksRoute: typeof BrokerBlocksRoute
   CompareRoute: typeof CompareRoute
+  CostsRoute: typeof CostsRoute
   DailyReportRoute: typeof DailyReportRoute
   DecisionModelRoute: typeof DecisionModelRoute
   GetStartedRoute: typeof GetStartedRoute
@@ -988,6 +1001,13 @@ declare module '@tanstack/react-router' {
       path: '/daily-report'
       fullPath: '/daily-report'
       preLoaderRoute: typeof DailyReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/costs': {
+      id: '/costs'
+      path: '/costs'
+      fullPath: '/costs'
+      preLoaderRoute: typeof CostsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compare': {
@@ -1342,6 +1362,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BrokerBlocksRoute: BrokerBlocksRoute,
   CompareRoute: CompareRoute,
+  CostsRoute: CostsRoute,
   DailyReportRoute: DailyReportRoute,
   DecisionModelRoute: DecisionModelRoute,
   GetStartedRoute: GetStartedRoute,
