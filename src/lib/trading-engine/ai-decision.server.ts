@@ -372,6 +372,7 @@ If no action is warranted, return an empty orders array.`;
           briefing: learned.briefing,
           rationale: learned.rationale,
           ai_unavailable: true,
+          model_used: "learned-model",
           orders: learned.orders as DecisionOutput["orders"],
         };
       }
@@ -429,6 +430,7 @@ If no action is warranted, return an empty orders array.`;
         briefing: heuristic.briefing,
         rationale: heuristic.rationale,
         ai_unavailable: true,
+        model_used: "heuristic",
         orders: heuristic.orders.map((o) =>
           o.side === "sell"
             ? {
@@ -456,6 +458,7 @@ If no action is warranted, return an empty orders array.`;
       console.warn(`Heuristic fallback failed — ${hMsg}`);
       return {
         ai_unavailable: true,
+        model_used: "none",
         briefing: `AI provider unavailable (${msg.slice(0, 120)}); heuristic fallback errored. Guardrail exits still applied.`,
         rationale: `AI gateway error: ${msg.slice(0, 200)}. Heuristic error: ${hMsg.slice(0, 200)}.`,
         orders: [],

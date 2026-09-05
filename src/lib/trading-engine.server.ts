@@ -3201,7 +3201,7 @@ export async function runDailyTick(
     run_date: asOf,
     briefing: decision.briefing,
     rationale: decision.rationale,
-    model: "google/gemini-2.5-flash",
+    model: decisionModelLabel,
     portfolio_value: newTotal,
     raw: asJson({
       orders: decision.orders,
@@ -3469,7 +3469,7 @@ export async function runDailyTick(
       userId: portfolio.user_id,
       decisionId,
       runDate: asOf,
-      model: "google/gemini-2.5-flash",
+      model: decisionModelLabel,
       mode: (portfolio.mode as string | null) ?? null,
 
       executed: executed.map((t) => ({
