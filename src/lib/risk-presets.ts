@@ -32,6 +32,10 @@ export type RiskDialConfig = {
    * bps a new position must earn back.
    */
   stamp_exempt_preference?: "off" | "balanced" | "strong";
+  /** Permit cash-funded bearish exposure through listed inverse ETFs. */
+  shorts_enabled: boolean;
+  /** Maximum total short-sleeve value as a fraction of NAV. */
+  short_sleeve_max_pct: number;
   risk_level?: number;
   /** Position-sizing multiplier applied to every buy budget (0.25–2). */
   size_multiplier?: number;
@@ -78,6 +82,8 @@ export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
   commodity_max_atr_pct: 0.06,
   fx_currency_limits: {},
   stamp_exempt_preference: "balanced",
+  shorts_enabled: true,
+  short_sleeve_max_pct: 0.5,
   atr_scaled_stop_enabled: true,
   initial_stop_atr_mult: 2.5,
   atr_scaled_stop_floor_pct: 0.03,

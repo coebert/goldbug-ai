@@ -256,8 +256,9 @@ export function formatShortSleeveBlock(args: {
   const room = Math.max(0, cap * nav - e.shortValue);
   const grossRoom = Math.max(0, nav - e.grossValue);
   const lines = [
-    "SHORT SLEEVE (cash-funded, inverse ETFs only — no margin, no borrowing):",
-    `  Available proxies: ${SHORT_PROXIES.map((p) => `${p.symbol} (${p.exposure})`).join(", ")}`,
+    "SHORT SLEEVE (cash-funded, inverse ETFs only — no margin, no borrowing, no naked stock shorts):",
+    `  Available proxies: ${SHORT_PROXIES.map((p) => `${p.symbol} (${p.exposure}; proxy for ${p.underlyings.join("/")})`).join(", ")}`,
+    `  How to take a short: place side=buy on the proxy, never side=sell on an unheld stock. A sell only closes something already held.`,
     `  Current: long ${((e.longValue / (nav || 1)) * 100).toFixed(0)}% NAV, short ${(e.shortPctNav * 100).toFixed(0)}% NAV, net ${(e.netPctNav * 100).toFixed(0)}%, gross ${(e.grossPctNav * 100).toFixed(0)}%`,
     `  Sleeve room: ${ccy} ${room.toFixed(0)} (cap ${(cap * 100).toFixed(0)}% NAV). Gross room: ${ccy} ${grossRoom.toFixed(0)} (longs + shorts may never exceed 100% NAV).`,
     `  Buy an inverse ETF only for a deliberate bearish or hedging view. They reset daily, so treat them as tactical (review by ${SHORT_PROXY_MAX_HOLD_DAYS} sessions), never buy-and-hold.`,

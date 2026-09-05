@@ -457,6 +457,9 @@ export async function runDailyTick(
   const affordabilityResult = filterUniverseByAffordability({
     fullUniverse, priceMap, heldSymbols, cash, totalValue,
     perSymbolCapPct, minTradeValue, currency: portfolio.currency,
+    // Shorts are expressed by buying these inverse ETFs. Keep them inside the
+    // model's candidate window even when the wider universe is truncated.
+    prioritySymbols: shortsEnabled ? SHORT_PROXIES.map((p) => p.symbol) : [],
   });
   const perSymbolBudget = affordabilityResult.perSymbolBudget;
   const droppedForCash = affordabilityResult.dropped;

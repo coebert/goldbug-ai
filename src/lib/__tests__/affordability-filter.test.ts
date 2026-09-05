@@ -152,4 +152,32 @@ describe("filterUniverseByAffordability", () => {
     expect(res.candidates.map((c) => c.symbol)).toEqual(["CHEAP", "MID", "EXP", "MEGA"]);
     expect(res.dropped).toEqual([]);
   });
+
+  it("keeps priority short proxies inside a truncated candidate window", () => {
+    const universe: UniverseSymbol[] = [
+      ...Array.from({ length: 24 }, (_, i) => ({
+        symbol: `STK${i + 1}`,
+        name: `Stock ${i + 1}`,
+        asset_class: "stock" as const,
+      })),
+      { symbol: "XUKS.L", name: "Inverse FTSE", asset_class: "etf" },
+      { symbol: "XSPS.L", name: "Inverse S&P", asset_class: "etf" },
+    ];
+    const prices = new Map(universe.map((u) => [u.symbol, 10]));
+    const res = filterUniverseByAffordability({
+      fullUniverse: universe,
+      priceMap: prices,
+      heldSymbols: [],
+      cash: 10_000,
+      totalValue: 10_000,
+      perSymbolCapPct: 0.15,
+      minTradeValue: 25,
+      currency: "GBP",
+      maxCandidates: 6,
+      prioritySymbols: ["XUKS.L", "XSPS.L"],
+    });
+
+    expect(res.candidates).toHaveLength(6);
+    expect(res.candidates.map((c) => c.symbol).slice(0, 2)).toEqual(["XUKS.L", "XSPS.L"]);
+  });
 });

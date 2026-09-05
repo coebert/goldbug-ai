@@ -76,10 +76,9 @@ export async function callAiForDecision(args: {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
   const gateway = createLovableAiGatewayProvider(key, { structuredOutputs: true });
-  // Current-generation decision model; the deprecated 2.5-flash stays only as
-  // a last-resort backup so a primary outage still gets a real AI decision.
-  const PRIMARY_MODEL = process.env.AI_DECISION_MODEL || "google/gemini-3.6-flash";
-  const BACKUP_MODEL = "google/gemini-2.5-flash";
+  // Workspace-standard decision model. Keep the identifier literal so the
+  // Decision model page records exactly what produced each decision.
+  const PRIMARY_MODEL = "openai/gpt-5.6-sol";
 
   const risk = riskProfile(args.portfolio.risk_level);
   const cfg = parseRiskConfig(args.portfolio.risk_config);
@@ -137,7 +136,8 @@ ${r.transitioned ? "Because the regime just shifted, explicitly reassess existin
 
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
-- No borrowing, no margin, no shorting, no leverage, no derivatives.
+- No borrowing, no margin, no naked shorting, no leverage, no CFDs, no options.
+- Bearish exposure is allowed ONLY through the SHORT SLEEVE below: buy one of the listed cash-funded inverse ETFs. Selling an unheld stock is rejected and never creates a short.
 - Cash balance must never go negative.
 - No single position may exceed ${(perSymbolCap * 100).toFixed(0)}% of portfolio value.
 - Keep at least ${(effectiveCashFloorPct(cfg, args.portfolio.risk_level) * 100).toFixed(0)}% of portfolio value in cash.
@@ -280,8 +280,9 @@ Return:
       sma_trend       — MA trend AND MACD histogram / crosses (grouped)
       rsi             — daily RSI-14 AND weekly RSI alignment
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
-      news_sentiment  — weighted LLM sentiment for this symbol, its typed event_features (catalysts from the MARKET-EVENT FEED), INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
+      news_sentiment  — weighted LLM sentiment for this symbol, its typed event_features (catalysts from the MARKET-EVENT FEED), INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL, a SHORT-SLEEVE proxy buy when the view is on that index, or skip.
       volatility      — 20d vol, ATR%, Bollinger width
+  To take a permitted short position, return side="buy" on XUKS.L (bearish FTSE 100) or XSPS.L (bearish S&P 500). There is no "short" side: SELL only reduces an existing holding and is rejected when nothing is held.
 - fx_intents (PREFERRED when the FX WALLET & EXPOSURE block is present): array of typed intents (kind = "pre_fund" | "hedge" | "sweep_idle" | "carry_tilt" | "close_hedge") — see the FX STRATEGY playbook for the required fields per kind. Guardrails (per-tick turnover, min notional, tilt-exposure cap) are applied server-side; oversized intents are trimmed rather than rejected. Reason MUST cite the numbered rule and its numeric trigger.
 - fx_conversions (LEGACY, discouraged unless no intent kind fits): array of { from_ccy, to_ccy, amount_percent (1..100 of the from-currency balance), reason }. Prefer fx_intents. Omit both if no FX action is warranted.
 If no action is warranted, return an empty orders array.`;
@@ -293,7 +294,7 @@ If no action is warranted, return an empty orders array.`;
   const attempts: Array<{ model: string; note: string }> = [
     { model: PRIMARY_MODEL, note: "primary" },
     { model: PRIMARY_MODEL, note: "retry" },
-    { model: BACKUP_MODEL, note: "backup" },
+    { model: PRIMARY_MODEL, note: "final retry" },
   ];
 
   let lastError: unknown = null;
@@ -304,7 +305,13 @@ If no action is warranted, return an empty orders array.`;
         system,
         prompt: user,
         output: Output.object({ schema: DecisionSchema }),
-        maxOutputTokens: 16_000,
+        providerOptions: {
+          lovable: {
+            // GPT-5.6 chat calls must explicitly disable reasoning; the gateway
+            // otherwise defaults it on and may reject structured decision calls.
+            reasoningEffort: "none",
+          },
+        },
         maxRetries: 0,
       });
       const output = await result.output;
