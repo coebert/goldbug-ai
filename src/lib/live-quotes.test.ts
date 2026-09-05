@@ -94,7 +94,7 @@ describe("applyLiveQuotes", () => {
       aboveSma50Pct: 100,
       advancersPct: 50,
     },
-    comparison: [],
+    comparison: { days: 90, series: [], keys: [] },
   };
 
   it("returns the pulse untouched when there are no ticks", () => {
