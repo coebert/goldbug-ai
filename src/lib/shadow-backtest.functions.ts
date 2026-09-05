@@ -12,21 +12,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const Input = z
-  .object({
-    portfolio_id: z.string().uuid(),
-    /** Trading days to replay, ending yesterday. */
-    days: z.number().int().min(3).max(45).default(30),
-    /** Keep the clone for inspection instead of deleting it. */
-    keep_clone: z.boolean().default(false),
-  })
-  .parse.bind(
-    z.object({
-      portfolio_id: z.string().uuid(),
-      days: z.number().int().min(3).max(45).default(30),
-      keep_clone: z.boolean().default(false),
-    }),
-  );
+const Shape = z.object({
+  portfolio_id: z.string().uuid(),
+  /** Trading days to replay, ending yesterday. Ignored when full_history. */
+  days: z.number().int().min(3).max(400).default(30),
+  /**
+   * Replay every day the book has existed (from its first equity snapshot or
+   * first trade) instead of a fixed trailing window.
+   */
+  full_history: z.boolean().default(false),
+  /** Keep the clone for inspection instead of deleting it. */
+  keep_clone: z.boolean().default(false),
+});
+const Input = Shape.parse.bind(Shape);
 
 function businessDaysEndingYesterday(count: number): string[] {
   const dates: string[] = [];
@@ -34,13 +32,27 @@ function businessDaysEndingYesterday(count: number): string[] {
   cursor.setUTCHours(0, 0, 0, 0);
   cursor.setUTCDate(cursor.getUTCDate() - 1);
   let guard = 0;
-  while (dates.length < count && guard++ < 400) {
+  while (dates.length < count && guard++ < 1200) {
     const dow = cursor.getUTCDay();
     if (dow !== 0 && dow !== 6) dates.unshift(cursor.toISOString().slice(0, 10));
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
   return dates;
 }
+
+function businessDaysBetween(fromDate: string, toDate: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${fromDate}T00:00:00Z`);
+  const end = new Date(`${toDate}T00:00:00Z`);
+  let guard = 0;
+  while (cursor <= end && guard++ < 3000) {
+    const dow = cursor.getUTCDay();
+    if (dow !== 0 && dow !== 6) dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
 
 export const runShadowBacktest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -57,8 +69,38 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       .single();
     if (liveErr || !live) throw new Error("Portfolio not found");
 
-    const dates = businessDaysEndingYesterday(data.days);
+    let dates = businessDaysEndingYesterday(data.days);
+    if (data.full_history) {
+      // Earliest day the book has any recorded life.
+      const [{ data: snap0 }, { data: trade0 }] = await Promise.all([
+        supabase
+          .from("equity_snapshots")
+          .select("snapshot_date")
+          .eq("portfolio_id", data.portfolio_id)
+          .order("snapshot_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("trades")
+          .select("trade_date")
+          .eq("portfolio_id", data.portfolio_id)
+          .order("trade_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const candidates = [snap0?.snapshot_date, trade0?.trade_date]
+        .filter(Boolean)
+        .map((d) => String(d).slice(0, 10))
+        .sort();
+      const start = candidates[0];
+      if (start) {
+        const yesterday = businessDaysEndingYesterday(1)[0]!;
+        const full = businessDaysBetween(start, yesterday);
+        if (full.length >= 3) dates = full;
+      }
+    }
     const from = dates[0]!;
+
 
     // Start the shadow book on the live book's own equity at the window start,
     // so the two curves are measured on the same money.
@@ -99,6 +141,78 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
     const shadowId = clone.id as string;
 
     const { runDailyTick, snapshotPortfolio } = await import("./trading-engine.server");
+    const { getPriceOn } = await import("./market-data.server");
+
+    // Seed the shadow book with the positions the live book actually held on the
+    // first replay day, reconstructed by unwinding every trade made since then.
+    // Without this the shadow starts 100% cash and the comparison is unfair.
+    type Seed = {
+      symbol: string;
+      asset_class: "stock" | "etf" | "crypto" | "commodity" | "fx";
+      quantity: number;
+      avg_cost: number;
+      instrument_ccy: string | null;
+    };
+    const seeds = new Map<string, Seed>();
+    const { data: liveHoldings } = await supabase
+      .from("holdings")
+      .select("symbol, asset_class, quantity, avg_cost, instrument_ccy")
+      .eq("portfolio_id", data.portfolio_id);
+    for (const h of liveHoldings ?? []) {
+      seeds.set(h.symbol as string, {
+        symbol: h.symbol as string,
+        asset_class: (h.asset_class ?? "stock") as Seed["asset_class"],
+        quantity: Number(h.quantity ?? 0),
+        avg_cost: Number(h.avg_cost ?? 0),
+        instrument_ccy: (h.instrument_ccy as string | null) ?? null,
+      });
+    }
+    const { data: laterTrades } = await supabase
+      .from("trades")
+      .select("symbol, side, quantity, price")
+      .eq("portfolio_id", data.portfolio_id)
+      .gte("trade_date", from);
+    for (const t of laterTrades ?? []) {
+      const sym = t.symbol as string;
+      const prev = seeds.get(sym) ?? {
+        symbol: sym,
+        asset_class: "stock" as const,
+        quantity: 0,
+        avg_cost: Number(t.price ?? 0),
+        instrument_ccy: null,
+      };
+      const delta = (t.side === "buy" ? -1 : 1) * Number(t.quantity ?? 0);
+      seeds.set(sym, { ...prev, quantity: prev.quantity + delta });
+    }
+    const seeded = [...seeds.values()].filter((s) => s.quantity > 1e-8);
+
+    let invested = 0;
+    for (const s of seeded) {
+      let px: number | null = null;
+      try {
+        px = await getPriceOn(s.symbol, from);
+      } catch {
+        px = null;
+      }
+      invested += s.quantity * (px ?? s.avg_cost);
+    }
+    const seededCash = Math.max(0, startingCash - invested);
+
+    if (seeded.length > 0) {
+      await supabase.from("holdings").insert(
+        seeded.map((s) => ({
+          portfolio_id: shadowId,
+          symbol: s.symbol,
+          asset_class: s.asset_class,
+          quantity: s.quantity,
+          avg_cost: s.avg_cost,
+          instrument_ccy: s.instrument_ccy ?? undefined,
+          opened_at: new Date(`${from}T00:00:00Z`).toISOString(),
+        })),
+      );
+      await supabase.from("portfolios").update({ current_cash: seededCash }).eq("id", shadowId);
+    }
+
 
     let aiDays = 0;
     let fallbackDays = 0;

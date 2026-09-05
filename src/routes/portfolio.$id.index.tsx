@@ -524,10 +524,20 @@ function PortfolioPage() {
   const isLiveBook =
     q.data?.portfolio?.mode === "live_prod" || q.data?.portfolio?.mode === "live_sim";
   const runBt = useMutation({
-    mutationFn: () =>
-      isLiveBook
-        ? runShadowBtFn({ data: { portfolio_id: id, days: Math.max(3, days) } })
-        : runBtFn({ data: { portfolio_id: id, days } }),
+    mutationFn: (opts: { fullHistory?: boolean } | undefined) => {
+      const fullHistory = opts?.fullHistory === true;
+      return isLiveBook
+        ? runShadowBtFn({
+            data: {
+              portfolio_id: id,
+              days: fullHistory ? 400 : Math.max(3, days),
+              full_history: fullHistory,
+            },
+          })
+        : runBtFn({ data: { portfolio_id: id, days } });
+    },
+
+
     onSuccess: async (r) => {
       const m = r.metrics;
       setLastBtMetrics(m ?? null);
@@ -1094,7 +1104,10 @@ function PortfolioPage() {
                   runBtPending={runBt.isPending}
                   resetPending={reset.isPending}
                   onRunDay={() => runDay.mutate()}
-                  onRunBacktest={() => runBt.mutate()}
+                  onRunBacktest={() => runBt.mutate(undefined)}
+                  onRunFullHistoryBacktest={
+                    isLiveBook ? () => runBt.mutate({ fullHistory: true }) : undefined
+                  }
                   onReset={() => setConfirmReset(true)}
                 />
 
