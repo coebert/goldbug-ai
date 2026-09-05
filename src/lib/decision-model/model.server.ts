@@ -71,6 +71,14 @@ export type StoredModel = {
     cost_calibrated_symbols?: number;
     mean_weight?: number;
     trades_scanned?: number;
+    /** Rows rebuilt from bars before the engine kept records. */
+    history_samples?: number;
+    history_from?: string | null;
+    /** Split of the measured round-trip cost. */
+    cost_fee_bps?: number;
+    cost_slippage_bps?: number;
+    cost_fills?: number;
+    cost_invoiced_fills?: number;
   };
 
   /** True when out-of-sample evidence says the fit is worth trading. */
@@ -170,6 +178,10 @@ export async function fitAndStoreModel(args: {
       trades_scanned: data.tradesScanned,
       history_samples: data.historySamples,
       history_from: data.historyFrom,
+      cost_fee_bps: data.costFeeBps,
+      cost_slippage_bps: data.costSlippageBps,
+      cost_fills: data.costFills,
+      cost_invoiced_fills: data.costInvoicedFills,
     },
 
     usable,

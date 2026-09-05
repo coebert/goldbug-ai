@@ -81,6 +81,14 @@ export type DatasetResult = {
   roundTripCostBps: number;
   /** Symbols with their own measured cost (rest use the account median). */
   costCalibratedSymbols: number;
+  /** Median invoiced charge per one-way ticket, in bps of notional. */
+  costFeeBps: number;
+  /** Median gap between the day's close and the price this account was filled at. */
+  costSlippageBps: number;
+  /** Broker fills the cost model was measured from. */
+  costFills: number;
+  /** Of those, fills carrying itemised broker charges rather than a modelled fee. */
+  costInvoicedFills: number;
   meanWeight: number;
   tradesScanned: number;
   /** Rows rebuilt from bars before the first recorded decision. */
@@ -510,6 +518,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     samples: [], dates: [], symbols: [], decisionsScanned: 0, snapshotsScanned: 0,
     skippedNoForwardPrice: 0, horizonDays, from: null, to: null, labelMode,
     tradedSamples: 0, heldSamples: 0, roundTripCostBps: 0, costCalibratedSymbols: 0,
+    costFeeBps: 0, costSlippageBps: 0, costFills: 0, costInvoicedFills: 0,
     meanWeight: 0, tradesScanned: 0, historySamples: 0, historyFrom: null,
   };
   if (ids.length === 0) return empty;
@@ -935,6 +944,10 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     heldSamples,
     roundTripCostBps: Math.round(costs.medianBps * 2 * 10) / 10,
     costCalibratedSymbols: costs.calibrated,
+    costFeeBps: costs.feeBps,
+    costSlippageBps: costs.slippageBps,
+    costFills: costs.fills,
+    costInvoicedFills: costs.invoicedFills,
     meanWeight: samples.length ? Math.round((weightSum / samples.length) * 100) / 100 : 0,
     tradesScanned: trades.length,
     historySamples,
