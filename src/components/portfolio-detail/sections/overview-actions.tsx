@@ -20,6 +20,7 @@ export function OverviewActions({
   resetPending,
   onRunDay,
   onRunBacktest,
+  onRunFullHistoryBacktest,
   onReset,
 }: {
   id: string;
@@ -30,6 +31,7 @@ export function OverviewActions({
   resetPending: boolean;
   onRunDay: () => void;
   onRunBacktest: () => void;
+  onRunFullHistoryBacktest?: () => void;
   onReset: () => void;
 }) {
   return (
