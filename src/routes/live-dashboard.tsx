@@ -127,7 +127,11 @@ function LiveDashboardPage() {
   // Saxo pushes ticks over its streaming socket; the poll below is only the
   // safety net for when the socket is down or an instrument has no feed.
   const stream = useBrokerPriceStream(portfolioId, Boolean(portfolioId));
-  const streamLive = stream.status === "live" && Object.keys(stream.quotes).length > 0;
+  // Only real pushed ticks count as streaming; a connected socket that has
+  // pushed nothing (closed market, dead feed) must not claim to be live.
+  const streamLive = stream.status === "live" && stream.streamedSymbols.length > 0;
+  const streamConnected = stream.status === "subscribed" || stream.status === "connecting";
+
   const quotesQ = useQuery({
     queryKey: ["live-dashboard-broker-quotes", portfolioId],
     queryFn: () => quotes({ data: { portfolioId: portfolioId as string } }),
