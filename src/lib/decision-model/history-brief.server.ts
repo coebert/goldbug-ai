@@ -14,7 +14,7 @@
  * The AI is then asked to turn that table into a playbook (playbook.server.ts).
  */
 
-import { FEATURE_SPECS, labelOf, bucketOf } from "./features";
+import { FEATURE_SPECS, labelOf } from "./features";
 import { buildDataset } from "./dataset.server";
 import type { Sample } from "./fit";
 
@@ -128,7 +128,7 @@ function evidenceFor(samples: Sample[], featureIndex: number): FeatureEvidence |
   return {
     key: spec.key,
     label: labelOf(spec.key),
-    group: bucketOf(spec.key),
+    group: spec.bucket,
     cells: filled,
     spreadBps: mt - mb,
     tStat: se > 0 ? (mt - mb) / se : 0,
