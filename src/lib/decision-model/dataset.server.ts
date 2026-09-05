@@ -24,6 +24,7 @@
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Candle } from "../market-data.server";
 import { priceSymbolVariants } from "../price-symbol";
 import {
   extractFeatureVector,
@@ -103,7 +104,7 @@ const HISTORY_SAMPLE_WEIGHT = 0.35;
 
 
 /** Close prices for one symbol, ordered by date, keyed by the engine symbol. */
-type PriceSeries = { dates: string[]; closes: number[] };
+type PriceSeries = { dates: string[]; closes: number[]; candles: Candle[] };
 
 function baseSymbol(symbol: string): string {
   return (symbol.split(":")[0] ?? symbol).trim().toUpperCase();
@@ -121,7 +122,7 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
 
   const keys = Array.from(wanted.keys());
   const CHUNK = 120;
-  const rowsBySymbol = new Map<string, Array<{ d: string; c: number }>>();
+  const rowsBySymbol = new Map<string, Candle[]>();
 
   for (let i = 0; i < keys.length; i += CHUNK) {
     const slice = keys.slice(i, i + CHUNK);
@@ -130,7 +131,7 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
     for (;;) {
       const { data, error } = await supabaseAdmin
         .from("price_cache")
-        .select("symbol, price_date, close")
+        .select("symbol, price_date, open, high, low, close, volume")
         .in("symbol", slice)
         .gte("price_date", from)
         .order("price_date", { ascending: true })
@@ -142,7 +143,14 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
         const close = Number(r.close);
         if (!Number.isFinite(close) || close <= 0) continue;
         const arr = rowsBySymbol.get(engine);
-        const row = { d: r.price_date as string, c: close };
+        const row: Candle = {
+          date: r.price_date as string,
+          open: Number(r.open) || close,
+          high: Number(r.high) || close,
+          low: Number(r.low) || close,
+          close,
+          volume: Number(r.volume) || 0,
+        };
         if (arr) arr.push(row);
         else rowsBySymbol.set(engine, [row]);
       }
@@ -152,16 +160,18 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
   }
 
   for (const [symbol, rows] of rowsBySymbol) {
-    rows.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     // De-duplicate variants landing on the same date (keep the first seen).
     const dates: string[] = [];
     const closes: number[] = [];
+    const candles: Candle[] = [];
     for (const r of rows) {
-      if (dates[dates.length - 1] === r.d) continue;
-      dates.push(r.d);
-      closes.push(r.c);
+      if (dates[dates.length - 1] === r.date) continue;
+      dates.push(r.date);
+      closes.push(r.close);
+      candles.push(r);
     }
-    out.set(symbol, { dates, closes });
+    out.set(symbol, { dates, closes, candles });
   }
   return out;
 }
@@ -752,6 +762,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
 
     if (c.traded) tradedSamples++;
     if (c.held) heldSamples++;
+    if (c.priority === 0 && c.weight === HISTORY_SAMPLE_WEIGHT) historySamples++;
     weightSum += c.weight;
     samples.push({ date: c.date, symbol: c.symbol, x: extractFeatureVector(c.row), y, w: c.weight });
   }
@@ -774,6 +785,8 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     costCalibratedSymbols: costs.calibrated,
     meanWeight: samples.length ? Math.round((weightSum / samples.length) * 100) / 100 : 0,
     tradesScanned: trades.length,
+    historySamples,
+    historyFrom: historyYears > 0 ? historyFrom : null,
   };
 }
 
