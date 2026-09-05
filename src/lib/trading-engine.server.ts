@@ -3424,6 +3424,9 @@ export async function runDailyTick(
         insider_lessons: insiderBlock != null,
         policy_remarks: policyBlock != null,
         measured_round_trip_bps: measuredRoundTripBps,
+        symbol_costs_measured: symbolCosts
+          ? Array.from(symbolCosts.values()).filter((c) => c.measured).length
+          : 0,
         attribution: attribution != null,
       },
       materiality: materiality
