@@ -2089,6 +2089,21 @@ export async function routeOrdersToBroker(params: {
         status: "error",
         reason: msg,
       });
+      // Alert the owner: the order never even reached the broker cleanly.
+      const { notifyTradeRejected } = await import("./trade-open-notify.server");
+      notifyTradeRejected({
+        userId,
+        portfolioId: portfolio.id,
+        orderId: liveOrderId,
+        decisionId: decisionId ?? null,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        price: limitPlan ? limitPlan.limitPrice : (order.price ?? null),
+        currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
+        status: "error",
+        rejectReason: msg.slice(0, 500),
+      });
       continue;
     }
 
