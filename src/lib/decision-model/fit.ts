@@ -19,8 +19,14 @@ export type Sample = {
   symbol: string;
   /** Raw feature values, aligned to FEATURE_KEYS; null = missing. */
   x: Array<number | null>;
-  /** Forward return over the horizon (fraction, e.g. 0.021 = +2.1%). */
+  /** Label over the horizon (forward return, or a risk/cost-adjusted variant). */
   y: number;
+  /**
+   * Observation weight. Days where this account actually committed capital to
+   * the name matter more than days it merely looked at it, so those rows are
+   * weighted up. Defaults to 1.
+   */
+  w?: number;
 };
 
 export type NormalisedSample = {
@@ -28,7 +34,9 @@ export type NormalisedSample = {
   symbol: string;
   z: number[];
   y: number;
+  w: number;
 };
+
 
 const WINSOR = 3;
 
