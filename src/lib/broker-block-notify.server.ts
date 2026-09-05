@@ -15,6 +15,7 @@ const REASON_LABEL: Record<string, string> = {
   suitability: "suitability test required",
   not_tradable: "not tradable on this account",
   not_permitted: "trading permission missing",
+  kid_unavailable: "no Key Information Document (retail clients cannot buy it)",
 };
 
 export interface BrokerBlockNotifyInput {
