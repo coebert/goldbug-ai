@@ -969,6 +969,39 @@ export type Database = {
         }
         Relationships: []
       }
+      decision_playbooks: {
+        Row: {
+          brief: string
+          coverage: Json
+          created_at: string
+          horizon_days: number
+          id: string
+          model: string
+          playbook: Json
+          user_id: string
+        }
+        Insert: {
+          brief?: string
+          coverage?: Json
+          created_at?: string
+          horizon_days?: number
+          id?: string
+          model: string
+          playbook?: Json
+          user_id: string
+        }
+        Update: {
+          brief?: string
+          coverage?: Json
+          created_at?: string
+          horizon_days?: number
+          id?: string
+          model?: string
+          playbook?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       decisions: {
         Row: {
           briefing: string
