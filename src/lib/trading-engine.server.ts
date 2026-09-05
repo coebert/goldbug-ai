@@ -1102,6 +1102,32 @@ export async function runDailyTick(
   // This account's own measured round-trip dealing cost (bps), captured when
   // the learned model loads so the cost brief can quote it verbatim.
   let measuredRoundTripBps: number | null = null;
+
+  // Per-symbol dealing costs, re-measured from the newest fills on this tick.
+  // A single account-wide average under-prices an illiquid UK single stock and
+  // over-prices a tight index fund; the gate below uses each name's own floor
+  // and only falls back to the account figure where there are no fills yet.
+  let symbolCosts: Map<string, LiveSymbolCost> | null = null;
+  {
+    const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
+    if (userId) {
+      try {
+        const { refreshSymbolExecutionCosts, loadSymbolExecutionCosts } = await import(
+          "./execution-costs.server"
+        );
+        const res = await refreshSymbolExecutionCosts({ userId });
+        symbolCosts = res.snapshot
+          ? res.snapshot.bySymbol
+          : await loadSymbolExecutionCosts(userId);
+        if (measuredRoundTripBps == null && res.snapshot?.accountRoundTripBps) {
+          measuredRoundTripBps = res.snapshot.accountRoundTripBps;
+        }
+      } catch (e) {
+        srvLog.warn("per-symbol execution costs unavailable", e);
+      }
+    }
+  }
+
   const modelBlock = await (async () => {
     if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
     try {
@@ -1224,6 +1250,11 @@ export async function runDailyTick(
       riskProfileBlock,
       modelBlock,
       measuredRoundTripBps,
+      symbolCosts: symbolCosts
+        ? Array.from(symbolCosts.values())
+            .filter((c) => c.measured)
+            .map((c) => ({ symbol: c.symbol, roundTripBps: c.roundTripBps, tickets: c.tickets }))
+        : null,
 
         shortSleeveBlock: formatShortSleeveBlock({
 
@@ -1270,30 +1301,6 @@ export async function runDailyTick(
     } catch { /* best effort: fall back to modelled costs */ }
   }
 
-  // Per-symbol dealing costs, re-measured from the newest fills on this tick.
-  // A single account-wide average under-prices an illiquid UK single stock and
-  // over-prices a tight index fund; the gate below uses each name's own floor
-  // and only falls back to the account figure where there are no fills yet.
-  let symbolCosts: Map<string, LiveSymbolCost> | null = null;
-  {
-    const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
-    if (userId) {
-      try {
-        const { refreshSymbolExecutionCosts, loadSymbolExecutionCosts } = await import(
-          "./execution-costs.server"
-        );
-        const res = await refreshSymbolExecutionCosts({ userId });
-        symbolCosts = res.snapshot
-          ? res.snapshot.bySymbol
-          : await loadSymbolExecutionCosts(userId);
-        if (measuredRoundTripBps == null && res.snapshot?.accountRoundTripBps) {
-          measuredRoundTripBps = res.snapshot.accountRoundTripBps;
-        }
-      } catch (e) {
-        srvLog.warn("per-symbol execution costs unavailable", e);
-      }
-    }
-  }
 
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
   // not just in the prompt. If the regime bucket is risk_off, strip any AI
