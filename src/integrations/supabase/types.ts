@@ -924,6 +924,51 @@ export type Database = {
           },
         ]
       }
+      decision_models: {
+        Row: {
+          bucket_weights: Json
+          coefficients: Json
+          coverage: Json
+          feature_keys: Json
+          fitted_at: string
+          horizon_days: number
+          id: string
+          lambda: number
+          metrics: Json
+          note: string
+          usable: boolean
+          user_id: string
+        }
+        Insert: {
+          bucket_weights?: Json
+          coefficients?: Json
+          coverage?: Json
+          feature_keys?: Json
+          fitted_at?: string
+          horizon_days: number
+          id?: string
+          lambda: number
+          metrics?: Json
+          note?: string
+          usable?: boolean
+          user_id: string
+        }
+        Update: {
+          bucket_weights?: Json
+          coefficients?: Json
+          coverage?: Json
+          feature_keys?: Json
+          fitted_at?: string
+          horizon_days?: number
+          id?: string
+          lambda?: number
+          metrics?: Json
+          note?: string
+          usable?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       decisions: {
         Row: {
           briefing: string
