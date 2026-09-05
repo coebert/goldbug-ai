@@ -613,6 +613,16 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
           book_drawdown: Math.max(-0.9, drawdown),
         };
 
+        const sector = symbolSector(base);
+        const standing = sector ? standings.get(sector) : undefined;
+        const sx: SxContext = {
+          ...NEUTRAL_SX,
+          momentum_30d: standing?.momentum_30d ?? null,
+          momentum_90d: standing?.momentum_90d ?? null,
+          rank_norm: standing?.rank_norm ?? null,
+          book_weight: sector && total > 0 ? Math.min(1, (sectorValue.get(sector) ?? 0) / total) : 0,
+        };
+
         const notional = tradedNotional.get(`${pid}|${d.run_date}|${base}`) ?? 0;
         const traded = notional > 0;
         let weight = bookWeight;
