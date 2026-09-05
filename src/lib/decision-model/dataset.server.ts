@@ -566,6 +566,8 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     weight: number;
     traded: boolean;
     held: boolean;
+    /** True for rows rebuilt from bars before the first recorded decision. */
+    history?: boolean;
   };
   const byKey = new Map<string, Candidate>();
   let snapshotsScanned = 0;
@@ -716,6 +718,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
         weight: HISTORY_SAMPLE_WEIGHT,
         traded: false,
         held: false,
+        history: true,
       });
     }
   }
@@ -762,7 +765,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
 
     if (c.traded) tradedSamples++;
     if (c.held) heldSamples++;
-    if (c.priority === 0 && c.weight === HISTORY_SAMPLE_WEIGHT) historySamples++;
+    if (c.history) historySamples++;
     weightSum += c.weight;
     samples.push({ date: c.date, symbol: c.symbol, x: extractFeatureVector(c.row), y, w: c.weight });
   }
