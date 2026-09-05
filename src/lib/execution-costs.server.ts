@@ -350,3 +350,173 @@ export function roundTripCostFrac(costs: CostModel, symbol: string): number {
   const bps = v ? v.buyBps + v.sellBps : costs.medianBps * 2;
   return Math.min(0.03, Math.max(0.0005, bps / 10_000));
 }
+
+// --------------------------------------------------------------------------
+// Live tracking
+//
+// The gate needs a per-name floor at decision time, not at fit time. These
+// helpers recompute the figures from the newest fills and cache them in
+// `symbol_execution_costs`, throttled so an hourly tick does not re-price the
+// whole fill history on every candidate.
+// --------------------------------------------------------------------------
+
+/** Don't re-price the book more often than this unless a new fill landed. */
+export const COST_REFRESH_MS = 15 * 60 * 1000;
+
+export type LiveSymbolCost = {
+  symbol: string;
+  buyBps: number;
+  sellBps: number;
+  roundTripBps: number;
+  fills: number;
+  tickets: number;
+  /** False when the figure is the account average standing in for a name with no fills. */
+  measured: boolean;
+  lastFillAt: string | null;
+};
+
+export type LiveCostSnapshot = {
+  bySymbol: Map<string, LiveSymbolCost>;
+  /** Account-wide round trip, the fallback floor for an unfilled name. */
+  accountRoundTripBps: number;
+  feeBps: number;
+  slippageBps: number;
+  fills: number;
+  invoicedFills: number;
+  computedAt: string;
+};
+
+function snapshotFrom(costs: CostModel): LiveCostSnapshot {
+  const bySymbol = new Map<string, LiveSymbolCost>();
+  for (const [symbol, v] of costs.bySymbol) {
+    bySymbol.set(symbol, {
+      symbol,
+      buyBps: v.buyBps,
+      sellBps: v.sellBps,
+      roundTripBps: v.buyBps + v.sellBps,
+      fills: v.fills,
+      tickets: v.tickets,
+      measured: v.fills > 0,
+      lastFillAt: v.lastFillAt,
+    });
+  }
+  return {
+    bySymbol,
+    accountRoundTripBps: costs.medianBps * 2,
+    feeBps: costs.feeBps,
+    slippageBps: costs.slippageBps,
+    fills: costs.fills,
+    invoicedFills: costs.invoicedFills,
+    computedAt: new Date().toISOString(),
+  };
+}
+
+/** Portfolios belonging to a user — the fill scope for their cost model. */
+async function portfolioIdsFor(userId: string): Promise<string[]> {
+  const { data } = await supabaseAdmin.from("portfolios").select("id").eq("user_id", userId);
+  return (data ?? []).map((r) => String(r.id));
+}
+
+/**
+ * Recompute per-symbol costs from fills and persist them. Skipped when the
+ * cached rows are fresher than `COST_REFRESH_MS` and no fill has landed since
+ * they were written — the figures only move when a new ticket prints or the
+ * tape re-prices an existing one.
+ */
+export async function refreshSymbolExecutionCosts(args: {
+  userId: string;
+  portfolioIds?: string[];
+  force?: boolean;
+}): Promise<{ refreshed: boolean; symbols: number; snapshot: LiveCostSnapshot | null }> {
+  const ids = args.portfolioIds?.length ? args.portfolioIds : await portfolioIdsFor(args.userId);
+  if (ids.length === 0) return { refreshed: false, symbols: 0, snapshot: null };
+
+  if (!args.force) {
+    const [{ data: cached }, { data: newest }] = await Promise.all([
+      supabaseAdmin
+        .from("symbol_execution_costs")
+        .select("computed_at")
+        .eq("user_id", args.userId)
+        .order("computed_at", { ascending: false })
+        .limit(1),
+      supabaseAdmin
+        .from("live_fills")
+        .select("filled_at")
+        .in("portfolio_id", ids)
+        .order("filled_at", { ascending: false })
+        .limit(1),
+    ]);
+    const at = cached?.[0]?.computed_at ? Date.parse(String(cached[0].computed_at)) : 0;
+    const fillAt = newest?.[0]?.filled_at ? Date.parse(String(newest[0].filled_at)) : 0;
+    const fresh = at > 0 && Date.now() - at < COST_REFRESH_MS && fillAt <= at;
+    if (fresh) return { refreshed: false, symbols: 0, snapshot: null };
+  }
+
+  const costs = await computeExecutionCosts(ids);
+  const snapshot = snapshotFrom(costs);
+  const rows = Array.from(snapshot.bySymbol.values()).map((v) => ({
+    user_id: args.userId,
+    symbol: v.symbol,
+    symbol_key: v.symbol,
+    buy_bps: v.buyBps,
+    sell_bps: v.sellBps,
+    round_trip_bps: v.roundTripBps,
+    fee_bps: costs.feeBps,
+    slippage_bps: costs.slippageBps,
+    tickets: v.tickets,
+    fills: v.fills,
+    invoiced_fills: costs.bySymbol.get(v.symbol)?.invoicedFills ?? 0,
+    measured: v.measured,
+    first_fill_at: costs.bySymbol.get(v.symbol)?.firstFillAt
+      ? `${costs.bySymbol.get(v.symbol)!.firstFillAt}T00:00:00Z`
+      : null,
+    last_fill_at: v.lastFillAt ? `${v.lastFillAt}T00:00:00Z` : null,
+    computed_at: snapshot.computedAt,
+  }));
+  if (rows.length > 0) {
+    const { error } = await supabaseAdmin
+      .from("symbol_execution_costs")
+      .upsert(rows, { onConflict: "user_id,symbol_key" });
+    if (error) return { refreshed: false, symbols: 0, snapshot };
+  }
+  return { refreshed: true, symbols: rows.length, snapshot };
+}
+
+/** The stored per-symbol costs, keyed by base symbol. */
+export async function loadSymbolExecutionCosts(
+  userId: string,
+): Promise<Map<string, LiveSymbolCost>> {
+  const out = new Map<string, LiveSymbolCost>();
+  const { data } = await supabaseAdmin
+    .from("symbol_execution_costs")
+    .select("symbol, symbol_key, buy_bps, sell_bps, round_trip_bps, fills, tickets, measured, last_fill_at")
+    .eq("user_id", userId);
+  for (const r of data ?? []) {
+    out.set(String(r.symbol_key), {
+      symbol: String(r.symbol),
+      buyBps: Number(r.buy_bps) || 0,
+      sellBps: Number(r.sell_bps) || 0,
+      roundTripBps: Number(r.round_trip_bps) || 0,
+      fills: Number(r.fills) || 0,
+      tickets: Number(r.tickets) || 0,
+      measured: Boolean(r.measured),
+      lastFillAt: r.last_fill_at ? String(r.last_fill_at) : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * The round-trip floor to apply to one candidate: its own measured cost when
+ * this account has actually dealt the name, else the account-wide figure.
+ */
+export function symbolRoundTripFloor(
+  symbol: string,
+  bySymbol: Map<string, LiveSymbolCost> | null | undefined,
+  accountFallbackBps: number | null | undefined,
+): number | null {
+  const own = bySymbol?.get(baseSymbol(symbol));
+  if (own && own.measured && own.roundTripBps > 0) return own.roundTripBps;
+  const acct = Number(accountFallbackBps);
+  return Number.isFinite(acct) && acct > 0 ? acct : null;
+}
