@@ -281,16 +281,20 @@ export async function buildDailyComparison(args: {
       ic: hist?.ic ?? null,
       from: hist?.from ?? null,
       to: hist?.to ?? null,
+      market,
+      marketWeight: marketSessionWeight({ market, session, rows: marketRows }),
       differs: (ai?.side ?? null) !== (rule?.side ?? null),
     };
   });
 
-  // Strongest historical signal first; within that, the best model score.
+  // Strongest historical signal first; within that, the best model score —
+  // with each name's score also weighted by how reliable its market's
+  // signals have been at this time of day.
   rows.sort((a, b) => {
     if (b.strength !== a.strength) return b.strength - a.strength;
     return (
-      strengthAdjustedScore(b.modelScore ?? 0, b.strength) -
-      strengthAdjustedScore(a.modelScore ?? 0, a.strength)
+      strengthAdjustedScore(b.modelScore ?? 0, b.strength) * b.marketWeight -
+      strengthAdjustedScore(a.modelScore ?? 0, a.strength) * a.marketWeight
     );
   });
 
@@ -301,6 +305,7 @@ export async function buildDailyComparison(args: {
     horizonDays,
     modelUsable,
     strengthsMeasured: [...strengths.values()].length,
+    markets,
     rows,
   };
 }
