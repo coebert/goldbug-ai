@@ -15,6 +15,7 @@ import {
   Shield,
   Settings as SettingsIcon,
   Ban,
+  SlidersHorizontal,
   LifeBuoy,
   FileText,
   type LucideIcon,
@@ -103,6 +104,14 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     icon: GitCompare,
     area: "markets",
     keywords: "benchmark side by side",
+  },
+  {
+    to: "/symbols",
+    label: "Symbols",
+    hint: "Each name's track record, dealing cost, price levels and your own limits.",
+    icon: SlidersHorizontal,
+    area: "markets",
+    keywords: "signal strength limits stop target cap per symbol overrides",
   },
   {
     to: "/spillover",
@@ -243,7 +252,7 @@ export function searchDestinations(query: string): Destination[] {
 /** Which area a pathname belongs to, for active highlighting. */
 export function areaForPath(pathname: string): AreaId {
   if (pathname === "/") return "home";
-  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
+  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
     return "markets";
   }
   if (
