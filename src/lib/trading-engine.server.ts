@@ -1056,7 +1056,7 @@ export async function runDailyTick(
         portfolioId,
         totalValue: totalValue,
         cash,
-        asOf: asOfDate,
+        asOf,
       }).catch(() => null);
       const scores = scoreCandidates(
         model,
