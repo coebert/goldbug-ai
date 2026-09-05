@@ -363,6 +363,10 @@ If no action is warranted, return an empty orders array.`;
         holdings: args.holdings.map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
         fearLabel: args.fearLabel ?? null,
         reason: msg,
+        portfolioId: (args.portfolio as { id?: string | null }).id ?? null,
+        totalValue: args.totalValue,
+        cash: args.cashValue,
+
       });
       if (learned) {
         console.warn(
