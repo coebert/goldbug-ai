@@ -50,7 +50,19 @@ export type StoredModel = {
     from: string | null;
     to: string | null;
     real_money_only: boolean;
+    /** How the label was built: cost/risk-adjusted, or the raw forward return. */
+    label_mode?: string;
+    /** Observations on days this account actually traded the name. */
+    traded_samples?: number;
+    /** Observations where the name was already held. */
+    held_samples?: number;
+    /** Round-trip dealing cost subtracted from the label, in bps. */
+    round_trip_cost_bps?: number;
+    cost_calibrated_symbols?: number;
+    mean_weight?: number;
+    trades_scanned?: number;
   };
+
   /** True when out-of-sample evidence says the fit is worth trading. */
   usable: boolean;
   note: string;
