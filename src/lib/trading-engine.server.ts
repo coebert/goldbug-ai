@@ -1242,6 +1242,22 @@ export async function runDailyTick(
 
 
 
+  // The cost gate must price this account's real friction even on ticks where
+  // the AI (and with it the learned model) never loaded — a quiet tick, a
+  // tripped breaker or a closed venue must not silently fall back to the
+  // optimistic tariff-only estimate.
+  if (measuredRoundTripBps == null) {
+    try {
+      const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
+      if (userId) {
+        const { loadLatestModel } = await import("./decision-model/model.server");
+        const m = await loadLatestModel(userId);
+        const rt = Number(m?.coverage?.round_trip_cost_bps);
+        if (Number.isFinite(rt) && rt > 0) measuredRoundTripBps = rt;
+      }
+    } catch { /* best effort: fall back to modelled costs */ }
+  }
+
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
   // not just in the prompt. If the regime bucket is risk_off, strip any AI
   // crypto BUY orders (X6) — sells / trims are always allowed to fire.
