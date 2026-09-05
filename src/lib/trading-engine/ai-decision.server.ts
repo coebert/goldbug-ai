@@ -63,6 +63,9 @@ export async function callAiForDecision(args: {
   shortSleeveBlock?: string | null;
   /** Weights fitted on this account's own history + today's model ranking. */
   learnedModelBlock?: string | null;
+  /** Realised risk/return profile of this exact book, from its own records. */
+  riskProfileBlock?: string | null;
+
 
 
 
