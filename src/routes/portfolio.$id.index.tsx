@@ -523,11 +523,9 @@ function PortfolioPage() {
   // broker routing) and the run is still saved against this portfolio.
   const isLiveBook =
     q.data?.portfolio?.mode === "live_prod" || q.data?.portfolio?.mode === "live_sim";
-  const [fullHistoryBt, setFullHistoryBt] = useState(false);
   const runBt = useMutation({
-    mutationFn: (opts?: { fullHistory?: boolean }) => {
+    mutationFn: (opts: { fullHistory?: boolean } | undefined) => {
       const fullHistory = opts?.fullHistory === true;
-      setFullHistoryBt(fullHistory);
       return isLiveBook
         ? runShadowBtFn({
             data: {
@@ -536,8 +534,9 @@ function PortfolioPage() {
               full_history: fullHistory,
             },
           })
-        : runBtFn({ data: { portfolio_id: id, days: fullHistory ? 400 : days } });
+        : runBtFn({ data: { portfolio_id: id, days } });
     },
+
 
     onSuccess: async (r) => {
       const m = r.metrics;
