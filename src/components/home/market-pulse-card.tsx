@@ -336,12 +336,23 @@ export function MarketPulseCard() {
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Activity className="h-4 w-4 text-primary" /> Market pulse
+            {live && !live.stale ? (
+              <span
+                data-testid="pulse-live-badge"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 px-2 py-0.5 text-[10px] font-medium text-emerald-500"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                Live
+              </span>
+            ) : null}
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            The state of world markets{pulse.asOf ? ` as at ${pulse.asOf}` : ""} — prices, trends and
-            where the money is going.
+            {live && !live.stale
+              ? `Live prices as at ${formatUkTime(live.asOf ?? Date.now())} — ${live.covered} of ${live.requested} markets updating now.`
+              : `The state of world markets${pulse.asOf ? ` as at ${pulse.asOf}` : ""} — prices, trends and where the money is going.`}
           </p>
         </div>
+
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge
             variant="outline"
