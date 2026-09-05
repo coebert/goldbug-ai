@@ -1186,13 +1186,32 @@ export async function runDailyTick(
       // re-orders the ranking so the AI works the strongest evidence first.
       let strengths: Map<string, import("./decision-model/symbol-strength").SymbolStrength> | null =
         null;
+      let marketCtx: {
+        rows: import("./decision-model/market-strength").MarketStrength[];
+        session: import("./decision-model/market-strength").SessionBucket | null;
+        assetClassBySymbol: Map<string, string>;
+      } | null = null;
       try {
-        const { loadSymbolStrengths } = await import("./decision-model/symbol-strength.server");
+        const { loadSymbolStrengths, loadMarketStrengths } = await import(
+          "./decision-model/symbol-strength.server"
+        );
         strengths = await loadSymbolStrengths(userId, model.horizon_days);
+        const marketRows = await loadMarketStrengths(userId, model.horizon_days);
+        if (marketRows.length > 0) {
+          const { sessionForTimestamp } = await import("./decision-model/market-strength");
+          const { UNIVERSE } = await import("./universe.server");
+          marketCtx = {
+            rows: marketRows,
+            session: sessionForTimestamp(asOf),
+            assetClassBySymbol: new Map(
+              UNIVERSE.map((u) => [u.symbol.toUpperCase(), u.asset_class as string]),
+            ),
+          };
+        }
       } catch (e) {
         srvLog.warn("symbol signal strengths unavailable for prompt", e);
       }
-      return formatModelBlock(model, scores, strengths);
+      return formatModelBlock(model, scores, strengths, marketCtx);
     } catch (e) {
       srvLog.warn("learned model scoring unavailable for prompt", e);
       return null;
