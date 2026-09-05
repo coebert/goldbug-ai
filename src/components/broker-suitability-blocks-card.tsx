@@ -85,6 +85,16 @@ const REASON_COPY: Record<
       "Clear the block after approval.",
     ],
   },
+  kid_unavailable: {
+    label: "No Key Information Document",
+    what:
+      "UK/EU rules stop retail clients buying a fund with no Key Information Document. US-listed funds such as SPY never publish one, so the order can never fill.",
+    next: [
+      "Use the UK/EU-listed equivalent instead (for example VUSA or CSPX in place of SPY).",
+      "Leave this block in place — retrying the US listing will always be refused.",
+      "Only clear it if Saxo confirms a Key Information Document is now published.",
+    ],
+  },
 };
 
 function copyFor(reason: string) {
