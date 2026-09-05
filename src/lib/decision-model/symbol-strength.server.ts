@@ -17,6 +17,11 @@ import {
   type StrengthObservation,
   type SymbolStrength,
 } from "./symbol-strength";
+import {
+  summariseMarketStrengths,
+  type MarketStrength,
+} from "./market-strength";
+import { UNIVERSE } from "../universe.server";
 
 export type { SymbolStrength } from "./symbol-strength";
 
@@ -33,6 +38,8 @@ export type ComputeStrengthResult = {
   to: string | null;
   /** True when a fitted model supplied the scores (otherwise raw outcomes only). */
   modelScored: boolean;
+  /** Market × time-of-day cells measured from the same observations. */
+  marketRows: MarketStrength[];
 };
 
 /**
