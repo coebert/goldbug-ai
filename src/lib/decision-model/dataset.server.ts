@@ -351,7 +351,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     samples: [], dates: [], symbols: [], decisionsScanned: 0, snapshotsScanned: 0,
     skippedNoForwardPrice: 0, horizonDays, from: null, to: null, labelMode,
     tradedSamples: 0, heldSamples: 0, roundTripCostBps: 0, costCalibratedSymbols: 0,
-    meanWeight: 0, tradesScanned: 0,
+    meanWeight: 0, tradesScanned: 0, historySamples: 0, historyFrom: null,
   };
   if (ids.length === 0) return empty;
 
