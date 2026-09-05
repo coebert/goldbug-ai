@@ -132,6 +132,21 @@ export async function reconcileFillsToTradesForPortfolio(
     }))
     .filter((f) => f.price > 0);
 
+  // Carry the model's confidence from the originating order onto the trade
+  // ledger so the trade list can show how sure the model was.
+  const convictionByOrder = new Map<string, number>();
+  const orderIds = [...new Set(fills.map((f) => f.order_id).filter(Boolean))] as string[];
+  if (orderIds.length > 0) {
+    const ordRes = await admin
+      .from("live_orders")
+      .select("id, conviction")
+      .in("id", orderIds);
+    for (const o of ordRes.data ?? []) {
+      const c = Number((o as { conviction?: unknown }).conviction);
+      if (Number.isFinite(c)) convictionByOrder.set(String(o.id), c);
+    }
+  }
+
   const rows = priced.map((f) => {
     const qty = Number(f.quantity);
     const px = f.price;
