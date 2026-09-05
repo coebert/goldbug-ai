@@ -506,6 +506,16 @@ export function formatModelBlock(
    * noisy instrument happened to top today's raw score.
    */
   strengths?: Map<string, SymbolStrength> | null,
+  /**
+   * Market × time-of-day track record plus the session this decision is
+   * being made in. When present, the ranking also scales each candidate by
+   * how reliable that market's signals have been at this time of day.
+   */
+  market?: {
+    rows: import("./market-strength").MarketStrength[];
+    session: import("./market-strength").SessionBucket | null;
+    assetClassBySymbol?: Map<string, string>;
+  } | null,
 ): string {
   if (!model) return "";
   const bw = Object.entries(model.bucket_weights)
