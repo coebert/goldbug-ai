@@ -204,7 +204,146 @@ function CostsDashboard() {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Broker charges and slippage</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {data && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Stat
+                  label="Broker charges paid"
+                  value={data.account.feeBps != null ? bps(data.account.feeBps) : "—"}
+                  note="one way, averaged over your tickets"
+                />
+                <Stat
+                  label="Slippage paid"
+                  value={data.account.slippageBps != null ? bps(data.account.slippageBps) : "—"}
+                  note="gap between printed price and your fill"
+                />
+                <Stat
+                  label="Round trip"
+                  value={data.account.roundTripBps != null ? bps(data.account.roundTripBps) : "—"}
+                  note={`${data.account.tickets} tickets measured`}
+                />
+              </div>
+            )}
+            <div>
+              <p className="mb-2 text-sm font-medium">
+                {data?.broker.broker ?? "Saxo"} {data?.broker.tier ?? "Classic"} tariff
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Market</TableHead>
+                    <TableHead>Currency</TableHead>
+                    <TableHead className="text-right">Commission</TableHead>
+                    <TableHead className="text-right">Minimum per side</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data?.broker.rows ?? []).map((t) => (
+                    <TableRow key={`${t.venue}-${t.currency}`}>
+                      <TableCell className="font-medium">{t.venue}</TableCell>
+                      <TableCell>{t.currency}</TableCell>
+                      <TableCell className="text-right">{t.rateBps.toFixed(0)}bps</TableCell>
+                      <TableCell className="text-right">
+                        {t.minCharge.toLocaleString()} {t.currency}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {data && (
+              <p className="text-xs text-muted-foreground">
+                Taxes on top: UK stamp duty {(data.broker.ukStampDutyBps / 100).toFixed(2)}% on buys
+                of UK single stocks (funds and non-UK listings are exempt), plus a £
+                {data.broker.ptmLevyGbp.toFixed(2)} takeover-panel levy on UK trades above £
+                {data.broker.ptmLevyThresholdGbp.toLocaleString()}.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Reserve and ticket rules</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              These rules ration how often the AI may spend money on dealing
+              {data?.reserve.portfolioName ? ` on ${data.reserve.portfolioName}` : ""}
+              {data?.reserve.navBase != null
+                ? `, sized on an account value of ${money(data.reserve.navBase)}`
+                : ""}
+              {data?.reserve.navAsOf
+                ? ` (as of ${formatUk(data.reserve.navAsOf, { day: "numeric", month: "short" })})`
+                : ""}
+              . Selling is never rationed.
+            </p>
+            {data && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Stat
+                  label="Smallest buy allowed"
+                  value={data.reserve.minTicketBase != null ? money(data.reserve.minTicketBase) : "—"}
+                  note={`greater of ${(data.reserve.minTicketPctOfNav * 100).toFixed(1)}% of the account or ${money(data.reserve.absoluteMinTicketBase)}`}
+                />
+                <Stat
+                  label="Buys per day"
+                  value={`${data.reserve.maxBuysPerDay} max`}
+                  note="sells are not capped"
+                />
+                <Stat
+                  label="Same-name cooldown"
+                  value={`${data.reserve.addCooldownDays} days`}
+                  note="before topping up a name again"
+                />
+                <Stat
+                  label="Dealing budget"
+                  value={`${(data.reserve.frictionBudgetPctOfNav * 10_000).toFixed(0)}bps`}
+                  note={
+                    data.reserve.frictionBudgetBase != null
+                      ? `${money(data.reserve.frictionBudgetBase)} of costs per rolling window, never below ${data.reserve.minBudgetTickets} typical tickets`
+                      : `per rolling window, never below ${data.reserve.minBudgetTickets} typical tickets`
+                  }
+                />
+                <Stat
+                  label="Most in one name"
+                  value={`${(data.reserve.maxPositionPctOfNav * 100).toFixed(0)}%`}
+                  note="hard cap on a single holding"
+                />
+                <Stat
+                  label="Exception tickets"
+                  value={`${data.reserve.reserveTickets} per run`}
+                  note={`allowed past a spent budget when the expected gain is ${data.reserve.reserveEdgeMultiple}x the cost and conviction is at least ${(data.reserve.reserveMinConviction * 100).toFixed(0)}%`}
+                />
+                <Stat
+                  label="Stall breaker"
+                  value={`after ${data.reserve.stallDays} quiet days`}
+                  note={`the exception bar eases to ${data.reserve.stallEdgeMultiple}x cost and ${(data.reserve.stallMinConviction * 100).toFixed(0)}% conviction, so the budget throttles rather than stops`}
+                />
+                <Stat
+                  label="Normal pace"
+                  value={`${data.reserve.churnCalmFills} buys / ${data.reserve.churnWindowDays} days`}
+                  note="exception tickets shrink when the market is violent or the book is already busy"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </PageShell>
+  );
+}
+
+function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold">{value}</p>
+      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
+    </div>
   );
 }
