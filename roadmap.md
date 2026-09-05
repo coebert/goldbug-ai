@@ -49,3 +49,4 @@
 - Per-symbol measured round-trip cost from fills/slippage, surfaced in the AI prompt.
 - P&L comparison chart: real vs shadow backtest, net of fees and taxes.
 - Shadow backtest must actually trade (currently zero new positions).
+- Shadow replay: US names (JNJ/SPY/MSFT) bought with GBP cash at USD prices but valued after FX -> false ~21% loss. Fix currency conversion on shadow fills before trusting the gap chart.
