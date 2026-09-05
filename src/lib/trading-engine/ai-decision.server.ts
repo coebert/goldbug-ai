@@ -68,6 +68,8 @@ export async function callAiForDecision(args: {
   riskProfileBlock?: string | null;
   /** Learned decision model: verdict, evidence strength, and today's mdl scores. */
   modelBlock?: string | null;
+  /** This account's measured round-trip dealing cost (bps), from real fills. */
+  measuredRoundTripBps?: number | null;
 
 
 
