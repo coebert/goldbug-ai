@@ -1163,6 +1163,8 @@ export async function runDailyTick(
           ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
           : null,
         learnedModelBlock,
+        riskProfileBlock,
+
         shortSleeveBlock: formatShortSleeveBlock({
 
           enabled: cfg.shorts_enabled,
