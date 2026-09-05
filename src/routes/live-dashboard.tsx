@@ -223,16 +223,25 @@ function LiveDashboardPage() {
                               Streaming
                             </span>
                           )}
+                          {!streamLive && streamConnected && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              Connected
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-muted-foreground">
                           {streamLive
-                            ? `Prices stream straight from Saxo on ${streamedSymbols.size} of ${positions.length} positions${stream.lastTickAt ? ` — last update ${new Date(stream.lastTickAt).toLocaleTimeString("en-GB")}` : ""}.`
+                            ? `Prices stream straight from Saxo on ${streamedSymbols.size} of ${positions.length} positions — ${stream.tickCount} updates${stream.lastTickAt ? `, last at ${new Date(stream.lastTickAt).toLocaleTimeString("en-GB")}` : ""}.`
+                            : streamConnected
+                            ? "Connected to Saxo, waiting for the first price update — showing the latest snapshot meanwhile."
                             : brokerQuotes && brokerQuotes.covered > 0
                             ? `Live prices on ${brokerQuotes.covered} of ${brokerQuotes.requested} positions (${brokerQuotes.fromBroker} straight from Saxo${brokerQuotes.covered > brokerQuotes.fromBroker ? `, ${brokerQuotes.covered - brokerQuotes.fromBroker} from the market feed` : ""})${brokerQuotes.covered < brokerQuotes.requested ? " — the rest fall back to the cached daily close" : ""}.`
                             : "Live prices unavailable — prices shown are the cached daily close."}
 
                         </p>
                       </CardHeader>
+
 
                       <CardContent>
                         {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}{quoteSourceBySymbol.has(p.symbol) ? <span className="ml-1 text-[10px] text-muted-foreground">live</span> : null}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
