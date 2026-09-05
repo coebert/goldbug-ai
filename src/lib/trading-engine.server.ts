@@ -1070,6 +1070,33 @@ export async function runDailyTick(
     }
   })();
 
+  // How this exact book has actually behaved — realised volatility, drawdown,
+  // win/loss shape, live concentration and dealing cost — so sizing is bound by
+  // its own record rather than a generic prior. Best-effort.
+  const riskProfileBlock = await (async () => {
+    if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
+    try {
+      const { buildRiskProfileBlock } = await import("./decision-model/risk-profile.server");
+      const priceBySymbol = new Map<string, number>();
+      for (const f of features as unknown as Array<{ symbol?: string; price?: number }>) {
+        const px = Number(f?.price);
+        if (f?.symbol && Number.isFinite(px) && px > 0) priceBySymbol.set(String(f.symbol), px);
+      }
+      return await buildRiskProfileBlock({
+        portfolioId,
+        nav: totalValue,
+        cash,
+        asOf,
+        currency: portfolio.currency || "GBP",
+        priceBySymbol,
+      });
+    } catch (e) {
+      srvLog.warn("book risk profile unavailable for prompt", e);
+      return null;
+    }
+  })();
+
+
 
   const decision: DecisionOutput = breakerTripped
 
