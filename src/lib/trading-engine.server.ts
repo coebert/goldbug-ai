@@ -3450,6 +3450,10 @@ export async function runDailyTick(
           ? Array.from(symbolCosts.values()).filter((c) => c.measured).length
           : 0,
         attribution: attribution != null,
+        live_prices_applied: liveOverlay?.applied.length ?? 0,
+        live_prices_requested: liveOverlay?.requested ?? 0,
+        live_prices_from_broker: liveOverlay?.fromBroker ?? 0,
+        live_prices_as_of: liveOverlay?.asOf ?? null,
       },
       materiality: materiality
         ? {
