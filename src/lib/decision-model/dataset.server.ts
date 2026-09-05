@@ -633,7 +633,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
         byKey.set(key, {
           date: d.run_date,
           symbol,
-          row: withPf(s, pf),
+          row: withContext(withPf(s, pf), { date: d.run_date, sx, mx }),
           priority,
           weight: Math.min(8, weight),
           traded,
