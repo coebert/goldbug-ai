@@ -13,23 +13,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 type Any = Record<string, unknown>;
 
-const { generateText, NoObjectGeneratedError, calls } = vi.hoisted(() => {
-  const calls: Array<{ system: string; prompt: string }> = [];
+const { streamText, NoObjectGeneratedError, calls } = vi.hoisted(() => {
+  const calls: Array<{ system: string; prompt: string; model?: { id?: string } }> = [];
   class NoObjectGeneratedError extends Error {
     text?: string;
     static isInstance(e: unknown): boolean {
       return e instanceof NoObjectGeneratedError;
     }
   }
-  const generateText = vi.fn(async (a: Any): Promise<{ output: Any }> => {
-    calls.push({ system: String(a.system), prompt: String(a.prompt) });
-    return { output: { briefing: "b", rationale: "r", orders: [] as Any[] } };
+  // `streamText` is synchronous in the production path; the test awaits only
+  // its `output` promise, just like the AI SDK stream result.
+  const streamText = vi.fn((a: Any): { output: Promise<Any> } => {
+    calls.push({
+      system: String(a.system),
+      prompt: String(a.prompt),
+      model: a.model as { id?: string },
+    });
+    return { output: Promise.resolve({ briefing: "b", rationale: "r", orders: [] as Any[] }) };
   });
-  return { generateText, NoObjectGeneratedError, calls };
+  return { streamText, NoObjectGeneratedError, calls };
 });
 
 vi.mock("ai", () => ({
-  generateText: (a: Any) => generateText(a),
+  streamText: (a: Any) => streamText(a),
   Output: { object: (o: Any) => o },
   NoObjectGeneratedError,
 }));
@@ -116,10 +122,14 @@ function baseArgs(over: Partial<Parameters<typeof callAiForDecision>[0]> = {}) {
 
 beforeEach(() => {
   calls.length = 0;
-  generateText.mockClear();
-  generateText.mockImplementation(async (a: Any): Promise<{ output: Any }> => {
-    calls.push({ system: String(a.system), prompt: String(a.prompt) });
-    return { output: { briefing: "b", rationale: "r", orders: [] } };
+  streamText.mockClear();
+  streamText.mockImplementation((a: Any): { output: Promise<Any> } => {
+    calls.push({
+      system: String(a.system),
+      prompt: String(a.prompt),
+      model: a.model as { id?: string },
+    });
+    return { output: Promise.resolve({ briefing: "b", rationale: "r", orders: [] }) };
   });
   process.env.LOVABLE_API_KEY = "test-key";
   delete process.env.HEURISTIC_BUYS_ENABLED;
@@ -133,12 +143,12 @@ describe("callAiForDecision — configuration guards", () => {
   it("throws when the gateway key is missing (never silently trades)", async () => {
     delete process.env.LOVABLE_API_KEY;
     await expect(callAiForDecision(baseArgs())).rejects.toThrow("LOVABLE_API_KEY missing");
-    expect(generateText).not.toHaveBeenCalled();
+    expect(streamText).not.toHaveBeenCalled();
   });
 
   it("returns the model's structured output verbatim on the happy path", async () => {
-    generateText.mockImplementationOnce(async () => ({
-      output: {
+    streamText.mockImplementationOnce(() => ({
+      output: Promise.resolve({
         briefing: "calm",
         rationale: "why",
         orders: [
@@ -157,7 +167,7 @@ describe("callAiForDecision — configuration guards", () => {
             },
           },
         ],
-      },
+      }),
     }));
     const out = await callAiForDecision(baseArgs());
     expect(out.orders).toHaveLength(1);
@@ -275,7 +285,12 @@ describe("callAiForDecision — failure fallback and order sizing", () => {
   ];
 
   function failWith(error: unknown) {
-    generateText.mockImplementation(async () => {
+    // Terminal gateway statuses skip the retry ladder, keeping these tests
+    // deterministic and free of real backoff sleeps.
+    if (error && typeof error === "object" && !("statusCode" in error)) {
+      (error as { statusCode?: number }).statusCode = 400;
+    }
+    streamText.mockImplementation(() => {
       throw error;
     });
   }
