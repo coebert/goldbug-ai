@@ -195,6 +195,9 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       seeds.set(key, { ...prev, quantity: Math.max(0, prev.quantity + delta) });
     }
     const candidates = [...seeds.values()].filter((s) => s.quantity > 1e-8);
+    const seedNotes: string[] = [
+      `reconstructed ${candidates.length} of ${seeds.size} names`,
+    ];
 
     // Only seed what the engine can actually price on the start day; anything it
     // cannot value would silently vanish from equity, so hold it as cash instead.
@@ -207,7 +210,10 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       } catch {
         px = null;
       }
-      if (px == null || !Number.isFinite(px) || px <= 0) continue;
+      if (px == null || !Number.isFinite(px) || px <= 0) {
+        seedNotes.push(`${s.symbol}: no price on ${from}`);
+        continue;
+      }
       seeded.push(s);
       invested += s.quantity * px;
     }
