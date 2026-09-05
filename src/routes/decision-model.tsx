@@ -219,7 +219,27 @@ function DecisionModelPage() {
                   label="Period"
                   value={`${model.coverage.from ?? "—"} → ${model.coverage.to ?? "—"}`}
                 />
+                <Stat
+                  label="Days you dealt the name"
+                  value={String(model.coverage.traded_samples ?? 0)}
+                  hint="Weighted more heavily than days the name was only screened"
+                />
+                <Stat
+                  label="Already-held observations"
+                  value={String(model.coverage.held_samples ?? 0)}
+                />
+                <Stat
+                  label="Dealing cost in the target"
+                  value={
+                    model.coverage.label_mode === "price"
+                      ? "None (raw price)"
+                      : `${(model.coverage.round_trip_cost_bps ?? 0).toFixed(1)} bps round trip`
+                  }
+                  hint={`From your own fills on ${model.coverage.cost_calibrated_symbols ?? 0} instruments`}
+                />
+                <Stat label="Trades replayed" value={String(model.coverage.trades_scanned ?? 0)} />
               </CardContent>
+
             </Card>
           </div>
         )}
