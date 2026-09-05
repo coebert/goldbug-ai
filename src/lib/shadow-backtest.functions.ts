@@ -312,6 +312,7 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         orders_executed: ordersExecuted,
         seeded_positions: seeded.length,
         seeded_cash: Math.round(seededCash * 100) / 100,
+        seed_notes: seedNotes.slice(0, 12),
         universe_total: universeSeen,
         candidates_total: candidatesSeen,
         days_with_candidates: daysWithCandidates,
