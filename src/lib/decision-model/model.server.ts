@@ -9,6 +9,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { asJson } from "@/lib/_server/db-json";
 import { buildDataset } from "./dataset.server";
 import {
+  strengthAdjustedScore,
+  strengthLabel,
+  type SymbolStrength,
+} from "./symbol-strength";
+import {
   BUCKETS,
   FEATURE_KEYS,
   FEATURE_SPECS,
@@ -279,12 +284,6 @@ export async function loadLatestModel(userId: string): Promise<StoredModel | nul
 // Scoring today's candidates
 // --------------------------------------------------------------------------
 
-import {
-  strengthAdjustedScore,
-  strengthLabel,
-  type SymbolStrength,
-} from "./symbol-strength";
-
 export type SymbolScore = {
   symbol: string;
   score: number;
@@ -514,7 +513,7 @@ export function formatModelBlock(
     .map(([k, v]) => `${k} ${v}%`)
     .join(", ");
   const strengthFor = (symbol: string): SymbolStrength | null =>
-    strengths?.get(strengthKey(symbol)) ?? null;
+    strengths?.get(baseSymbol(symbol).replace(/\.L$/, "")) ?? null;
   const top = [...scores].sort(
     (a, b) =>
       strengthAdjustedScore(b.score, strengthFor(b.symbol)?.strength) -
