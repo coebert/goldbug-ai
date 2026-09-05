@@ -1,17 +1,34 @@
 /**
  * Builds the training set for the learned decision model out of the account's
- * own recorded history.
+ * own recorded history — trades included, not just prices.
  *
- * Source of truth: every row in `decisions` carries `raw.signals` — the full
- * per-symbol indicator snapshot the engine handed the AI on that date. Pairing
- * each snapshot with the realised forward return from `price_cache` gives a
- * clean, look-ahead-free panel of (features today -> what happened next).
+ * Three things make this portfolio-specific rather than a generic signal study:
+ *
+ *  1. FEATURES. Every row in `decisions` carries `raw.signals` — the exact
+ *     per-symbol snapshot the engine handed the AI that day. On top of that we
+ *     rebuild the book as it stood on the day (position size, unrealised P&L,
+ *     holding age, cash share, drawdown from peak, decayed memory of realised
+ *     losses on the name) from `trades` and `equity_snapshots`, and feed that
+ *     in as features too. No look-ahead: only trades dated strictly before the
+ *     decision date are applied.
+ *
+ *  2. LABEL. Not the raw forward return, but the forward return net of the
+ *     round-trip dealing cost this account actually paid on the name (measured
+ *     from `live_fills` fees), divided by the risk the name was carrying at the
+ *     time. So the model learns "what pays after my costs, per unit of risk",
+ *     which is the only return this book can bank.
+ *
+ *  3. WEIGHT. Days where real money went into the name — and days on the live
+ *     book rather than a paper one — carry more weight in the fit than days the
+ *     engine merely looked at the symbol.
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { priceSymbolVariants } from "../price-symbol";
-import { extractFeatureVector, FEATURE_KEYS, type AnyRow } from "./features";
+import { extractFeatureVector, FEATURE_KEYS, NEUTRAL_PF, withPf, type AnyRow, type PfContext } from "./features";
 import type { Sample } from "./fit";
+
+export type LabelMode = "risk_net" | "price";
 
 export type DatasetOptions = {
   userId: string;
@@ -19,6 +36,8 @@ export type DatasetOptions = {
   horizonDays?: number;
   /** Only use decisions from real-money books when true. */
   realMoneyOnly?: boolean;
+  /** `risk_net` (default) = cost- and risk-adjusted; `price` = raw forward return. */
+  labelMode?: LabelMode;
 };
 
 export type DatasetResult = {
@@ -31,12 +50,33 @@ export type DatasetResult = {
   horizonDays: number;
   from: string | null;
   to: string | null;
+  labelMode: LabelMode;
+  /** Observations on a day this account actually traded the name. */
+  tradedSamples: number;
+  /** Observations where the name was already held. */
+  heldSamples: number;
+  /** Median round-trip dealing cost applied to the label, in bps. */
+  roundTripCostBps: number;
+  /** Symbols with their own measured cost (rest use the account median). */
+  costCalibratedSymbols: number;
+  meanWeight: number;
+  tradesScanned: number;
 };
 
 const REAL_MONEY_MODES = new Set(["live_prod", "live_sim"]);
+const LOSS_MEMORY_HALFLIFE_DAYS = 30;
+const DEFAULT_ONE_WAY_COST_BPS = 15;
 
 /** Close prices for one symbol, ordered by date, keyed by the engine symbol. */
 type PriceSeries = { dates: string[]; closes: number[] };
+
+function baseSymbol(symbol: string): string {
+  return (symbol.split(":")[0] ?? symbol).trim().toUpperCase();
+}
+
+function dayDiff(a: string, b: string): number {
+  return Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000);
+}
 
 async function loadPriceSeries(symbols: string[], from: string): Promise<Map<string, PriceSeries>> {
   const out = new Map<string, PriceSeries>();
@@ -106,8 +146,158 @@ function indexOnOrAfter(series: PriceSeries, date: string): number {
   return ans;
 }
 
+/** Realised daily volatility over the `lookback` bars ending at `i0`, scaled to the horizon. */
+function horizonRisk(series: PriceSeries, i0: number, horizonDays: number, lookback = 20): number {
+  const start = Math.max(1, i0 - lookback);
+  const rets: number[] = [];
+  for (let i = start; i <= i0; i++) {
+    const a = series.closes[i - 1]!;
+    const b = series.closes[i]!;
+    if (a > 0 && b > 0) {
+      const r = Math.log(b / a);
+      if (Number.isFinite(r) && Math.abs(r) < 0.5) rets.push(r);
+    }
+  }
+  if (rets.length < 5) return 0.04;
+  const m = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const sd = Math.sqrt(rets.reduce((a, b) => a + (b - m) * (b - m), 0) / (rets.length - 1));
+  const scaled = sd * Math.sqrt(horizonDays);
+  return Math.min(0.30, Math.max(0.01, scaled));
+}
+
+// --------------------------------------------------------------------------
+// Dealing costs actually paid on this account
+// --------------------------------------------------------------------------
+
+type CostModel = { bySymbol: Map<string, number>; medianBps: number; calibrated: number };
+
+async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
+  const bySymbol = new Map<string, number>();
+  const agg = new Map<string, { fee: number; notional: number }>();
+
+  for (let page = 0; ; page++) {
+    const { data, error } = await supabaseAdmin
+      .from("live_fills")
+      .select("symbol, quantity, fill_price, fee")
+      .in("portfolio_id", portfolioIds)
+      .range(page * 1000, page * 1000 + 999);
+    if (error) break; // costs are a refinement, never a reason to fail the fit
+    for (const r of data ?? []) {
+      const qty = Math.abs(Number(r.quantity) || 0);
+      const px = Number(r.fill_price) || 0;
+      const fee = Math.abs(Number(r.fee) || 0);
+      const notional = qty * px;
+      if (!(notional > 0)) continue;
+      const key = baseSymbol(String(r.symbol ?? ""));
+      const cur = agg.get(key) ?? { fee: 0, notional: 0 };
+      cur.fee += fee;
+      cur.notional += notional;
+      agg.set(key, cur);
+    }
+    if ((data?.length ?? 0) < 1000) break;
+  }
+
+  const perSymbolBps: number[] = [];
+  for (const [sym, v] of agg) {
+    if (v.notional <= 0) continue;
+    const bps = (v.fee / v.notional) * 10_000;
+    if (!Number.isFinite(bps) || bps <= 0 || bps > 400) continue;
+    bySymbol.set(sym, bps);
+    perSymbolBps.push(bps);
+  }
+  perSymbolBps.sort((a, b) => a - b);
+  const medianBps = perSymbolBps.length
+    ? perSymbolBps[Math.floor(perSymbolBps.length / 2)]!
+    : DEFAULT_ONE_WAY_COST_BPS;
+
+  return { bySymbol, medianBps, calibrated: bySymbol.size };
+}
+
+function roundTripCostFrac(costs: CostModel, symbol: string): number {
+  const oneWay = costs.bySymbol.get(baseSymbol(symbol)) ?? costs.medianBps;
+  return Math.min(0.02, Math.max(0.0005, (oneWay * 2) / 10_000));
+}
+
+// --------------------------------------------------------------------------
+// Rebuilding the book as it stood on each decision day
+// --------------------------------------------------------------------------
+
+type TradeRow = {
+  portfolio_id: string;
+  symbol: string;
+  side: string;
+  quantity: number;
+  price: number;
+  value: number;
+  trade_date: string;
+};
+
+type Position = { qty: number; avgCost: number; openedAt: string };
+type LossEvent = { date: string; amount: number };
+
+type BookState = {
+  positions: Map<string, Position>;
+  losses: Map<string, LossEvent[]>;
+  cursor: number;
+};
+
+function applyTrade(state: BookState, t: TradeRow) {
+  const key = baseSymbol(t.symbol);
+  const qty = Math.abs(Number(t.quantity) || 0);
+  const price = Number(t.price) || 0;
+  if (!(qty > 0) || !(price > 0)) return;
+
+  const pos = state.positions.get(key);
+  if (t.side === "buy") {
+    if (pos && pos.qty > 0) {
+      const total = pos.qty + qty;
+      pos.avgCost = (pos.avgCost * pos.qty + price * qty) / total;
+      pos.qty = total;
+    } else {
+      state.positions.set(key, { qty, avgCost: price, openedAt: t.trade_date });
+    }
+    return;
+  }
+
+  // Sell: bank the realised P&L, remember it if it was a loss.
+  if (!pos || pos.qty <= 0) return;
+  const sold = Math.min(qty, pos.qty);
+  const realised = (price - pos.avgCost) * sold;
+  if (realised < 0) {
+    const arr = state.losses.get(key) ?? [];
+    arr.push({ date: t.trade_date, amount: realised });
+    state.losses.set(key, arr);
+  }
+  pos.qty -= sold;
+  if (pos.qty <= 1e-9) state.positions.delete(key);
+}
+
+function lossMemory(state: BookState, symbol: string, date: string, equity: number): number {
+  const events = state.losses.get(baseSymbol(symbol));
+  if (!events || !(equity > 0)) return 0;
+  let total = 0;
+  for (const e of events) {
+    const age = dayDiff(date, e.date);
+    if (age < 0 || age > 180) continue;
+    total += e.amount * Math.pow(0.5, age / LOSS_MEMORY_HALFLIFE_DAYS);
+  }
+  return Math.max(-1, total / equity);
+}
+
+// --------------------------------------------------------------------------
+
+type DecRow = { portfolio_id: string; run_date: string; raw: unknown };
+
+function modePriority(mode: string): number {
+  if (mode === "live_prod") return 3;
+  if (mode === "live_sim") return 2;
+  if (mode === "paper") return 1;
+  return 0;
+}
+
 export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult> {
   const horizonDays = Math.max(1, Math.min(20, opts.horizonDays ?? 5));
+  const labelMode: LabelMode = opts.labelMode ?? "risk_net";
 
   const { data: portfolios, error: pErr } = await supabaseAdmin
     .from("portfolios")
@@ -115,23 +305,27 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     .eq("user_id", opts.userId);
   if (pErr) throw new Error(`portfolios read failed: ${pErr.message}`);
 
-  const ids = (portfolios ?? [])
-    .filter((p) => !opts.realMoneyOnly || REAL_MONEY_MODES.has((p.mode as string) ?? ""))
-    .map((p) => p.id as string);
-  if (ids.length === 0) {
-    return {
-      samples: [], dates: [], symbols: [], decisionsScanned: 0, snapshotsScanned: 0,
-      skippedNoForwardPrice: 0, horizonDays, from: null, to: null,
-    };
-  }
+  const modeById = new Map<string, string>();
+  for (const p of portfolios ?? []) modeById.set(p.id as string, (p.mode as string) ?? "");
 
-  // Pull every decision snapshot, paging through the row cap.
-  type DecRow = { run_date: string; raw: unknown };
+  const ids = Array.from(modeById.entries())
+    .filter(([, mode]) => !opts.realMoneyOnly || REAL_MONEY_MODES.has(mode))
+    .map(([id]) => id);
+
+  const empty: DatasetResult = {
+    samples: [], dates: [], symbols: [], decisionsScanned: 0, snapshotsScanned: 0,
+    skippedNoForwardPrice: 0, horizonDays, from: null, to: null, labelMode,
+    tradedSamples: 0, heldSamples: 0, roundTripCostBps: 0, costCalibratedSymbols: 0,
+    meanWeight: 0, tradesScanned: 0,
+  };
+  if (ids.length === 0) return empty;
+
+  // --- decisions ----------------------------------------------------------
   const decisions: DecRow[] = [];
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
       .from("decisions")
-      .select("run_date, raw")
+      .select("portfolio_id, run_date, raw")
       .in("portfolio_id", ids)
       .order("run_date", { ascending: true })
       .range(page * 500, page * 500 + 499);
@@ -139,37 +333,201 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     decisions.push(...((data ?? []) as unknown as DecRow[]));
     if ((data?.length ?? 0) < 500) break;
   }
+  if (decisions.length === 0) return empty;
 
-  // One snapshot per (date, symbol) — several portfolios tick the same day.
-  const byKey = new Map<string, { date: string; symbol: string; row: AnyRow }>();
+  const firstDate = decisions[0]!.run_date;
+
+  // --- trades (position history) -----------------------------------------
+  const trades: TradeRow[] = [];
+  for (let page = 0; ; page++) {
+    const { data, error } = await supabaseAdmin
+      .from("trades")
+      .select("portfolio_id, symbol, side, quantity, price, value, trade_date")
+      .in("portfolio_id", ids)
+      .order("trade_date", { ascending: true })
+      .range(page * 1000, page * 1000 + 999);
+    if (error) throw new Error(`trades read failed: ${error.message}`);
+    trades.push(...((data ?? []) as unknown as TradeRow[]));
+    if ((data?.length ?? 0) < 1000) break;
+  }
+
+  const tradesByPortfolio = new Map<string, TradeRow[]>();
+  for (const t of trades) {
+    const arr = tradesByPortfolio.get(t.portfolio_id);
+    if (arr) arr.push(t);
+    else tradesByPortfolio.set(t.portfolio_id, [t]);
+  }
+  // Notional traded per (portfolio, date, symbol) — drives the sample weight.
+  const tradedNotional = new Map<string, number>();
+  for (const t of trades) {
+    const key = `${t.portfolio_id}|${t.trade_date}|${baseSymbol(t.symbol)}`;
+    const v = Math.abs(Number(t.value) || Math.abs(Number(t.quantity) || 0) * (Number(t.price) || 0));
+    tradedNotional.set(key, (tradedNotional.get(key) ?? 0) + v);
+  }
+
+  // --- equity / cash by day ----------------------------------------------
+  type EqRow = { portfolio_id: string; snapshot_date: string; cash: number; total_value: number };
+  const equity: EqRow[] = [];
+  for (let page = 0; ; page++) {
+    const { data, error } = await supabaseAdmin
+      .from("equity_snapshots")
+      .select("portfolio_id, snapshot_date, cash, total_value")
+      .in("portfolio_id", ids)
+      .order("snapshot_date", { ascending: true })
+      .range(page * 1000, page * 1000 + 999);
+    if (error) break;
+    equity.push(...((data ?? []) as unknown as EqRow[]));
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  const equityByPortfolio = new Map<string, EqRow[]>();
+  for (const e of equity) {
+    const arr = equityByPortfolio.get(e.portfolio_id);
+    if (arr) arr.push(e);
+    else equityByPortfolio.set(e.portfolio_id, [e]);
+  }
+  // Running peak per portfolio, for the drawdown feature.
+  const peakByPortfolioDate = new Map<string, number>();
+  for (const [pid, rows] of equityByPortfolio) {
+    let peak = 0;
+    for (const r of rows) {
+      const tv = Number(r.total_value) || 0;
+      if (tv > peak) peak = tv;
+      peakByPortfolioDate.set(`${pid}|${r.snapshot_date}`, peak);
+    }
+  }
+
+  function equityOn(pid: string, date: string): { cash: number; total: number; peak: number } | null {
+    const rows = equityByPortfolio.get(pid);
+    if (!rows || rows.length === 0) return null;
+    let lo = 0;
+    let hi = rows.length - 1;
+    let ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (rows[mid]!.snapshot_date <= date) {
+        ans = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    if (ans < 0) return null;
+    const r = rows[ans]!;
+    const total = Number(r.total_value) || 0;
+    if (!(total > 0)) return null;
+    return {
+      cash: Number(r.cash) || 0,
+      total,
+      peak: peakByPortfolioDate.get(`${pid}|${r.snapshot_date}`) ?? total,
+    };
+  }
+
+  const costs = await loadCostModel(ids);
+
+  // --- walk each portfolio's decisions forward, rebuilding the book -------
+  type Candidate = {
+    date: string;
+    symbol: string;
+    row: AnyRow;
+    priority: number;
+    weight: number;
+    traded: boolean;
+    held: boolean;
+  };
+  const byKey = new Map<string, Candidate>();
   let snapshotsScanned = 0;
+
+  const decisionsByPortfolio = new Map<string, DecRow[]>();
   for (const d of decisions) {
-    const raw = d.raw as { signals?: unknown } | null;
-    const signals = Array.isArray(raw?.signals) ? (raw!.signals as AnyRow[]) : [];
-    for (const s of signals) {
-      const symbol = typeof s?.["symbol"] === "string" ? (s["symbol"] as string) : null;
-      if (!symbol) continue;
-      snapshotsScanned++;
-      const key = `${d.run_date}|${symbol}`;
-      if (!byKey.has(key)) byKey.set(key, { date: d.run_date, symbol, row: s });
+    const arr = decisionsByPortfolio.get(d.portfolio_id);
+    if (arr) arr.push(d);
+    else decisionsByPortfolio.set(d.portfolio_id, [d]);
+  }
+
+  for (const [pid, rows] of decisionsByPortfolio) {
+    const mode = modeById.get(pid) ?? "";
+    const priority = modePriority(mode);
+    const bookWeight = REAL_MONEY_MODES.has(mode) ? 2 : mode === "paper" ? 1.2 : 1;
+    const pTrades = (tradesByPortfolio.get(pid) ?? []).slice().sort((a, b) =>
+      a.trade_date < b.trade_date ? -1 : a.trade_date > b.trade_date ? 1 : 0,
+    );
+    const state: BookState = { positions: new Map(), losses: new Map(), cursor: 0 };
+
+    for (const d of rows) {
+      // Only trades settled strictly before today — no look-ahead.
+      while (state.cursor < pTrades.length && pTrades[state.cursor]!.trade_date < d.run_date) {
+        applyTrade(state, pTrades[state.cursor]!);
+        state.cursor++;
+      }
+
+      const eq = equityOn(pid, d.run_date);
+      const total = eq?.total ?? 0;
+      const cashWeight = eq && total > 0 ? Math.max(0, Math.min(1, eq.cash / total)) : 0;
+      const drawdown = eq && eq.peak > 0 ? Math.min(0, total / eq.peak - 1) : 0;
+
+      const raw = d.raw as { signals?: unknown } | null;
+      const signals = Array.isArray(raw?.signals) ? (raw!.signals as AnyRow[]) : [];
+      for (const s of signals) {
+        const symbol = typeof s?.["symbol"] === "string" ? (s["symbol"] as string) : null;
+        if (!symbol) continue;
+        snapshotsScanned++;
+
+        const key = `${d.run_date}|${symbol}`;
+        const existing = byKey.get(key);
+        if (existing && existing.priority >= priority) continue;
+
+        const base = baseSymbol(symbol);
+        const pos = state.positions.get(base);
+        const price = Number(s["price"]) || 0;
+        const held = !!pos && pos.qty > 0;
+        const positionWeight = held && total > 0 && price > 0 ? (pos!.qty * price) / total : 0;
+        const unrealised = held && pos!.avgCost > 0 && price > 0 ? price / pos!.avgCost - 1 : 0;
+        const holdDays = held ? Math.max(0, dayDiff(d.run_date, pos!.openedAt)) : 0;
+
+        const pf: PfContext = {
+          ...NEUTRAL_PF,
+          position_weight: Math.min(1, positionWeight),
+          unrealised_pct: Math.max(-0.9, Math.min(3, unrealised)),
+          hold_days: holdDays,
+          loss_memory: lossMemory(state, base, d.run_date, total),
+          cash_weight: cashWeight,
+          book_drawdown: Math.max(-0.9, drawdown),
+        };
+
+        const notional = tradedNotional.get(`${pid}|${d.run_date}|${base}`) ?? 0;
+        const traded = notional > 0;
+        let weight = bookWeight;
+        if (traded && total > 0) weight *= 1 + 2 * Math.min(1, notional / (0.05 * total));
+        else if (traded) weight *= 2;
+        if (held) weight *= 1.25;
+
+        byKey.set(key, {
+          date: d.run_date,
+          symbol,
+          row: withPf(s, pf),
+          priority,
+          weight: Math.min(8, weight),
+          traded,
+          held,
+        });
+      }
     }
   }
 
   const symbols = Array.from(new Set(Array.from(byKey.values()).map((v) => v.symbol)));
-  const allDates = Array.from(new Set(Array.from(byKey.values()).map((v) => v.date))).sort();
-  const from = allDates[0] ?? null;
-
-  const prices = from ? await loadPriceSeries(symbols, from) : new Map<string, PriceSeries>();
+  const prices = await loadPriceSeries(symbols, firstDate);
 
   const samples: Sample[] = [];
   let skippedNoForwardPrice = 0;
-  for (const { date, symbol, row } of byKey.values()) {
-    const series = prices.get(symbol);
+  let tradedSamples = 0;
+  let heldSamples = 0;
+  let weightSum = 0;
+
+  for (const c of byKey.values()) {
+    const series = prices.get(c.symbol);
     if (!series) {
       skippedNoForwardPrice++;
       continue;
     }
-    const i0 = indexOnOrAfter(series, date);
+    const i0 = indexOnOrAfter(series, c.date);
     const i1 = i0 < 0 ? -1 : i0 + horizonDays;
     if (i0 < 0 || i1 >= series.dates.length) {
       skippedNoForwardPrice++;
@@ -181,13 +539,24 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
       skippedNoForwardPrice++;
       continue;
     }
-    const y = p1 / p0 - 1;
+    const gross = p1 / p0 - 1;
     // Guard against unit switches / bad cache rows producing absurd returns.
-    if (!Number.isFinite(y) || Math.abs(y) > 1) {
+    if (!Number.isFinite(gross) || Math.abs(gross) > 1) {
       skippedNoForwardPrice++;
       continue;
     }
-    samples.push({ date, symbol, x: extractFeatureVector(row), y });
+
+    let y = gross;
+    if (labelMode === "risk_net") {
+      const net = gross - roundTripCostFrac(costs, c.symbol);
+      const risk = horizonRisk(series, i0, horizonDays);
+      y = Math.max(-5, Math.min(5, net / risk));
+    }
+
+    if (c.traded) tradedSamples++;
+    if (c.held) heldSamples++;
+    weightSum += c.weight;
+    samples.push({ date: c.date, symbol: c.symbol, x: extractFeatureVector(c.row), y, w: c.weight });
   }
 
   const usedDates = Array.from(new Set(samples.map((s) => s.date))).sort();
@@ -201,6 +570,13 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     horizonDays,
     from: usedDates[0] ?? null,
     to: usedDates[usedDates.length - 1] ?? null,
+    labelMode,
+    tradedSamples,
+    heldSamples,
+    roundTripCostBps: Math.round(costs.medianBps * 2 * 10) / 10,
+    costCalibratedSymbols: costs.calibrated,
+    meanWeight: samples.length ? Math.round((weightSum / samples.length) * 100) / 100 : 0,
+    tradesScanned: trades.length,
   };
 }
 

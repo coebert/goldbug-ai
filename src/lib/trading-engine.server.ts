@@ -1049,13 +1049,27 @@ export async function runDailyTick(
       if (!userId) return null;
       const model = await loadLatestModel(userId);
       if (!model) return null;
-      const scores = scoreCandidates(model, features as unknown as Array<Record<string, unknown>>);
+      // The model was fitted with this account's own book state as features,
+      // so today's book has to be handed in the same way.
+      const { loadBookSnapshot } = await import("./decision-model/book-state.server");
+      const book = await loadBookSnapshot({
+        portfolioId,
+        totalValue: totalValue,
+        cash,
+        asOf,
+      }).catch(() => null);
+      const scores = scoreCandidates(
+        model,
+        features as unknown as Array<Record<string, unknown>>,
+        book,
+      );
       return formatModelBlock(model, scores);
     } catch (e) {
       srvLog.warn("learned decision model unavailable for prompt", e);
       return null;
     }
   })();
+
 
   const decision: DecisionOutput = breakerTripped
 

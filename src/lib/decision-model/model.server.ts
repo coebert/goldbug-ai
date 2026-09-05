@@ -12,11 +12,15 @@ import {
   BUCKETS,
   FEATURE_KEYS,
   FEATURE_SPECS,
+  NEUTRAL_PF,
   bucketOf,
   extractFeatureVector,
   labelOf,
+  withPf,
   type AnyRow,
+  type PfContext,
 } from "./features";
+
 import {
   bucketWeights,
   evaluate,
@@ -50,7 +54,19 @@ export type StoredModel = {
     from: string | null;
     to: string | null;
     real_money_only: boolean;
+    /** How the label was built: cost/risk-adjusted, or the raw forward return. */
+    label_mode?: string;
+    /** Observations on days this account actually traded the name. */
+    traded_samples?: number;
+    /** Observations where the name was already held. */
+    held_samples?: number;
+    /** Round-trip dealing cost subtracted from the label, in bps. */
+    round_trip_cost_bps?: number;
+    cost_calibrated_symbols?: number;
+    mean_weight?: number;
+    trades_scanned?: number;
   };
+
   /** True when out-of-sample evidence says the fit is worth trading. */
   usable: boolean;
   note: string;
@@ -59,17 +75,24 @@ export type StoredModel = {
 /** Out-of-sample bars a fit must clear before the engine is allowed to use it. */
 export const MIN_TEST_DATES = 8;
 export const MIN_MEAN_IC = 0.02;
+/** The out-of-sample IC must also be stable, not one lucky week. */
+export const MIN_IC_T = 1.5;
+
 
 export async function fitAndStoreModel(args: {
   userId: string;
   horizonDays?: number;
   realMoneyOnly?: boolean;
+  /** `risk_net` (default): forward return net of this account's dealing costs, per unit of risk. */
+  labelMode?: "risk_net" | "price";
 }): Promise<StoredModel> {
   const data = await buildDataset({
     userId: args.userId,
     horizonDays: args.horizonDays ?? 5,
     realMoneyOnly: args.realMoneyOnly ?? false,
+    labelMode: args.labelMode ?? "risk_net",
   });
+
 
   if (data.samples.length < 200) {
     throw new Error(
@@ -93,17 +116,25 @@ export async function fitAndStoreModel(args: {
   const baselineTest = evaluate(testRows, new Array<number>(n).fill(1 / n));
 
   const testIc = wf.best.test.mean_ic;
+  const testT = wf.best.test.ic_t_stat;
+  // A positive mean IC on its own is not evidence: with a couple of dozen test
+  // days it is routinely noise. The fit must also be statistically stable and
+  // beat the naive equal-weight composite on the same days.
   const usable =
     wf.best.test.dates >= MIN_TEST_DATES &&
     testIc !== null &&
     testIc >= MIN_MEAN_IC &&
+    testT !== null &&
+    testT >= MIN_IC_T &&
+    testIc > (baselineTest.mean_ic ?? -Infinity) &&
     (wf.best.test.top_bottom_spread_pct ?? 0) > 0;
 
   const note = usable
-    ? `Out-of-sample selection edge confirmed over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}).`
+    ? `Out-of-sample selection edge confirmed over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}, t ${(testT ?? 0).toFixed(2)}).`
     : `Fit stored for inspection but NOT used for trading: out-of-sample edge too weak (mean IC ${
         testIc === null ? "n/a" : testIc.toFixed(3)
-      } over ${wf.best.test.dates} days).`;
+      }, t ${testT === null ? "n/a" : testT.toFixed(2)} over ${wf.best.test.dates} days).`;
+
 
   const model: Omit<StoredModel, "id" | "fitted_at"> = {
     horizon_days: data.horizonDays,
@@ -121,7 +152,15 @@ export async function fitAndStoreModel(args: {
       from: data.from,
       to: data.to,
       real_money_only: args.realMoneyOnly ?? false,
+      label_mode: data.labelMode,
+      traded_samples: data.tradedSamples,
+      held_samples: data.heldSamples,
+      round_trip_cost_bps: data.roundTripCostBps,
+      cost_calibrated_symbols: data.costCalibratedSymbols,
+      mean_weight: data.meanWeight,
+      trades_scanned: data.tradesScanned,
     },
+
     usable,
     note,
   };
@@ -185,13 +224,65 @@ export type SymbolScore = {
 };
 
 /**
- * Apply the stored model to today's candidate rows. Normalisation matches the
- * training path exactly: z-scored across today's candidates, winsorised.
+ * Today's book, so the portfolio features see the same shape at scoring time
+ * as the dataset builder gave them during the fit.
  */
-export function scoreCandidates(model: StoredModel, rows: AnyRow[]): SymbolScore[] {
+export type BookSnapshot = {
+  totalValue: number;
+  cash: number;
+  /** Highest total value the book has reached; enables the drawdown feature. */
+  peakValue?: number | null;
+  holdings: Array<{
+    symbol: string;
+    quantity: number;
+    avg_cost?: number | null;
+    opened_at?: string | null;
+  }>;
+  /** Decayed realised loss per symbol as a fraction of the book (<= 0). */
+  lossMemory?: Record<string, number>;
+  asOf?: string;
+};
+
+function baseSymbol(symbol: string): string {
+  return (symbol.split(":")[0] ?? symbol).trim().toUpperCase();
+}
+
+/** Account-state block for one candidate row, from today's book. */
+export function pfFor(book: BookSnapshot | null | undefined, row: AnyRow): PfContext {
+  if (!book || !(book.totalValue > 0)) return NEUTRAL_PF;
+  const symbol = String(row["symbol"] ?? "");
+  const key = baseSymbol(symbol);
+  const h = book.holdings.find((x) => baseSymbol(x.symbol) === key);
+  const price = Number(row["price"]) || 0;
+  const qty = Number(h?.quantity) || 0;
+  const avgCost = Number(h?.avg_cost) || 0;
+  const held = qty > 0;
+  const asOf = book.asOf ?? new Date().toISOString().slice(0, 10);
+  const openedAt = h?.opened_at ? String(h.opened_at).slice(0, 10) : null;
+  const holdDays =
+    held && openedAt ? Math.max(0, Math.round((Date.parse(asOf) - Date.parse(openedAt)) / 86_400_000)) : 0;
+  const peak = Number(book.peakValue) || book.totalValue;
+
+  return {
+    position_weight: held && price > 0 ? Math.min(1, (qty * price) / book.totalValue) : 0,
+    unrealised_pct: held && avgCost > 0 && price > 0 ? Math.max(-0.9, Math.min(3, price / avgCost - 1)) : 0,
+    hold_days: holdDays,
+    loss_memory: Math.max(-1, Math.min(0, Number(book.lossMemory?.[key]) || 0)),
+    cash_weight: Math.max(0, Math.min(1, book.cash / book.totalValue)),
+    book_drawdown: peak > 0 ? Math.max(-0.9, Math.min(0, book.totalValue / peak - 1)) : 0,
+  };
+}
+
+/**
+ * Apply the stored model to today's candidate rows. Normalisation matches the
+ * training path exactly: z-scored across today's candidates, winsorised. Pass
+ * `book` so the portfolio-state features are populated as they were in training.
+ */
+export function scoreCandidates(model: StoredModel, rows: AnyRow[], book?: BookSnapshot | null): SymbolScore[] {
   if (rows.length < 3 || model.coefficients.length !== FEATURE_KEYS.length) return [];
 
-  const vectors = rows.map((r) => extractFeatureVector(r));
+  const vectors = rows.map((r) => extractFeatureVector(book ? withPf(r, pfFor(book, r)) : r));
+
   const n = FEATURE_KEYS.length;
 
   const stats: Array<{ m: number; sd: number }> = [];
@@ -256,8 +347,15 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
     .join("; ");
 
   const m = model.metrics.test;
-  return `LEARNED MODEL — FITTED ON THIS ACCOUNT'S OWN HISTORY (${model.coverage.samples} observations, ${model.coverage.dates} trading days ${model.coverage.from ?? "?"} → ${model.coverage.to ?? "?"}):
-- This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day against the realised ${model.horizon_days}-day forward return, demeaned within each day so it measures SELECTION skill, not market direction.
+  const cov = model.coverage;
+
+  const labelLine =
+    cov.label_mode === "price"
+      ? `the realised ${model.horizon_days}-day forward return`
+      : `the realised ${model.horizon_days}-day forward return NET of the round-trip dealing cost this account actually pays (${cov.round_trip_cost_bps ?? "?"}bps, measured from ${cov.cost_calibrated_symbols ?? 0} symbols' invoiced fills), divided by the risk the name was carrying — i.e. what this book could actually have banked per unit of risk`;
+  return `LEARNED MODEL — FITTED ON THIS ACCOUNT'S OWN HISTORY (${cov.samples} observations, ${cov.dates} trading days ${cov.from ?? "?"} → ${cov.to ?? "?"}; ${cov.traded_samples ?? 0} of them days you actually dealt the name, ${cov.held_samples ?? 0} where you already held it):
+- This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day — plus the state of THIS book that day (position size, unrealised P&L, holding age, cash share, drawdown, recent realised loss on the name) — against ${labelLine}, demeaned within each day so it measures SELECTION skill, not market direction. Days where real money went in are weighted more heavily than days the name was merely screened.
+
 - Out-of-sample check (${m.dates} days never used in fitting): mean rank IC ${m.mean_ic?.toFixed(3) ?? "n/a"} (t ${m.ic_t_stat?.toFixed(2) ?? "n/a"}), positive on ${m.ic_hit_rate == null ? "n/a" : (m.ic_hit_rate * 100).toFixed(0)}% of days, top-minus-bottom spread ${m.top_bottom_spread_pct?.toFixed(2) ?? "n/a"}% per ${model.horizon_days}d.
 - ${model.usable ? "VERDICT: the edge held out of sample — treat the mdl score as real evidence." : "VERDICT: the out-of-sample edge is WEAK. Use the mdl score only as a tie-breaker, never as a reason on its own."}
 - Signal weights measured from your results (this is what has actually paid): ${bw || "n/a"}. Where your instinctive weighting differs from these, justify the difference explicitly.

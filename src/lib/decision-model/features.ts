@@ -10,13 +10,20 @@
  * and when scoring (today's candidate rows).
  */
 
-/** The five buckets the AI already attributes its own orders across. */
+/**
+ * The five buckets the AI already attributes its own orders across, plus a
+ * sixth for the state of THIS account (position size, cash, drawdown, past
+ * losses on the name) — the part that makes the fit portfolio-specific rather
+ * than a generic cross-sectional signal study.
+ */
 export type SignalBucket =
   | "sma_trend"
   | "rsi"
   | "price_change"
   | "news_sentiment"
-  | "volatility";
+  | "volatility"
+  | "portfolio";
+
 
 export type FeatureSpec = {
   key: string;
@@ -177,6 +184,48 @@ export const FEATURE_SPECS: readonly FeatureSpec[] = [
     bucket: "volatility",
     extract: (r) => num(sub(r, "rank_info")?.["low_vol_z"]),
   },
+  // --- this account's own state ------------------------------------------
+  // All read off a `pf` block injected by the dataset builder (history) or the
+  // engine (live scoring). Missing => null => neutral after normalisation.
+  {
+    key: "pf_position_weight",
+    label: "Existing position size (% of book)",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["position_weight"]),
+  },
+  {
+    key: "pf_unrealised_pct",
+    label: "Unrealised P&L on the holding",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["unrealised_pct"]),
+  },
+  {
+    key: "pf_hold_days",
+    label: "How long the name has been held",
+    bucket: "portfolio",
+    extract: (r) => {
+      const v = num(sub(r, "pf")?.["hold_days"]);
+      return v === null ? null : Math.min(v, 120) / 30;
+    },
+  },
+  {
+    key: "pf_loss_memory",
+    label: "Recent realised loss on this name",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["loss_memory"]),
+  },
+  {
+    key: "pf_cash_weight",
+    label: "Cash share of the book",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["cash_weight"]),
+  },
+  {
+    key: "pf_book_drawdown",
+    label: "Book drawdown from peak",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["book_drawdown"]),
+  },
 ] as const;
 
 export const FEATURE_KEYS: readonly string[] = FEATURE_SPECS.map((f) => f.key);
@@ -187,7 +236,43 @@ export const BUCKETS: readonly SignalBucket[] = [
   "price_change",
   "news_sentiment",
   "volatility",
+  "portfolio",
 ];
+
+/**
+ * The account-state block the portfolio features read. Built from history when
+ * fitting and from the live book when scoring, so both paths see the same shape.
+ */
+export type PfContext = {
+  /** Position value as a share of total book value (0 when not held). */
+  position_weight: number;
+  /** Unrealised P&L on the holding as a fraction of cost (0 when not held). */
+  unrealised_pct: number;
+  /** Calendar days the name has been held (0 when not held). */
+  hold_days: number;
+  /** Decayed realised loss on this name, as a fraction of book value (<= 0). */
+  loss_memory: number;
+  /** Cash share of the book on the day. */
+  cash_weight: number;
+  /** Book drawdown from its running peak (<= 0). */
+  book_drawdown: number;
+};
+
+export const NEUTRAL_PF: PfContext = {
+  position_weight: 0,
+  unrealised_pct: 0,
+  hold_days: 0,
+  loss_memory: 0,
+  cash_weight: 0,
+  book_drawdown: 0,
+};
+
+/** Attach an account-state block to a signal/candidate row. */
+export function withPf(row: AnyRow, pf: PfContext): AnyRow {
+  return { ...row, pf };
+}
+
+
 
 /** Raw (un-normalised) feature vector for one symbol on one date. */
 export function extractFeatureVector(row: AnyRow): Array<number | null> {

@@ -19,8 +19,14 @@ export type Sample = {
   symbol: string;
   /** Raw feature values, aligned to FEATURE_KEYS; null = missing. */
   x: Array<number | null>;
-  /** Forward return over the horizon (fraction, e.g. 0.021 = +2.1%). */
+  /** Label over the horizon (forward return, or a risk/cost-adjusted variant). */
   y: number;
+  /**
+   * Observation weight. Days where this account actually committed capital to
+   * the name matter more than days it merely looked at it, so those rows are
+   * weighted up. Defaults to 1.
+   */
+  w?: number;
 };
 
 export type NormalisedSample = {
@@ -28,7 +34,9 @@ export type NormalisedSample = {
   symbol: string;
   z: number[];
   y: number;
+  w: number;
 };
+
 
 const WINSOR = 3;
 
@@ -86,9 +94,16 @@ export function normaliseByDate(samples: Sample[], featureCount: number, minPerD
         // Missing or degenerate (every symbol identical) => neutral 0.
         z.push(v === null || v === undefined || !Number.isFinite(v) || sd <= 0 ? 0 : clamp((v - m) / sd, -WINSOR, WINSOR));
       }
-      out.push({ date, symbol: r.symbol, z, y: r.y - ym });
+      out.push({
+        date,
+        symbol: r.symbol,
+        z,
+        y: r.y - ym,
+        w: Number.isFinite(r.w) && (r.w ?? 1) > 0 ? Math.min(8, r.w!) : 1,
+      });
     }
   }
+
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return out;
 }
@@ -100,12 +115,14 @@ export function ridgeFit(rows: NormalisedSample[], featureCount: number, lambda:
   const b = new Array<number>(n).fill(0);
 
   for (const r of rows) {
+    const wt = r.w > 0 ? r.w : 1;
     for (let i = 0; i < n; i++) {
-      const zi = r.z[i]!;
+      const zi = r.z[i]! * wt;
       b[i]! += zi * r.y;
       for (let j = i; j < n; j++) A[i]![j]! += zi * r.z[j]!;
     }
   }
+
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < i; j++) A[i]![j] = A[j]![i]!;
     A[i]![i]! += lambda;
