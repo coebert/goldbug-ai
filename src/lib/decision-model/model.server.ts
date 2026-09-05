@@ -133,7 +133,15 @@ export async function fitAndStoreModel(args: {
       from: data.from,
       to: data.to,
       real_money_only: args.realMoneyOnly ?? false,
+      label_mode: data.labelMode,
+      traded_samples: data.tradedSamples,
+      held_samples: data.heldSamples,
+      round_trip_cost_bps: data.roundTripCostBps,
+      cost_calibrated_symbols: data.costCalibratedSymbols,
+      mean_weight: data.meanWeight,
+      trades_scanned: data.tradesScanned,
     },
+
     usable,
     note,
   };
