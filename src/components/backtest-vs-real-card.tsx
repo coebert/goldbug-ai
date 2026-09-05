@@ -84,9 +84,12 @@ export function BacktestVsRealCard({
         date: p.date,
         Backtest: Number(p.backtest.toFixed(3)),
         Real: Number(p.real.toFixed(3)),
+        Gap: Number(p.gap.toFixed(3)),
+        MoneyGap: Number(p.moneyGap.toFixed(2)),
       })),
     [c],
   );
+
 
   return (
     <Card data-testid="backtest-vs-real-card">
