@@ -24,9 +24,15 @@ import {
 } from "recharts";
 
 import { getMarketPulse } from "@/lib/market-pulse.functions";
+import { getLiveQuotes } from "@/lib/live-quotes.functions";
+import { applyLiveQuotes } from "@/lib/live-quotes";
 import type { PulseAlert } from "@/lib/market-pulse-alerts";
 import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
 import { formatUkTime } from "@/lib/uk-time";
+
+/** Live quote poll — one batched request, so it can run far faster than the pulse. */
+const LIVE_REFRESH_MS = 20_000;
+
 import {
   groupLabel,
   toneBlurb,
