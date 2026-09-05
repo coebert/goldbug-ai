@@ -94,8 +94,14 @@ export function normaliseByDate(samples: Sample[], featureCount: number, minPerD
         // Missing or degenerate (every symbol identical) => neutral 0.
         z.push(v === null || v === undefined || !Number.isFinite(v) || sd <= 0 ? 0 : clamp((v - m) / sd, -WINSOR, WINSOR));
       }
-      out.push({ date, symbol: r.symbol, z, y: r.y - ym });
-    }
+      out.push({
+        date,
+        symbol: r.symbol,
+        z,
+        y: r.y - ym,
+        w: Number.isFinite(r.w) && (r.w ?? 1) > 0 ? Math.min(8, r.w!) : 1,
+      });
+
   }
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return out;
