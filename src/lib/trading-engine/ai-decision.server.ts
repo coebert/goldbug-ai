@@ -19,6 +19,7 @@ import { buildTradingCostBlock } from "./trading-cost-prompt";
 import { regimeDescription, humanRegime, type PersistedRegime } from "../regime-detector.server";
 import { DecisionSchema, type DecisionOutput, type Portfolio, type Holding } from "./types";
 import { formatCandidateTable, activeAssetClasses } from "./features-prompt";
+import { StrictDecisionSchema, normalizeStrictDecision } from "./strict-decision-schema";
 import type { buildCandidateFeatures } from "./candidate-features.server";
 
 export async function callAiForDecision(args: {
@@ -304,7 +305,7 @@ If no action is warranted, return an empty orders array.`;
         model: gateway(attempt.model),
         system,
         prompt: user,
-        output: Output.object({ schema: DecisionSchema }),
+        output: Output.object({ schema: StrictDecisionSchema }),
         providerOptions: {
           lovable: {
             // GPT-5.6 chat calls must explicitly disable reasoning; the gateway
@@ -314,7 +315,7 @@ If no action is warranted, return an empty orders array.`;
         },
         maxRetries: 0,
       });
-      const output = await result.output;
+      const output = normalizeStrictDecision(await result.output);
       if (i > 0) {
         console.warn(`AI decision succeeded on ${attempt.note} attempt (${attempt.model})`);
       }
