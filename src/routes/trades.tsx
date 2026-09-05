@@ -406,7 +406,16 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
             </span>
           )}
           <span>· Filled {fmtNum(row.filledQty, 0)}/{fmtNum(row.order.quantity, 0)}</span>
-          {row.avgFillPrice != null && <span>· Avg {fmtNum(row.avgFillPrice)}</span>}
+          {row.avgFillPrice != null && (
+            <span>· Avg {fmtNum(row.avgFillPrice)}{row.charges.currency ? ` ${row.charges.currency}` : ""}</span>
+          )}
+          {row.charges.total > 0 && (
+            <span>
+              · Commission {fmtNum(row.charges.commission > 0 ? row.charges.commission : row.charges.total)}
+              {row.charges.currency ? ` ${row.charges.currency}` : ""}
+              {row.charges.invoiced ? "" : " (est.)"}
+            </span>
+          )}
           {row.holding
             ? <span>· Position now {fmtNum(row.holding.quantity, 0)} @ {fmtNum(row.holding.avg_cost)}</span>
             : <span>· No open position</span>}
@@ -427,7 +436,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
     </div>
   );
 
-  const feesTotal = row.fills.reduce((s, f) => s + f.fee, 0);
+  const feesTotal = row.charges.total;
   const notional = row.notional ?? (row.avgFillPrice != null ? row.avgFillPrice * row.filledQty : 0);
   const cashFlow = buy ? -(notional + feesTotal) : notional - feesTotal;
   // Realized P&L estimate for sells (buys have no realized P&L on entry).
@@ -481,6 +490,66 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
       )}
 
       {row.filledQty > 0 && (
+        <div className="rounded-md border border-border bg-muted/10 p-2.5">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Filled size, price and broker charges
+          </h4>
+          <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground sm:grid-cols-4">
+            <div>
+              Filled size:{" "}
+              <span className="text-foreground">
+                {fmtNum(row.filledQty, 0)} of {fmtNum(row.order.quantity, 0)}
+              </span>
+            </div>
+            <div>
+              Average price:{" "}
+              <span className="text-foreground">
+                {row.avgFillPrice != null ? fmtNum(row.avgFillPrice) : "—"}
+                {fillCurrency ? ` ${fillCurrency}` : ""}
+              </span>
+            </div>
+            <div>
+              Commission:{" "}
+              <span className="text-foreground">
+                {fmtNum(row.charges.commission)}
+                {fillCurrency ? ` ${fillCurrency}` : ""}
+              </span>
+            </div>
+            <div>
+              Total charges:{" "}
+              <span className="text-foreground">
+                {fmtNum(row.charges.total)}
+                {fillCurrency ? ` ${fillCurrency}` : ""}
+              </span>
+            </div>
+            {row.charges.exchange > 0 && (
+              <div>
+                Exchange fees:{" "}
+                <span className="text-foreground">{fmtNum(row.charges.exchange)}</span>
+              </div>
+            )}
+            {row.charges.tax > 0 && (
+              <div>
+                Stamp duty / tax:{" "}
+                <span className="text-foreground">{fmtNum(row.charges.tax)}</span>
+              </div>
+            )}
+            {row.charges.other > 0 && (
+              <div>
+                Other charges:{" "}
+                <span className="text-foreground">{fmtNum(row.charges.other)}</span>
+              </div>
+            )}
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground/80">
+            {row.charges.invoiced
+              ? "Charges as invoiced by the broker."
+              : "Estimated from the broker's tariff — replaced automatically once the charge report arrives."}
+          </p>
+        </div>
+      )}
+
+      {row.filledQty > 0 && (
         <ImpactBreakdown
           buy={buy}
           priorQty={priorQty ?? 0}
@@ -506,7 +575,9 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
               ? row.fills.map((f, i) => (
                   <Step
                     key={f.id}
-                    label={`Fill ${i + 1} · ${fmtNum(f.quantity, 0)} @ ${fmtNum(f.fill_price)} ${f.currency}`}
+                    label={`Fill ${i + 1} · ${fmtNum(f.quantity, 0)} @ ${fmtNum(f.fill_price)} ${f.currency}${
+                      f.fee > 0 ? ` · charges ${fmtNum(f.commission > 0 ? f.commission : f.fee)}` : ""
+                    }`}
                     at={f.filled_at}
                     state="done"
                   />
@@ -540,7 +611,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
             <div className="mt-2 grid grid-cols-1 gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground sm:grid-cols-2">
               <div>Avg cost now: <span className="text-foreground">{row.holding ? fmtNum(row.holding.avg_cost) : "—"}</span></div>
               <div>Fill notional: <span className="text-foreground">{row.notional != null ? fmtNum(row.notional) : "—"}</span></div>
-              <div>Fees: <span className="text-foreground">{fmtNum(row.fills.reduce((s, f) => s + f.fee, 0))}</span></div>
+              <div>Fees: <span className="text-foreground">{fmtNum(row.charges.total)}</span></div>
               <div>Last update: <span className="text-foreground">{fmtTime(row.holding?.updated_at ?? row.order.updated_at)}</span></div>
             </div>
             {!row.holding && row.filledQty > 0 && (
