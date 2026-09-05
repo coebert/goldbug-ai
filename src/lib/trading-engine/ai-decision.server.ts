@@ -66,6 +66,8 @@ export async function callAiForDecision(args: {
   playbookBlock?: string | null;
   /** Realised risk/return profile of this exact book, from its own records. */
   riskProfileBlock?: string | null;
+  /** Learned decision model: verdict, evidence strength, and today's mdl scores. */
+  modelBlock?: string | null;
 
 
 
@@ -191,6 +193,8 @@ ${args.shortSleeveBlock ?? ""}
 ${args.playbookBlock ?? ""}
 
 ${args.riskProfileBlock ?? ""}
+
+${args.modelBlock ?? ""}
 
 
 

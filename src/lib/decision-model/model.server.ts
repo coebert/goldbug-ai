@@ -81,16 +81,31 @@ export type StoredModel = {
     cost_invoiced_fills?: number;
   };
 
-  /** True when out-of-sample evidence says the fit is worth trading. */
+  /** True when out-of-sample evidence says the fit is worth trading at all. */
   usable: boolean;
+  /**
+   * 0..1 — how strong the out-of-sample evidence is, scaling how aggressively
+   * the model may be traded. 1 = full bar cleared; a small but real edge sits
+   * below and is traded at proportionally reduced size. 0 = inspection-only.
+   */
+  edge_strength: number;
   note: string;
 };
 
-/** Out-of-sample bars a fit must clear before the engine is allowed to use it. */
+/** Out-of-sample bars a fit must clear before the engine is allowed to use it at full size. */
 export const MIN_TEST_DATES = 8;
 export const MIN_MEAN_IC = 0.02;
-/** The out-of-sample IC must also be stable, not one lucky week. */
+/** The out-of-sample IC must also be stable, not one lucky week, for full size. */
 export const MIN_IC_T = 1.5;
+/**
+ * Hard floors for ANY trading use. Below these there is no evidence of edge at
+ * all and the fit stays inspection-only; between the floor and the full bar the
+ * edge is small but real and is traded at reduced size (edge_strength < 1).
+ */
+export const FLOOR_MEAN_IC = 0.005;
+export const FLOOR_IC_T = 0.5;
+/** Smallest traded size fraction once the floor is cleared. */
+export const MIN_EDGE_STRENGTH = 0.25;
 
 
 export async function fitAndStoreModel(args: {
@@ -135,20 +150,39 @@ export async function fitAndStoreModel(args: {
   const testIc = wf.best.test.mean_ic;
   const testT = wf.best.test.ic_t_stat;
   // A positive mean IC on its own is not evidence: with a couple of dozen test
-  // days it is routinely noise. The fit must also be statistically stable and
-  // beat the naive equal-weight composite on the same days.
+  // days it is routinely noise. The fit must also show some stability and beat
+  // the naive equal-weight composite on the same days. But the bar is graded,
+  // not binary: a small edge that clears the hard floors is tradeable at
+  // reduced size — only a fit with no real evidence stays inspection-only.
+  const beatsBaseline = testIc !== null && testIc > (baselineTest.mean_ic ?? -Infinity);
   const usable =
     wf.best.test.dates >= MIN_TEST_DATES &&
     testIc !== null &&
-    testIc >= MIN_MEAN_IC &&
+    testIc >= FLOOR_MEAN_IC &&
     testT !== null &&
-    testT >= MIN_IC_T &&
-    testIc > (baselineTest.mean_ic ?? -Infinity) &&
+    testT >= FLOOR_IC_T &&
+    beatsBaseline &&
     (wf.best.test.top_bottom_spread_pct ?? 0) > 0;
 
+  // Evidence strength scales toward 1 as the out-of-sample IC and its t-stat
+  // reach the full bars; a fit that only just clears the floor trades at
+  // MIN_EDGE_STRENGTH of normal size.
+  const edge_strength = usable
+    ? Math.max(
+        MIN_EDGE_STRENGTH,
+        Math.min(
+          1,
+          0.5 * Math.min(1, (testIc ?? 0) / MIN_MEAN_IC) +
+            0.5 * Math.min(1, (testT ?? 0) / MIN_IC_T),
+        ),
+      )
+    : 0;
+
   const note = usable
-    ? `Out-of-sample selection edge confirmed over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}, t ${(testT ?? 0).toFixed(2)}).`
-    : `Fit stored for inspection but NOT used for trading: out-of-sample edge too weak (mean IC ${
+    ? edge_strength >= 1
+      ? `Out-of-sample selection edge confirmed over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}, t ${(testT ?? 0).toFixed(2)}) — full-size trading evidence.`
+      : `Small but real out-of-sample edge over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}, t ${(testT ?? 0).toFixed(2)}) — tradeable at ${(edge_strength * 100).toFixed(0)}% of normal size, not full conviction.`
+    : `Fit stored for inspection but NOT used for trading: no real out-of-sample edge (mean IC ${
         testIc === null ? "n/a" : testIc.toFixed(3)
       }, t ${testT === null ? "n/a" : testT.toFixed(2)} over ${wf.best.test.dates} days).`;
 
@@ -185,6 +219,7 @@ export async function fitAndStoreModel(args: {
     },
 
     usable,
+    edge_strength,
     note,
   };
 
@@ -197,7 +232,8 @@ export async function fitAndStoreModel(args: {
       feature_keys: asJson(model.feature_keys),
       coefficients: asJson(model.coefficients),
       bucket_weights: asJson(model.bucket_weights),
-      metrics: asJson(model.metrics),
+      // edge_strength rides inside the metrics JSON so no schema change is needed.
+      metrics: asJson({ ...model.metrics, edge_strength: model.edge_strength }),
       coverage: asJson(model.coverage),
       usable: model.usable,
       note: model.note,
@@ -229,6 +265,12 @@ export async function loadLatestModel(userId: string): Promise<StoredModel | nul
     metrics: data.metrics as StoredModel["metrics"],
     coverage: data.coverage as StoredModel["coverage"],
     usable: data.usable === true,
+    // Older rows predate the graded gate: a usable fit was full-strength.
+    edge_strength: (() => {
+      const v = Number((data.metrics as Record<string, unknown> | null)?.["edge_strength"]);
+      if (Number.isFinite(v)) return Math.max(0, Math.min(1, v));
+      return data.usable === true ? 1 : 0;
+    })(),
     note: (data.note as string) ?? "",
   };
 }
@@ -482,7 +524,7 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
 - This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day — plus the state of THIS book that day (position size, unrealised P&L, holding age, cash share, drawdown, recent realised loss on the name) — against ${labelLine}, demeaned within each day so it measures SELECTION skill, not market direction. Days where real money went in are weighted more heavily than days the name was merely screened.
 
 - Out-of-sample check (${m.dates} days never used in fitting): mean rank IC ${m.mean_ic?.toFixed(3) ?? "n/a"} (t ${m.ic_t_stat?.toFixed(2) ?? "n/a"}), positive on ${m.ic_hit_rate == null ? "n/a" : (m.ic_hit_rate * 100).toFixed(0)}% of days, top-minus-bottom spread ${m.top_bottom_spread_pct?.toFixed(2) ?? "n/a"}% per ${model.horizon_days}d.
-- ${model.usable ? "VERDICT: the edge held out of sample — treat the mdl score as real evidence." : "VERDICT: the out-of-sample edge is WEAK. Use the mdl score only as a tie-breaker, never as a reason on its own."}
+- ${model.usable ? (model.edge_strength >= 1 ? "VERDICT: the edge held out of sample — treat the mdl score as real evidence at full size." : `VERDICT: the out-of-sample edge is SMALL but real (strength ${(model.edge_strength * 100).toFixed(0)}%). You MAY trade on the mdl score, but scale any mdl-driven position to about ${(model.edge_strength * 100).toFixed(0)}% of the size the same conviction would normally get — a small edge earns a small stake, never a full one.`) : "VERDICT: no real out-of-sample edge. Use the mdl score only as a tie-breaker, never as a reason on its own."}
 - Signal weights measured from your results (this is what has actually paid): ${bw || "n/a"}. Where your instinctive weighting differs from these, justify the difference explicitly.
 - Strongest fitted drivers: ${drivers}.
 ${table ? `\nTODAY'S MODEL RANKING (higher = better expected ${model.horizon_days}d relative return):\n${table}\nWeakest: ${worst}.` : ""}

@@ -1085,6 +1085,50 @@ export async function runDailyTick(
     }
   })();
 
+  // The learned decision model, scored on today's candidates with today's book
+  // state — the same features and normalisation it was fitted on. A small but
+  // real out-of-sample edge is tradeable at reduced size (edge_strength in the
+  // block tells the AI how much); no edge at all keeps it a tie-breaker only.
+  // Best-effort: never break the tick.
+  const modelBlock = await (async () => {
+    if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
+    try {
+      const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
+      if (!userId) return null;
+      const { loadLatestModel, loadScoringContext, scoreCandidates, formatModelBlock } =
+        await import("./decision-model/model.server");
+      const model = await loadLatestModel(userId);
+      if (!model || model.coefficients.length === 0) return null;
+      const ctx = await loadScoringContext(asOf);
+      const lossMemoryLive: Record<string, number> = {};
+      for (const [sym, pm] of lossMemory) lossMemoryLive[sym] = pm.penalty;
+      const book = {
+        totalValue,
+        cash,
+        holdings: (holdings ?? []).map((h) => ({
+          symbol: h.symbol,
+          quantity: Number(h.quantity) || 0,
+          avg_cost: Number(h.avg_cost) || 0,
+          opened_at: (h as unknown as { opened_at?: string | null }).opened_at ?? null,
+        })),
+        lossMemory: lossMemoryLive,
+        asOf,
+      };
+      const scores = scoreCandidates(
+        model,
+        features as unknown as Array<Record<string, unknown>>,
+        book,
+        ctx,
+      );
+      return formatModelBlock(model, scores);
+    } catch (e) {
+      srvLog.warn("learned model scoring unavailable for prompt", e);
+      return null;
+    }
+  })();
+
+
+
 
 
   const decision: DecisionOutput = breakerTripped
@@ -1152,7 +1196,8 @@ export async function runDailyTick(
           ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
           : null,
         playbookBlock,
-        riskProfileBlock,
+      riskProfileBlock,
+      modelBlock,
 
         shortSleeveBlock: formatShortSleeveBlock({
 
