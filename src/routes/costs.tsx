@@ -46,6 +46,12 @@ export const Route = createFileRoute("/costs")({
 });
 
 const bps = (n: number) => `${n.toFixed(0)}bps`;
+const money = (n: number) =>
+  n.toLocaleString("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  });
 
 function CostsDashboard() {
   const queryClient = useQueryClient();
