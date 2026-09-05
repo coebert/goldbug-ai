@@ -5,6 +5,7 @@ import { z } from "zod";
 const FitInput = z.object({
   horizonDays: z.number().int().min(1).max(20).default(5),
   realMoneyOnly: z.boolean().default(false),
+  labelMode: z.enum(["risk_net", "price"]).default("risk_net"),
 });
 
 /** Refit the decision model on the account's full recorded history. */
@@ -18,12 +19,14 @@ export const fitDecisionModel = createServerFn({ method: "POST" })
         userId: context.userId,
         horizonDays: data.horizonDays,
         realMoneyOnly: data.realMoneyOnly,
+        labelMode: data.labelMode,
       });
       return { ok: true as const, model };
     } catch (e) {
       return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
     }
   });
+
 
 /** Read the most recently fitted model, with its feature labels for display. */
 export const getDecisionModel = createServerFn({ method: "GET" })
