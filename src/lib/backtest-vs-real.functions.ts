@@ -202,8 +202,13 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
       let slippage = 0;
       if (want && Number.isFinite(got) && got > 0 && qty > 0) {
         const adverse = String(f.side) === "sell" ? want - got : got - want;
-        if (adverse > 0) slippage = adverse * qty;
+        // A gap this wide is a pence/pounds mismatch between the order and the
+        // fill (or a stale limit), not real slippage — counting it would make
+        // the cost bigger than the account.
+        const plausible = Math.abs(want - got) / got <= 0.05;
+        if (adverse > 0 && plausible) slippage = adverse * qty;
       }
+
 
       return {
         date: String(f.filled_at ?? f.created_at ?? "").slice(0, 10),
