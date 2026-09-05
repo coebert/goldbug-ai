@@ -247,7 +247,11 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       // How often did the real model actually decide?
       let ordersProposed = 0;
       let ordersExecuted = 0;
+      let candidatesSeen = 0;
+      let universeSeen = 0;
+      let daysWithCandidates = 0;
       const rejectReasons = new Map<string, number>();
+      const budgetNotes = new Map<string, number>();
       const { data: decisions } = await supabase
         .from("decisions")
         .select("run_date, model, raw")
@@ -267,6 +271,20 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         const executed = Array.isArray(raw["executed"]) ? (raw["executed"] as unknown[]) : [];
         ordersProposed += orders.length;
         ordersExecuted += executed.length;
+        // Affordability/universe context explains a "no candidates" silence,
+        // which looks identical to the AI simply choosing to hold.
+        const aff = (raw["affordability"] ?? {}) as Record<string, unknown>;
+        const kept = Number(aff["candidates_kept"] ?? 0);
+        candidatesSeen += Number.isFinite(kept) ? kept : 0;
+        universeSeen = Math.max(universeSeen, Number(aff["universe_total"] ?? 0) || 0);
+        if (kept > 0) daysWithCandidates += 1;
+        const notes = Array.isArray(aff["notes"]) ? (aff["notes"] as unknown[]) : [];
+        for (const n of notes) {
+          if (typeof n === "string" && n.trim()) {
+            const k = n.slice(0, 120);
+            budgetNotes.set(k, (budgetNotes.get(k) ?? 0) + 1);
+          }
+        }
         for (const e of executed) {
           const rec = e as Record<string, unknown>;
           const why = rec["rejected"] ?? rec["reason"];
@@ -276,6 +294,11 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
           }
         }
       }
+      const topOf = (m: Map<string, number>) =>
+        [...m.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([reason, count]) => ({ reason, count }));
       const diagnostics = {
         ai_days: aiDays,
         fallback_days: fallbackDays,
@@ -283,10 +306,11 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         orders_executed: ordersExecuted,
         seeded_positions: seeded.length,
         seeded_cash: Math.round(seededCash * 100) / 100,
-        reject_reasons: [...rejectReasons.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 8)
-          .map(([reason, count]) => ({ reason, count })),
+        universe_total: universeSeen,
+        candidates_total: candidatesSeen,
+        days_with_candidates: daysWithCandidates,
+        budget_notes: topOf(budgetNotes),
+        reject_reasons: topOf(rejectReasons),
         errors: failures.slice(0, 5),
       };
 
