@@ -8,6 +8,7 @@ import {
   GitCompare,
   Network,
   BookOpen,
+  Brain,
   Sparkles,
   Plug,
   RefreshCw,
