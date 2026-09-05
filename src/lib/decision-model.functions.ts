@@ -6,6 +6,8 @@ const FitInput = z.object({
   horizonDays: z.number().int().min(1).max(20).default(5),
   realMoneyOnly: z.boolean().default(false),
   labelMode: z.enum(["risk_net", "price"]).default("risk_net"),
+  /** Years of bar history rebuilt behind the first recorded decision (0 = recorded days only). */
+  historyYears: z.number().int().min(0).max(25).default(10),
 });
 
 /** Refit the decision model on the account's full recorded history. */
@@ -20,6 +22,7 @@ export const fitDecisionModel = createServerFn({ method: "POST" })
         horizonDays: data.horizonDays,
         realMoneyOnly: data.realMoneyOnly,
         labelMode: data.labelMode,
+        historyYears: data.historyYears,
       });
       return { ok: true as const, model };
     } catch (e) {

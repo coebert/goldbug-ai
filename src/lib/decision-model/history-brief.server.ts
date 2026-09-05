@@ -57,6 +57,9 @@ export type HistoryBrief = {
     tradedSamples: number;
     heldSamples: number;
     roundTripCostBps: number;
+    /** Rows rebuilt from bars before the engine started recording decisions. */
+    historySamples: number;
+    historyFrom: string | null;
   };
   features: FeatureEvidence[];
   bestSymbols: SymbolRecord[];
@@ -214,7 +217,11 @@ export async function buildHistoryBrief(args: {
 
   const text = [
     `ACCOUNT HISTORY EVIDENCE — ${data.samples.length} observations of ${data.symbols.length} instruments over ${data.dates.length} trading days (${data.from ?? "?"} → ${data.to ?? "?"}).`,
-    `Outcome measured on every row: the realised ${horizonDays}-trading-day return NET of the round-trip dealing cost this account actually pays (${data.roundTripCostBps.toFixed(0)}bps, measured from invoiced fills), divided by the risk the name was carrying, then expressed relative to that same day's average across the candidate list. So it measures SELECTION, not market direction. ${data.tradedSamples} rows are days real money went into the name; ${data.heldSamples} are days it was already held.`,
+    `Outcome measured on every row: the realised ${horizonDays}-trading-day return NET of the round-trip dealing cost this account actually pays (${data.roundTripCostBps.toFixed(0)}bps, measured from invoiced fills), divided by the risk the name was carrying, then expressed relative to that same day's average across the candidate list. So it measures SELECTION, not market direction. ${data.tradedSamples} rows are days real money went into the name; ${data.heldSamples} are days it was already held.${
+      data.historySamples
+        ? ` A further ${data.historySamples} rows rebuild the same technical snapshot on these instruments back to ${data.historyFrom ?? "?"}, before this engine kept records — those rows carry no news, no book state and a smaller weight, so they show the long-run behaviour of the names without overruling this account's own record.`
+        : ""
+    }`,
     "",
     "SIGNAL BUCKETS — what each signal actually delivered on this book (q1 = lowest fifth of that signal on the day, q5 = highest):",
     ...strong.map(
@@ -248,6 +255,8 @@ export async function buildHistoryBrief(args: {
       tradedSamples: data.tradedSamples,
       heldSamples: data.heldSamples,
       roundTripCostBps: data.roundTripCostBps,
+      historySamples: data.historySamples,
+      historyFrom: data.historyFrom,
     },
     features,
     bestSymbols,
