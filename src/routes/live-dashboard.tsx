@@ -224,8 +224,9 @@ function LiveDashboardPage() {
                           {streamLive
                             ? `Prices stream straight from Saxo on ${streamedSymbols.size} of ${positions.length} positions${stream.lastTickAt ? ` — last update ${new Date(stream.lastTickAt).toLocaleTimeString("en-GB")}` : ""}.`
                             : brokerQuotes && brokerQuotes.covered > 0
-                            ? `Live Saxo quotes on ${brokerQuotes.covered} of ${brokerQuotes.requested} positions${brokerQuotes.covered < brokerQuotes.requested ? " — the rest fall back to the cached daily close" : ""}.`
-                            : "Broker quotes unavailable — prices shown are the cached daily close."}
+                            ? `Live prices on ${brokerQuotes.covered} of ${brokerQuotes.requested} positions (${brokerQuotes.fromBroker} straight from Saxo${brokerQuotes.covered > brokerQuotes.fromBroker ? `, ${brokerQuotes.covered - brokerQuotes.fromBroker} from the market feed` : ""})${brokerQuotes.covered < brokerQuotes.requested ? " — the rest fall back to the cached daily close" : ""}.`
+                            : "Live prices unavailable — prices shown are the cached daily close."}
+
                         </p>
                       </CardHeader>
 

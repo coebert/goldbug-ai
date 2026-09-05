@@ -24,9 +24,15 @@ import {
 } from "recharts";
 
 import { getMarketPulse } from "@/lib/market-pulse.functions";
+import { getLiveQuotes } from "@/lib/live-quotes.functions";
+import { applyLiveQuotes } from "@/lib/live-quotes";
 import type { PulseAlert } from "@/lib/market-pulse-alerts";
 import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
 import { formatUkTime } from "@/lib/uk-time";
+
+/** Live quote poll — one batched request, so it can run far faster than the pulse. */
+const LIVE_REFRESH_MS = 20_000;
+
 import {
   groupLabel,
   toneBlurb,
@@ -245,6 +251,7 @@ function formatCountdown(totalSeconds: number): string {
  */
 export function MarketPulseCard() {
   const fetchPulse = useServerFn(getMarketPulse);
+  const fetchLive = useServerFn(getLiveQuotes);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(90);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -257,6 +264,18 @@ export function MarketPulseCard() {
     refetchInterval: autoRefresh ? REFRESH_MS : false,
   });
 
+  // The daily tape only moves once a session; this is the live one. It polls
+  // far faster than the pulse itself because it is a single batched quote
+  // request, and it pauses with the same Auto/Pause control.
+  const liveQuery = useQuery({
+    queryKey: ["live-quotes", "pulse"],
+    queryFn: () => fetchLive({ data: {} }),
+    refetchInterval: autoRefresh ? LIVE_REFRESH_MS : false,
+    refetchOnWindowFocus: true,
+    staleTime: LIVE_REFRESH_MS,
+    gcTime: 5 * 60_000,
+  });
+
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
@@ -266,8 +285,12 @@ export function MarketPulseCard() {
     ? Math.max(0, Math.ceil((query.dataUpdatedAt + REFRESH_MS - now) / 1000))
     : REFRESH_MS / 1000;
 
+  const live = liveQuery.data ?? null;
+  const pulse = useMemo(
+    () => (query.data ? applyLiveQuotes(query.data, live) : query.data),
+    [query.data, live],
+  );
 
-  const pulse = query.data;
   const grouped = useMemo(() => {
     const out = new Map<PulseGroup, PulseQuote[]>();
     for (const q of pulse?.quotes ?? []) {
@@ -313,12 +336,23 @@ export function MarketPulseCard() {
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Activity className="h-4 w-4 text-primary" /> Market pulse
+            {live && !live.stale ? (
+              <span
+                data-testid="pulse-live-badge"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 px-2 py-0.5 text-[10px] font-medium text-emerald-500"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                Live
+              </span>
+            ) : null}
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            The state of world markets{pulse.asOf ? ` as at ${pulse.asOf}` : ""} — prices, trends and
-            where the money is going.
+            {live && !live.stale
+              ? `Live prices as at ${formatUkTime(live.asOf ?? Date.now())} — ${live.covered} of ${live.requested} markets updating now.`
+              : `The state of world markets${pulse.asOf ? ` as at ${pulse.asOf}` : ""} — prices, trends and where the money is going.`}
           </p>
         </div>
+
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge
             variant="outline"
