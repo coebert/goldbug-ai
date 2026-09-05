@@ -19,7 +19,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { POLL } from "@/lib/query-keys";
 
-const CATEGORIES = ["pending_slices", "insider_dealing"];
+const CATEGORIES = [
+  "pending_slices",
+  "insider_dealing",
+  "trade_opened",
+  "trade_filled",
+  "trade_rejected",
+];
 
 function severityTone(s: string): string {
   switch (s) {
