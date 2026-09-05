@@ -184,6 +184,48 @@ export const FEATURE_SPECS: readonly FeatureSpec[] = [
     bucket: "volatility",
     extract: (r) => num(sub(r, "rank_info")?.["low_vol_z"]),
   },
+  // --- this account's own state ------------------------------------------
+  // All read off a `pf` block injected by the dataset builder (history) or the
+  // engine (live scoring). Missing => null => neutral after normalisation.
+  {
+    key: "pf_position_weight",
+    label: "Existing position size (% of book)",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["position_weight"]),
+  },
+  {
+    key: "pf_unrealised_pct",
+    label: "Unrealised P&L on the holding",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["unrealised_pct"]),
+  },
+  {
+    key: "pf_hold_days",
+    label: "How long the name has been held",
+    bucket: "portfolio",
+    extract: (r) => {
+      const v = num(sub(r, "pf")?.["hold_days"]);
+      return v === null ? null : Math.min(v, 120) / 30;
+    },
+  },
+  {
+    key: "pf_loss_memory",
+    label: "Recent realised loss on this name",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["loss_memory"]),
+  },
+  {
+    key: "pf_cash_weight",
+    label: "Cash share of the book",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["cash_weight"]),
+  },
+  {
+    key: "pf_book_drawdown",
+    label: "Book drawdown from peak",
+    bucket: "portfolio",
+    extract: (r) => num(sub(r, "pf")?.["book_drawdown"]),
+  },
 ] as const;
 
 export const FEATURE_KEYS: readonly string[] = FEATURE_SPECS.map((f) => f.key);
@@ -194,7 +236,9 @@ export const BUCKETS: readonly SignalBucket[] = [
   "price_change",
   "news_sentiment",
   "volatility",
+  "portfolio",
 ];
+
 
 /** Raw (un-normalised) feature vector for one symbol on one date. */
 export function extractFeatureVector(row: AnyRow): Array<number | null> {
