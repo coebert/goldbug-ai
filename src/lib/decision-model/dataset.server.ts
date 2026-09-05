@@ -300,7 +300,7 @@ function lossMemory(state: BookState, symbol: string, date: string, equity: numb
 
 // --------------------------------------------------------------------------
 
-type DecRow = { portfolio_id: string; run_date: string; raw: unknown };
+type DecRow = { portfolio_id: string; run_date: string; raw: unknown; created_at?: string | null };
 
 function modePriority(mode: string): number {
   if (mode === "live_prod") return 3;
@@ -340,7 +340,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
       .from("decisions")
-      .select("portfolio_id, run_date, raw")
+      .select("portfolio_id, run_date, raw, created_at")
       .in("portfolio_id", ids)
       .order("run_date", { ascending: true })
       .range(page * 500, page * 500 + 499);
@@ -538,6 +538,8 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     held: boolean;
     /** True for rows rebuilt from bars before the first recorded decision. */
     history?: boolean;
+    /** Decision timestamp for market × time-of-day bucketing. */
+    at?: string | null;
   };
   const byKey = new Map<string, Candidate>();
   let snapshotsScanned = 0;
@@ -641,6 +643,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
           weight: Math.min(8, weight),
           traded,
           held,
+          at: d.created_at ?? null,
         });
       }
     }
@@ -737,7 +740,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     if (c.held) heldSamples++;
     if (c.history) historySamples++;
     weightSum += c.weight;
-    samples.push({ date: c.date, symbol: c.symbol, x: extractFeatureVector(c.row), y, w: c.weight });
+    samples.push({ date: c.date, symbol: c.symbol, x: extractFeatureVector(c.row), y, w: c.weight, at: c.at ?? null });
   }
 
   const usedDates = Array.from(new Set(samples.map((s) => s.date))).sort();
