@@ -2101,6 +2101,29 @@ export async function routeOrdersToBroker(params: {
       })
       .eq("id", liveOrderId);
 
+    // Live alert the moment the trade is accepted by the broker — stock, size
+    // and the signals behind it — so the owner can act without waiting for
+    // the fill reconciliation.
+    if (brokerRes.status !== "rejected" && brokerRes.status !== "error") {
+      const { notifyTradeOpened } = await import("./trade-open-notify.server");
+      notifyTradeOpened({
+        userId,
+        portfolioId: portfolio.id,
+        orderId: liveOrderId,
+        decisionId: decisionId ?? null,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        price: brokerRes.avgFillPrice ?? (limitPlan ? limitPlan.limitPrice : (order.price ?? null)),
+        currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
+        status: brokerRes.status,
+        orderType: limitPlan ? "limit" : "market",
+        limitPrice: limitPlan ? limitPlan.limitPrice : null,
+      });
+    }
+
+
+
     // Learn permanent, account-level rejections (e.g. Saxo's "suitability
     // test has not been taken" on complex products such as gold ETCs) so the
     // engine stops re-proposing the same symbol every hour.
