@@ -386,6 +386,12 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
           <span>Created {fmtTime(row.order.created_at)}</span>
           {row.order.submitted_at && <span>· Submitted {fmtTime(row.order.submitted_at)}</span>}
+          {firstFillAt && (
+            <span>
+              · Filled at {fmtTime(firstFillAt)}
+              {lastFillAt !== firstFillAt ? `–${fmtTime(lastFillAt)}` : ""}
+            </span>
+          )}
           <span>· Filled {fmtNum(row.filledQty, 0)}/{fmtNum(row.order.quantity, 0)}</span>
           {row.avgFillPrice != null && <span>· Avg {fmtNum(row.avgFillPrice)}</span>}
           {row.holding
