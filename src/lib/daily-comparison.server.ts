@@ -110,6 +110,7 @@ export async function buildDailyComparison(args: {
     horizonDays,
     modelUsable: false,
     strengthsMeasured: 0,
+    markets: [],
     rows: [],
   };
 
@@ -219,11 +220,45 @@ export async function buildDailyComparison(args: {
   // ---- historical signal strength --------------------------------------
   const strengths = await loadSymbolStrengths(args.userId, horizonDays);
 
+  // ---- market × time-of-day strength ------------------------------------
+  const marketRows = await loadMarketStrengths(args.userId, horizonDays).catch(() => []);
+  const session = sessionForTimestamp(decision?.created_at ? String(decision.created_at) : null);
+  const assetClassBySymbol = new Map(
+    UNIVERSE.map((u) => [u.symbol.toUpperCase(), u.asset_class as string]),
+  );
+  const marketOf = (symbol: string): MarketGroup => {
+    const base = symbol.split(":")[0]!.trim().toUpperCase();
+    return classifyMarketGroup(base, assetClassBySymbol.get(base) ?? null);
+  };
+  const markets: MarketStrengthCell[] = MARKET_GROUPS.map((g) => {
+    const all = marketRows.find((r) => r.market === g && r.session === "all")?.strength ?? null;
+    const now =
+      session == null
+        ? null
+        : (marketRows.find((r) => r.market === g && r.session === session)?.strength ?? null);
+    return {
+      market: g,
+      marketLabel: MARKET_LABELS[g],
+      strength: all?.strength ?? 0,
+      strengthLabel: strengthLabel(all?.strength ?? 0),
+      samples: all?.samples ?? 0,
+      hitRate: all?.hitRate ?? null,
+      meanNetBps: all?.meanNetBps ?? null,
+      session,
+      sessionLabel: session ? SESSION_LABELS[session] : null,
+      sessionStrength: now?.strength ?? null,
+      sessionStrengthLabel: now ? strengthLabel(now.strength) : null,
+      sessionSamples: now?.samples ?? null,
+      weight: marketSessionWeight({ market: g, session, rows: marketRows }),
+    };
+  });
+
   const rows: ComparisonRow[] = signals.map((s) => {
     const symbol = String(s["symbol"] ?? "");
     const hist = strengths.get(strengthSymbolKey(symbol)) ?? null;
     const strength = hist?.strength ?? NEUTRAL_STRENGTH;
     const m = modelScores.get(symbol) ?? null;
+    const market = marketOf(symbol);
     const rule = ruleBySymbol.get(symbol) ?? null;
     const ai = aiBySymbol.get(symbol) ?? null;
     return {
