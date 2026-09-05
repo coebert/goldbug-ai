@@ -31,6 +31,7 @@ import { listPortfolios } from "@/lib/portfolios.functions";
 import { getBacktestVsReal } from "@/lib/backtest-vs-real.functions";
 import { verdictFor } from "@/lib/backtest-vs-real";
 import { formatUk } from "@/lib/uk-time";
+import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
