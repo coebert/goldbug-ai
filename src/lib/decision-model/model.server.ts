@@ -335,9 +335,14 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
     .map((d) => `${labelOf(d.k)} ${d.c >= 0 ? "+" : ""}${d.c.toFixed(4)}`)
     .join("; ");
 
-  const m = model.metrics.test;
-  return `LEARNED MODEL — FITTED ON THIS ACCOUNT'S OWN HISTORY (${model.coverage.samples} observations, ${model.coverage.dates} trading days ${model.coverage.from ?? "?"} → ${model.coverage.to ?? "?"}):
-- This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day against the realised ${model.horizon_days}-day forward return, demeaned within each day so it measures SELECTION skill, not market direction.
+  const cov = model.coverage;
+  const labelLine =
+    cov.label_mode === "price"
+      ? `the realised ${model.horizon_days}-day forward return`
+      : `the realised ${model.horizon_days}-day forward return NET of the round-trip dealing cost this account actually pays (${cov.round_trip_cost_bps ?? "?"}bps, measured from ${cov.cost_calibrated_symbols ?? 0} symbols' invoiced fills), divided by the risk the name was carrying — i.e. what this book could actually have banked per unit of risk`;
+  return `LEARNED MODEL — FITTED ON THIS ACCOUNT'S OWN HISTORY (${cov.samples} observations, ${cov.dates} trading days ${cov.from ?? "?"} → ${cov.to ?? "?"}; ${cov.traded_samples ?? 0} of them days you actually dealt the name, ${cov.held_samples ?? 0} where you already held it):
+- This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day — plus the state of THIS book that day (position size, unrealised P&L, holding age, cash share, drawdown, recent realised loss on the name) — against ${labelLine}, demeaned within each day so it measures SELECTION skill, not market direction. Days where real money went in are weighted more heavily than days the name was merely screened.
+
 - Out-of-sample check (${m.dates} days never used in fitting): mean rank IC ${m.mean_ic?.toFixed(3) ?? "n/a"} (t ${m.ic_t_stat?.toFixed(2) ?? "n/a"}), positive on ${m.ic_hit_rate == null ? "n/a" : (m.ic_hit_rate * 100).toFixed(0)}% of days, top-minus-bottom spread ${m.top_bottom_spread_pct?.toFixed(2) ?? "n/a"}% per ${model.horizon_days}d.
 - ${model.usable ? "VERDICT: the edge held out of sample — treat the mdl score as real evidence." : "VERDICT: the out-of-sample edge is WEAK. Use the mdl score only as a tie-breaker, never as a reason on its own."}
 - Signal weights measured from your results (this is what has actually paid): ${bw || "n/a"}. Where your instinctive weighting differs from these, justify the difference explicitly.
