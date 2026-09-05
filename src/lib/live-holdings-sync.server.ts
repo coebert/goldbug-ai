@@ -25,6 +25,8 @@ import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { loadAvgCostFromFills } from "@/lib/holdings-cost-from-fills.server";
+import { engineSymbolKey } from "@/lib/price-symbol";
 import { writeEquitySnapshot } from "@/lib/valuation/write-snapshot.server";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
@@ -161,6 +163,12 @@ export async function reconcileLiveHoldingsFromBroker(
       .in("symbol", removedSymbols);
   }
 
+  // Cost basis rebuilt from the executed Saxo fills, used whenever the broker
+  // payload omits an average open price. The old fallback was the CURRENT
+  // market price, which zeroed out each position's unrealised P&L and made it
+  // disagree with the live P&L Saxo reports.
+  const fillCost = await loadAvgCostFromFills(db as never, portfolioId);
+
   // Upsert broker positions as local holdings.
   const rowsToUpsert: Insert<"holdings">[] = positions
     .filter((p) => p.symbol && Math.abs(p.quantity) > 1e-8)
@@ -171,8 +179,16 @@ export async function reconcileLiveHoldingsFromBroker(
       // in Aegis is in the instrument's base unit (GBP). Storing the raw
       // pence average made cost basis 100x the marked price, which surfaced
       // as "divisor ÷100 vs ÷1" mismatches on MKS/HSBA/ULVR/TSCO.
-      const rawCost = p.avgPrice || p.marketPrice || 0;
-      const avgCostBase = normalizeLseDisplayPriceToBase(p.symbol, rawCost, asset_class);
+      const brokerAvgBase = p.avgPrice > 0
+        ? normalizeLseDisplayPriceToBase(p.symbol, p.avgPrice, asset_class)
+        : 0;
+      // Fill prices are already stored in base units — do not re-normalise.
+      const fillAvgBase = fillCost.get(engineSymbolKey(p.symbol)) ?? 0;
+      const avgCostBase = brokerAvgBase > 0
+        ? brokerAvgBase
+        : fillAvgBase > 0
+          ? fillAvgBase
+          : normalizeLseDisplayPriceToBase(p.symbol, p.marketPrice || 0, asset_class);
       return {
         portfolio_id: portfolioId,
         symbol: p.symbol,
@@ -185,6 +201,7 @@ export async function reconcileLiveHoldingsFromBroker(
         instrument_ccy: instrumentCcyFor(p.symbol),
       };
     });
+
   if (rowsToUpsert.length > 0) {
     await db.from("holdings").upsert(
       rowsToUpsert,
