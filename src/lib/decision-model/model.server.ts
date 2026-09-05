@@ -559,6 +559,30 @@ export function formatModelBlock(
     .map((s) => `${s.symbol} ${s.score.toFixed(2)}`)
     .join(", ");
 
+  // Market × time-of-day track record: how reliable signals have been per
+  // market, all day and in the session this decision is being made in.
+  const marketBlock = (() => {
+    if (!market || market.rows.length === 0) return "";
+    const lines = market.rows
+      .filter((r) => r.session === "all")
+      .map((r) => {
+        const now =
+          market.session == null
+            ? undefined
+            : market.rows.find((x) => x.market === r.market && x.session === market.session);
+        const w = marketSessionWeight({ market: r.market, session: market.session, rows: market.rows });
+        const fmt = (s: SymbolStrength) =>
+          `${strengthLabel(s.strength)} (${s.samples} obs, right ${s.hitRate == null ? "n/a" : (s.hitRate * 100).toFixed(0)}%, avg ${s.meanNetBps == null ? "n/a" : `${s.meanNetBps >= 0 ? "+" : ""}${s.meanNetBps.toFixed(0)}bps`} net)`;
+        const allDay = `all day ${fmt(r.strength)}`;
+        const thisSession = now
+          ? `; right now (${SESSION_LABELS[now.session as SessionBucket] ?? now.session}) ${fmt(now.strength)}`
+          : "";
+        return `- ${MARKET_LABELS[r.market] ?? r.market}: ${allDay}${thisSession} → score weight ×${w.toFixed(2)}`;
+      })
+      .join("\n");
+    return `\nSIGNAL RELIABILITY BY MARKET AND TIME OF DAY (measured on this account's own history; the ranking above already scales each name's score by the weight shown):\n${lines}\n- Weight positions toward the markets whose signals have actually paid AT THIS TIME OF DAY. A market reading "weak" right now deserves smaller stakes or none at all, even when its all-day record is fine; a market reading "strong" right now may be worked harder. Times are London time.`;
+  })();
+
   const drivers = model.feature_keys
     .map((k, i) => ({ k, c: model.coefficients[i] ?? 0 }))
     .sort((a, b) => Math.abs(b.c) - Math.abs(a.c))
