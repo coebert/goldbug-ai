@@ -189,6 +189,9 @@ ${args.shortSleeveBlock ?? ""}
 
 ${args.learnedModelBlock ?? ""}
 
+${args.riskProfileBlock ?? ""}
+
+
 
 
 ${HISTORICAL_PLAYBOOK}
