@@ -3568,6 +3568,69 @@ export type Database = {
           },
         ]
       }
+      symbol_execution_costs: {
+        Row: {
+          buy_bps: number
+          computed_at: string
+          created_at: string
+          fee_bps: number | null
+          fills: number
+          first_fill_at: string | null
+          id: string
+          invoiced_fills: number
+          last_fill_at: string | null
+          measured: boolean
+          round_trip_bps: number
+          sell_bps: number
+          slippage_bps: number | null
+          symbol: string
+          symbol_key: string
+          tickets: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          buy_bps: number
+          computed_at?: string
+          created_at?: string
+          fee_bps?: number | null
+          fills?: number
+          first_fill_at?: string | null
+          id?: string
+          invoiced_fills?: number
+          last_fill_at?: string | null
+          measured?: boolean
+          round_trip_bps: number
+          sell_bps: number
+          slippage_bps?: number | null
+          symbol: string
+          symbol_key: string
+          tickets?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          buy_bps?: number
+          computed_at?: string
+          created_at?: string
+          fee_bps?: number | null
+          fills?: number
+          first_fill_at?: string | null
+          id?: string
+          invoiced_fills?: number
+          last_fill_at?: string | null
+          measured?: boolean
+          round_trip_bps?: number
+          sell_bps?: number
+          slippage_bps?: number | null
+          symbol?: string
+          symbol_key?: string
+          tickets?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       symbol_signal_strength: {
         Row: {
           computed_at: string
