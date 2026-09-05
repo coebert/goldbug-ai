@@ -206,7 +206,7 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
           asset_class: s.asset_class,
           quantity: s.quantity,
           avg_cost: s.avg_cost,
-          instrument_ccy: s.instrument_ccy,
+          instrument_ccy: s.instrument_ccy ?? undefined,
           opened_at: new Date(`${from}T00:00:00Z`).toISOString(),
         })),
       );
