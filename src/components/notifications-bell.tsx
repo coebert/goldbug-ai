@@ -6,7 +6,13 @@ import { listNotifications } from "@/lib/notifications.functions";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { POLL } from "@/lib/query-keys";
 
-const CATEGORIES = ["pending_slices", "insider_dealing"];
+const CATEGORIES = [
+  "pending_slices",
+  "insider_dealing",
+  "trade_opened",
+  "trade_filled",
+  "trade_rejected",
+];
 
 export function NotificationsBell({ className = "" }: { className?: string }) {
   const list = useServerFn(listNotifications);

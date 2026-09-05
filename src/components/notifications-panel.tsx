@@ -19,7 +19,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { POLL } from "@/lib/query-keys";
 
-const CATEGORIES = ["pending_slices", "insider_dealing"];
+const CATEGORIES = [
+  "pending_slices",
+  "insider_dealing",
+  "trade_opened",
+  "trade_filled",
+  "trade_rejected",
+];
 
 function severityTone(s: string): string {
   switch (s) {
@@ -154,6 +160,17 @@ export function NotificationsPanel() {
                             </Link>
                           )}
                           {n.slice_id && <span className="font-mono">slice {n.slice_id.slice(0, 8)}</span>}
+                          {(() => {
+                            const url = (n.details as { url?: unknown } | null)?.url;
+                            return typeof url === "string" && url.startsWith("/") ? (
+                              <Link
+                                to={url}
+                                className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-2 hover:opacity-80"
+                              >
+                                View trade
+                              </Link>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
