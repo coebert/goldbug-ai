@@ -70,6 +70,8 @@ export async function callAiForDecision(args: {
   modelBlock?: string | null;
   /** This account's measured round-trip dealing cost (bps), from real fills. */
   measuredRoundTripBps?: number | null;
+  /** Per-instrument round-trip costs measured live from this account's fills. */
+  symbolCosts?: Array<{ symbol: string; roundTripBps: number; tickets: number }> | null;
 
 
 
@@ -163,6 +165,7 @@ ${buildTradingCostBlock({
   currency: args.portfolio.currency,
   stampExemptPreference: cfg.stamp_exempt_preference,
   measuredRoundTripBps: args.measuredRoundTripBps ?? null,
+  symbolCosts: args.symbolCosts ?? null,
 })}
 
 
