@@ -101,8 +101,9 @@ export function normaliseByDate(samples: Sample[], featureCount: number, minPerD
         y: r.y - ym,
         w: Number.isFinite(r.w) && (r.w ?? 1) > 0 ? Math.min(8, r.w!) : 1,
       });
-
+    }
   }
+
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return out;
 }
@@ -114,12 +115,14 @@ export function ridgeFit(rows: NormalisedSample[], featureCount: number, lambda:
   const b = new Array<number>(n).fill(0);
 
   for (const r of rows) {
+    const wt = r.w > 0 ? r.w : 1;
     for (let i = 0; i < n; i++) {
-      const zi = r.z[i]!;
+      const zi = r.z[i]! * wt;
       b[i]! += zi * r.y;
       for (let j = i; j < n; j++) A[i]![j]! += zi * r.z[j]!;
     }
   }
+
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < i; j++) A[i]![j] = A[j]![i]!;
     A[i]![i]! += lambda;
