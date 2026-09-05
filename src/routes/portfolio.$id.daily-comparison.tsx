@@ -41,6 +41,18 @@ function strengthTone(label: string): "default" | "secondary" | "outline" {
   return label === "strong" ? "default" : label === "moderate" ? "secondary" : "outline";
 }
 
+function marketLabel(market: string): string {
+  return market === "equities"
+    ? "Shares & ETFs"
+    : market === "crypto"
+      ? "Crypto"
+      : market === "forex"
+        ? "Forex"
+        : market === "commodities"
+          ? "Commodities"
+          : market;
+}
+
 function DailyComparisonPage() {
   const { id } = Route.useParams();
   const load = useServerFn(getDailyComparison);
