@@ -17,7 +17,7 @@ import {
 import { tradingStylePrompt } from "../trading-style";
 import { buildTradingCostBlock } from "./trading-cost-prompt";
 import { regimeDescription, humanRegime, type PersistedRegime } from "../regime-detector.server";
-import { DecisionSchema, type DecisionOutput, type Portfolio, type Holding } from "./types";
+import { type DecisionOutput, type Portfolio, type Holding } from "./types";
 import { formatCandidateTable, activeAssetClasses } from "./features-prompt";
 import { StrictDecisionSchema, normalizeStrictDecision } from "./strict-decision-schema";
 import type { buildCandidateFeatures } from "./candidate-features.server";
