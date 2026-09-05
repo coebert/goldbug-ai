@@ -13,10 +13,12 @@
  *     decision date are applied.
  *
  *  2. LABEL. Not the raw forward return, but the forward return net of the
- *     round-trip dealing cost this account actually paid on the name (measured
- *     from `live_fills` fees), divided by the risk the name was carrying at the
- *     time. So the model learns "what pays after my costs, per unit of risk",
- *     which is the only return this book can bank.
+ *     round-trip dealing cost this account actually paid on that name, on that
+ *     side — the invoiced broker charges on the contract note plus the gap
+ *     between the day's printed close and the price the fill came back at,
+ *     measured per symbol from `live_fills` — divided by the risk the name was
+ *     carrying at the time. So the model learns "what pays after my costs, per
+ *     unit of risk", which is the only return this book can bank.
  *
  *  3. WEIGHT. Days where real money went into the name — and days on the live
  *     book rather than a paper one — carry more weight in the fit than days the
