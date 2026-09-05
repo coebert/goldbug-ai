@@ -1983,6 +1983,9 @@ export async function routeOrdersToBroker(params: {
         status: "pending",
         submitted_at: new Date().toISOString(),
         instrument_ccy: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
+        // Model self-rated confidence for this order, kept on the ledger so
+        // the trade list can show how sure the model was before the buy.
+        conviction: Number.isFinite(order.conviction) ? Number(order.conviction) : null,
       })
       .select("id")
       .single();
