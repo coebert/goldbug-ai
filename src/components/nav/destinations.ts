@@ -187,6 +187,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     area: "trades",
     keywords: "daily report decisions rationale considered passed",
   },
+  {
+    to: "/costs",
+    label: "Dealing costs",
+    tabLabel: "Costs",
+    hint: "What each name really costs to trade, and the hurdle new buys must clear.",
+    icon: Receipt,
+    area: "trades",
+    keywords: "costs fees commission stamp duty slippage floor hurdle spread",
+  },
 
 
   // --- System -----------------------------------------------------

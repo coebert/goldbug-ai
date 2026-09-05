@@ -4012,6 +4012,7 @@ export type Database = {
       trading_controls: {
         Row: {
           base_currency: string
+          cost_hurdle_multiple: number
           daily_notional_limit: number
           halt_reason: string | null
           id: boolean
@@ -4021,6 +4022,7 @@ export type Database = {
         }
         Insert: {
           base_currency?: string
+          cost_hurdle_multiple?: number
           daily_notional_limit?: number
           halt_reason?: string | null
           id?: boolean
@@ -4030,6 +4032,7 @@ export type Database = {
         }
         Update: {
           base_currency?: string
+          cost_hurdle_multiple?: number
           daily_notional_limit?: number
           halt_reason?: string | null
           id?: boolean

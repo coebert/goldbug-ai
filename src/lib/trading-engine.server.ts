@@ -1149,6 +1149,17 @@ export async function runDailyTick(
     }
   }
 
+  // Operator-set cost hurdle (Costs page slider). Drives how far above the
+  // round-trip friction a buy's expected move must clear; null keeps the
+  // gate's tuned default. Best-effort: never break the tick.
+  let costHurdleMultiple: number | null = null;
+  try {
+    const { loadCostHurdleMultiple } = await import("./trading-controls.server");
+    costHurdleMultiple = await loadCostHurdleMultiple();
+  } catch {
+    costHurdleMultiple = null;
+  }
+
   const modelBlock = await (async () => {
     if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
     try {
@@ -2861,6 +2872,7 @@ export async function runDailyTick(
           measuredRoundTripBps:
             symbolRoundTripFloor(meta.symbol, symbolCosts, measuredRoundTripBps) ??
             measuredRoundTripBps,
+          safetyMultiple: costHurdleMultiple ?? undefined,
         });
         if (!netEdge.pass) {
           executed.push({
