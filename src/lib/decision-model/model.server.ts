@@ -12,11 +12,15 @@ import {
   BUCKETS,
   FEATURE_KEYS,
   FEATURE_SPECS,
+  NEUTRAL_PF,
   bucketOf,
   extractFeatureVector,
   labelOf,
+  withPf,
   type AnyRow,
+  type PfContext,
 } from "./features";
+
 import {
   bucketWeights,
   evaluate,
