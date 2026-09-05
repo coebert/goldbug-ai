@@ -113,17 +113,25 @@ export async function fitAndStoreModel(args: {
   const baselineTest = evaluate(testRows, new Array<number>(n).fill(1 / n));
 
   const testIc = wf.best.test.mean_ic;
+  const testT = wf.best.test.ic_t_stat;
+  // A positive mean IC on its own is not evidence: with a couple of dozen test
+  // days it is routinely noise. The fit must also be statistically stable and
+  // beat the naive equal-weight composite on the same days.
   const usable =
     wf.best.test.dates >= MIN_TEST_DATES &&
     testIc !== null &&
     testIc >= MIN_MEAN_IC &&
+    testT !== null &&
+    testT >= MIN_IC_T &&
+    testIc > (baselineTest.mean_ic ?? -Infinity) &&
     (wf.best.test.top_bottom_spread_pct ?? 0) > 0;
 
   const note = usable
-    ? `Out-of-sample selection edge confirmed over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}).`
+    ? `Out-of-sample selection edge confirmed over ${wf.best.test.dates} days (mean IC ${(testIc ?? 0).toFixed(3)}, t ${(testT ?? 0).toFixed(2)}).`
     : `Fit stored for inspection but NOT used for trading: out-of-sample edge too weak (mean IC ${
         testIc === null ? "n/a" : testIc.toFixed(3)
-      } over ${wf.best.test.dates} days).`;
+      }, t ${testT === null ? "n/a" : testT.toFixed(2)} over ${wf.best.test.dates} days).`;
+
 
   const model: Omit<StoredModel, "id" | "fitted_at"> = {
     horizon_days: data.horizonDays,
