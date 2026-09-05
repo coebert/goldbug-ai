@@ -1037,7 +1037,28 @@ export async function runDailyTick(
     srvLog.info(`[trading-engine] AI decision skipped — ${materiality!.reason}`);
   }
 
+  // Weights fitted on this account's own decision history, plus today's
+  // candidates pre-scored by that model. Best-effort: never break the tick.
+  const learnedModelBlock = await (async () => {
+    if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
+    try {
+      const { loadLatestModel, scoreCandidates, formatModelBlock } = await import(
+        "./decision-model/model.server"
+      );
+      const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
+      if (!userId) return null;
+      const model = await loadLatestModel(userId);
+      if (!model) return null;
+      const scores = scoreCandidates(model, features as unknown as Array<Record<string, unknown>>);
+      return formatModelBlock(model, scores);
+    } catch (e) {
+      srvLog.warn("learned decision model unavailable for prompt", e);
+      return null;
+    }
+  })();
+
   const decision: DecisionOutput = breakerTripped
+
     ? {
         briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
@@ -1100,7 +1121,9 @@ export async function runDailyTick(
         cashPolicyBlock: cashPolicy.enabled
           ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
           : null,
+        learnedModelBlock,
         shortSleeveBlock: formatShortSleeveBlock({
+
           enabled: cfg.shorts_enabled,
           nav: totalValue,
           exposure: exposureSplit,
