@@ -57,6 +57,8 @@ export type ExecutedTrade = {
   reason: string;
   rejected?: string;
   instrument_ccy?: string;
+  /** Model self-rated confidence in [0,1], carried from the order. */
+  conviction?: number;
   // Sizing telemetry — populated for commodity trades so the decision/executed
   // rows expose the same slippage/liquidity numbers the sizer used.
   liquidity?: import("../commodity-liquidity-metrics").CommodityTradeLiquidity;
