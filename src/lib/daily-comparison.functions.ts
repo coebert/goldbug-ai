@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { DailyComparison } from "./daily-comparison.server";
 
-export type { DailyComparison, ComparisonRow } from "./daily-comparison.server";
+export type { DailyComparison, ComparisonRow, MarketStrengthCell } from "./daily-comparison.server";
 
 export const getDailyComparison = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
