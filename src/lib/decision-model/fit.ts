@@ -17,6 +17,12 @@
 export type Sample = {
   date: string;
   symbol: string;
+  /**
+   * Decision timestamp (ISO) when this sample came from a recorded run —
+   * lets market × time-of-day analysis bucket the observation. Rebuilt
+   * history rows have no timestamp.
+   */
+  at?: string | null;
   /** Raw feature values, aligned to FEATURE_KEYS; null = missing. */
   x: Array<number | null>;
   /** Label over the horizon (forward return, or a risk/cost-adjusted variant). */

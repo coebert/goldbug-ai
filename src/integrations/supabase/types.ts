@@ -2191,6 +2191,63 @@ export type Database = {
         }
         Relationships: []
       }
+      market_signal_strength: {
+        Row: {
+          computed_at: string
+          dates: number
+          from_date: string | null
+          hit_rate: number | null
+          horizon_days: number
+          ic: number | null
+          id: string
+          market: string
+          mean_net_bps: number | null
+          samples: number
+          session: string
+          strength: number
+          t_stat: number | null
+          to_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          computed_at?: string
+          dates?: number
+          from_date?: string | null
+          hit_rate?: number | null
+          horizon_days?: number
+          ic?: number | null
+          id?: string
+          market: string
+          mean_net_bps?: number | null
+          samples?: number
+          session: string
+          strength?: number
+          t_stat?: number | null
+          to_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          computed_at?: string
+          dates?: number
+          from_date?: string | null
+          hit_rate?: number | null
+          horizon_days?: number
+          ic?: number | null
+          id?: string
+          market?: string
+          mean_net_bps?: number | null
+          samples?: number
+          session?: string
+          strength?: number
+          t_stat?: number | null
+          to_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       news_backfill_jobs: {
         Row: {
           created_at: string
