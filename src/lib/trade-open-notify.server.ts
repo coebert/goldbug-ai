@@ -108,6 +108,93 @@ export function shortRationale(rationale: string | null | undefined): string | n
   return head.length > 180 ? `${head.slice(0, 177)}…` : head;
 }
 
+export interface TradeRejectNotifyInput {
+  userId: string;
+  portfolioId: string;
+  orderId: string;
+  decisionId?: string | null;
+  symbol: string;
+  side: string; // "buy" | "sell"
+  quantity: number;
+  price: number | null;
+  currency: string | null;
+  status: string; // "rejected" | "error"
+  rejectReason: string | null;
+}
+
+/**
+ * Alert the owner when the broker refuses an order outright, with the
+ * broker's own reason, so a failed trade is as visible as a filled one.
+ * Idempotent per order_id; fire-and-forget like notifyTradeOpened.
+ */
+export function notifyTradeRejected(input: TradeRejectNotifyInput): void {
+  void (async () => {
+    try {
+      const existing = await supabaseAdmin
+        .from("notifications")
+        .select("id")
+        .eq("user_id", input.userId)
+        .eq("category", "trade_rejected")
+        .contains("details", { order_id: input.orderId })
+        .limit(1)
+        .maybeSingle();
+      if (existing.data) return;
+
+      const sideUpper = input.side.toUpperCase();
+      const priceStr = fmtMoney(input.price, input.currency);
+      const notionalStr =
+        input.price != null ? fmtMoney(input.quantity * input.price, input.currency) : "";
+      const qtyStr = fmtQty(input.quantity);
+      const reason = (input.rejectReason ?? "").trim() || "No reason given by the broker";
+
+      const title = `AI trade FAILED: ${sideUpper} ${qtyStr} ${input.symbol}${
+        notionalStr ? ` (${notionalStr})` : ""
+      }`;
+
+      const body = [
+        `${sideUpper} ${qtyStr} ${input.symbol}${priceStr ? ` @ ${priceStr}` : ""}${
+          notionalStr ? ` — ${notionalStr}` : ""
+        }`,
+        `Broker: ${reason}`,
+        `Status: ${input.status}`,
+      ].join("\n");
+      const url = `/trades?order=${encodeURIComponent(input.orderId)}`;
+
+      await supabaseAdmin.from("notifications").insert({
+        user_id: input.userId,
+        category: "trade_rejected",
+        severity: "warning",
+        title,
+        body,
+        portfolio_id: input.portfolioId,
+        details: {
+          order_id: input.orderId,
+          decision_id: input.decisionId ?? null,
+          symbol: input.symbol,
+          side: input.side,
+          quantity: input.quantity,
+          price: input.price,
+          notional: input.price != null ? Number((input.quantity * input.price).toFixed(2)) : null,
+          currency: input.currency,
+          status: input.status,
+          reject_reason: input.rejectReason,
+          url,
+        },
+      });
+
+      await sendPushToUser(input.userId, {
+        title,
+        body,
+        url,
+        tag: `trade-reject-${input.orderId}`,
+        requireInteraction: true,
+      });
+    } catch (err) {
+      console.error("notifyTradeRejected failed", err);
+    }
+  })();
+}
+
 export function notifyTradeOpened(input: TradeOpenNotifyInput): void {
   void (async () => {
     try {
