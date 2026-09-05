@@ -477,6 +477,9 @@ export async function runDailyTick(
   // queue or drop the orders. Mechanical exits (stop-loss, take-profit, ATR
   // trailing, time exits) run below regardless, so risk cover is unchanged.
   const allVenuesClosed = await (async () => {
+    // A historical replay must judge the venue by the day being replayed, not
+    // by the wall clock, otherwise a weekend run skips every AI decision.
+    if (isHistoricalRun) return false;
     if (candidateSymbols.length === 0) return false;
     const { getMarketStatusForSymbol } = await import("./market-hours");
     return candidateSymbols.every((c) => !getMarketStatusForSymbol(c.symbol).isOpen);
