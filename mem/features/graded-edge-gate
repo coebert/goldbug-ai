@@ -1,0 +1,6 @@
+---
+name: Graded edge gate + live model wiring
+description: Usability gate is graded (FLOOR_MEAN_IC 0.005 / FLOOR_IC_T 0.5 hard floors; full bar 0.02/1.5), edge_strength scales traded size, model block wired into the live AI prompt
+type: feature
+---
+The decision model's usable gate is graded, not binary. Hard floors (mean IC >= 0.005, t >= 0.5, beats equal-weight baseline, positive spread, >= 8 test days) = tradeable; full bar (IC >= 0.02, t >= 1.5) = full size. `edge_strength` (0.25–1) = 0.5·IC-progress + 0.5·t-progress, stored inside the metrics JSON of `decision_models`. `formatModelBlock` tells the AI to size mdl-driven positions at edge_strength × normal. The engine scores today's candidates each AI tick via `loadLatestModel`/`loadScoringContext`/`scoreCandidates` (book state incl. lossMemory penalty as loss_memory proxy) and passes `modelBlock` into the AI prompt; best-effort, never breaks the tick. Sep 2026 refit on the extended history: usable, edge_strength 1 (IC 0.128, t 4.28, 68 test days).
