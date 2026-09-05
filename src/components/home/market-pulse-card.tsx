@@ -245,6 +245,7 @@ function formatCountdown(totalSeconds: number): string {
  */
 export function MarketPulseCard() {
   const fetchPulse = useServerFn(getMarketPulse);
+  const fetchLive = useServerFn(getLiveQuotes);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(90);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -257,6 +258,18 @@ export function MarketPulseCard() {
     refetchInterval: autoRefresh ? REFRESH_MS : false,
   });
 
+  // The daily tape only moves once a session; this is the live one. It polls
+  // far faster than the pulse itself because it is a single batched quote
+  // request, and it pauses with the same Auto/Pause control.
+  const liveQuery = useQuery({
+    queryKey: ["live-quotes", "pulse"],
+    queryFn: () => fetchLive({ data: {} }),
+    refetchInterval: autoRefresh ? LIVE_REFRESH_MS : false,
+    refetchOnWindowFocus: true,
+    staleTime: LIVE_REFRESH_MS,
+    gcTime: 5 * 60_000,
+  });
+
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
@@ -266,8 +279,12 @@ export function MarketPulseCard() {
     ? Math.max(0, Math.ceil((query.dataUpdatedAt + REFRESH_MS - now) / 1000))
     : REFRESH_MS / 1000;
 
+  const live = liveQuery.data ?? null;
+  const pulse = useMemo(
+    () => (query.data ? applyLiveQuotes(query.data, live) : query.data),
+    [query.data, live],
+  );
 
-  const pulse = query.data;
   const grouped = useMemo(() => {
     const out = new Map<PulseGroup, PulseQuote[]>();
     for (const q of pulse?.quotes ?? []) {
