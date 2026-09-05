@@ -123,6 +123,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     keywords: "backtest scanner reclaim setup insider batching",
   },
   {
+    to: "/decision-model",
+    label: "Decision model",
+    hint: "The signal weights fitted from your own trading history.",
+    icon: Brain,
+    area: "research",
+    keywords: "learned model weights fit signals edge",
+  },
+
+  {
     to: "/simulation-report",
     label: "Simulation report",
     hint: "Full write-up of the latest simulation run.",
