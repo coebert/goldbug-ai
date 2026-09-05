@@ -431,8 +431,44 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
     : null;
   const fillCurrency = row.fills[0]?.currency ?? "";
 
+  const decisionDate = (row.order.created_at ?? "").slice(0, 10) || undefined;
+
   const details = (
     <div className="space-y-3">
+      {row.portfolio && (
+        <div className="rounded-md border border-border bg-muted/10 p-2.5">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Why the AI chose this
+          </h4>
+          <div className="mb-2 grid grid-cols-1 gap-2 text-[11px] text-muted-foreground sm:grid-cols-3">
+            <div>
+              Stock: <span className="text-foreground">{row.order.symbol}</span>
+            </div>
+            <div>
+              Price: <span className="text-foreground">
+                {row.avgFillPrice != null
+                  ? `${fmtNum(row.avgFillPrice)}${fillCurrency ? ` ${fillCurrency}` : ""}`
+                  : row.order.limit_price
+                    ? `limit ${fmtNum(row.order.limit_price)}`
+                    : row.order.order_type}
+              </span>
+            </div>
+            <div>
+              Size: <span className="text-foreground">
+                {fmtNum(row.order.quantity, 0)} sh · {fmtNum(notional)}{fillCurrency ? ` ${fillCurrency}` : ""}
+              </span>
+            </div>
+          </div>
+          <Suspense fallback={<p className="text-xs text-muted-foreground">Loading reasoning…</p>}>
+            <TradeRationalePanel
+              portfolioId={row.portfolio.id}
+              symbol={row.order.symbol}
+              date={decisionDate}
+            />
+          </Suspense>
+        </div>
+      )}
+
       {row.order.reject_reason && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
           Reject reason: {row.order.reject_reason}
