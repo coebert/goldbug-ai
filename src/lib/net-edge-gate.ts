@@ -17,8 +17,24 @@ import {
  * Sells are never gated: exits must always be able to fire.
  */
 
-/** Default safety margin: expected move must be 1.5x the round-trip friction. */
-export const DEFAULT_EDGE_SAFETY_MULTIPLE = 1.5;
+/**
+ * Default safety margin: expected move must be 1.25x the round-trip friction.
+ *
+ * Tuned Sep 2026 by `scripts/run-cost-floor-sweep.ts` (2021-2026 real tape,
+ * churn cadence, realistic assumptions). Returns are flat for safety 1.1-1.4
+ * and collapse from 1.6 upward (-1.3% at the extreme), so the gate keeps a
+ * modest margin rather than the old 1.5x, which sat on the edge of the cliff.
+ */
+export const DEFAULT_EDGE_SAFETY_MULTIPLE = 1.25;
+
+/**
+ * Headroom applied to the account's fill-measured round-trip cost before it is
+ * used as a floor. The same sweep peaked with an effective floor near 130bps
+ * against a measured 90bps: the measured figure is an average, and the tickets
+ * the gate should refuse are the expensive tail of it. Above ~190bps effective
+ * the gate starts refusing profitable trades and P&L falls away.
+ */
+export const MEASURED_FLOOR_HEADROOM = 1.45;
 
 /** Used when a symbol has no ATR reading (conservative daily range). */
 export const FALLBACK_ATR_PCT = 0.015;
@@ -117,7 +133,7 @@ export function assessNetEdge(input: NetEdgeInput): NetEdgeAssessment {
   const modelledRoundTripBps = Number.isFinite(costs.roundTripBps) ? costs.roundTripBps : Infinity;
   const measuredFloor =
     Number.isFinite(input.measuredRoundTripBps) && Number(input.measuredRoundTripBps) > 0
-      ? Number(input.measuredRoundTripBps)
+      ? Number(input.measuredRoundTripBps) * MEASURED_FLOOR_HEADROOM
       : 0;
   const roundTripBps = Math.max(modelledRoundTripBps, measuredFloor);
   const netEdgeBps = moveBps - roundTripBps;
