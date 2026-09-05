@@ -61,6 +61,9 @@ export async function callAiForDecision(args: {
   fearLabel?: string | null;
   /** Cash-funded short sleeve (inverse ETFs) and its live room. */
   shortSleeveBlock?: string | null;
+  /** Weights fitted on this account's own history + today's model ranking. */
+  learnedModelBlock?: string | null;
+
 
 
 
@@ -180,6 +183,9 @@ ${args.sectorCycleBlock ?? ""}
 ${args.cashPolicyBlock ?? ""}
 
 ${args.shortSleeveBlock ?? ""}
+
+${args.learnedModelBlock ?? ""}
+
 
 
 ${HISTORICAL_PLAYBOOK}
