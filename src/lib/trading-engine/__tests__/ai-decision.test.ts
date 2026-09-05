@@ -212,6 +212,18 @@ describe("callAiForDecision — deterministic prompt construction", () => {
     expect(calls[0].system).toContain("at least 40% of portfolio value in cash");
   });
 
+  it("uses the workspace decision model and explains inverse-ETF short orders", async () => {
+    await callAiForDecision(
+      baseArgs({ shortSleeveBlock: "SHORT SLEEVE: XUKS.L and XSPS.L are available." }),
+    );
+    expect(calls[0].model?.id).toBe("openai/gpt-5.6-sol");
+    expect(calls[0].system).toContain("Bearish exposure is allowed ONLY through the SHORT SLEEVE");
+    expect(calls[0].system).toContain("no naked shorting");
+    expect(calls[0].system).toContain("SHORT SLEEVE: XUKS.L and XSPS.L are available.");
+    expect(calls[0].prompt).toContain('side="buy" on XUKS.L (bearish FTSE 100) or XSPS.L (bearish S&P 500)');
+    expect(calls[0].prompt).toContain('There is no "short" side');
+  });
+
   it("renders the no-events and no-cooldown branches explicitly", async () => {
     await callAiForDecision(baseArgs());
     expect(calls[0].system).toContain("UPCOMING KNOWN EVENTS: none tracked");
