@@ -68,6 +68,8 @@ export async function callAiForDecision(args: {
   riskProfileBlock?: string | null;
   /** Learned decision model: verdict, evidence strength, and today's mdl scores. */
   modelBlock?: string | null;
+  /** Real-time quote overlay: what the market is quoting right now. */
+  liveQuoteBlock?: string | null;
   /** This account's measured round-trip dealing cost (bps), from real fills. */
   measuredRoundTripBps?: number | null;
   /** Per-instrument round-trip costs measured live from this account's fills. */
@@ -168,6 +170,7 @@ ${buildTradingCostBlock({
   symbolCosts: args.symbolCosts ?? null,
 })}
 
+${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
 
 ${regimeBlock}
 
