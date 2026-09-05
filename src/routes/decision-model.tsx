@@ -148,8 +148,11 @@ function DecisionModelPage() {
                   {cov.samples} observations of {cov.symbols} instruments over {cov.dates} trading
                   days ({cov.from ?? "?"} → {cov.to ?? "?"}), outcomes measured{" "}
                   {cov.horizonDays} days forward and net of the{" "}
-                  {Math.round(cov.roundTripCostBps)}bps round trip this account pays. Last written{" "}
-                  {stored.created_at.slice(0, 10)}.
+                  {Math.round(cov.roundTripCostBps)}bps round trip this account pays. Written by{" "}
+                  <span className="font-medium text-foreground" data-testid="playbook-model">
+                    {stored.model.replace(/^google\//, "")}
+                  </span>{" "}
+                  on {stored.created_at.slice(0, 10)}.
                 </CardDescription>
               </CardHeader>
               <CardContent>
