@@ -30,6 +30,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SymbolsIndexRouteImport } from './routes/symbols.index'
 import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
+import { Route as SymbolsSymbolRouteImport } from './routes/symbols.$symbol'
 import { Route as MarketSymbolRouteImport } from './routes/market.$symbol'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdIndexRouteImport } from './routes/portfolio.$id.index'
@@ -175,6 +176,11 @@ const SymbolsIndexRoute = SymbolsIndexRouteImport.update({
 const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
   id: '/walk-forward/$id',
   path: '/walk-forward/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SymbolsSymbolRoute = SymbolsSymbolRouteImport.update({
+  id: '/symbols/$symbol',
+  path: '/symbols/$symbol',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketSymbolRoute = MarketSymbolRouteImport.update({
@@ -426,6 +432,7 @@ export interface FileRoutesByFullPath {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
+  '/symbols/$symbol': typeof SymbolsSymbolRoute
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/symbols/': typeof SymbolsIndexRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
@@ -490,6 +497,7 @@ export interface FileRoutesByTo {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
+  '/symbols/$symbol': typeof SymbolsSymbolRoute
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/symbols': typeof SymbolsIndexRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
@@ -555,6 +563,7 @@ export interface FileRoutesById {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
+  '/symbols/$symbol': typeof SymbolsSymbolRoute
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/symbols/': typeof SymbolsIndexRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
@@ -621,6 +630,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/market/$symbol'
+    | '/symbols/$symbol'
     | '/walk-forward/$id'
     | '/symbols/'
     | '/api/broker-blocks/clear'
@@ -685,6 +695,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/market/$symbol'
+    | '/symbols/$symbol'
     | '/walk-forward/$id'
     | '/symbols'
     | '/api/broker-blocks/clear'
@@ -749,6 +760,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/market/$symbol'
+    | '/symbols/$symbol'
     | '/walk-forward/$id'
     | '/symbols/'
     | '/api/broker-blocks/clear'
@@ -814,6 +826,7 @@ export interface RootRouteChildren {
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   MarketSymbolRoute: typeof MarketSymbolRoute
+  SymbolsSymbolRoute: typeof SymbolsSymbolRoute
   WalkForwardIdRoute: typeof WalkForwardIdRoute
   SymbolsIndexRoute: typeof SymbolsIndexRoute
   ApiBrokerBlocksClearRoute: typeof ApiBrokerBlocksClearRoute
@@ -1004,6 +1017,13 @@ declare module '@tanstack/react-router' {
       path: '/walk-forward/$id'
       fullPath: '/walk-forward/$id'
       preLoaderRoute: typeof WalkForwardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/symbols/$symbol': {
+      id: '/symbols/$symbol'
+      path: '/symbols/$symbol'
+      fullPath: '/symbols/$symbol'
+      preLoaderRoute: typeof SymbolsSymbolRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/market/$symbol': {
@@ -1318,6 +1338,7 @@ const rootRouteChildren: RootRouteChildren = {
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   MarketSymbolRoute: MarketSymbolRoute,
+  SymbolsSymbolRoute: SymbolsSymbolRoute,
   WalkForwardIdRoute: WalkForwardIdRoute,
   SymbolsIndexRoute: SymbolsIndexRoute,
   ApiBrokerBlocksClearRoute: ApiBrokerBlocksClearRoute,
