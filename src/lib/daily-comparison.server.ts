@@ -12,6 +12,18 @@ import { buildHeuristicBuys, buildHeuristicSells, type HeuristicFeature } from "
 import { loadLatestModel, loadScoringContext, scoreCandidates } from "./decision-model/model.server";
 import { loadSymbolStrengths, strengthSymbolKey } from "./decision-model/symbol-strength.server";
 import { strengthAdjustedScore, strengthLabel, NEUTRAL_STRENGTH } from "./decision-model/symbol-strength";
+import { loadMarketStrengths } from "./decision-model/symbol-strength.server";
+import {
+  classifyMarketGroup,
+  marketSessionWeight,
+  sessionForTimestamp,
+  MARKET_GROUPS,
+  MARKET_LABELS,
+  SESSION_LABELS,
+  type MarketGroup,
+  type SessionBucket,
+} from "./decision-model/market-strength";
+import { UNIVERSE } from "./universe.server";
 
 export type ComparisonRow = {
   symbol: string;
@@ -38,8 +50,31 @@ export type ComparisonRow = {
   ic: number | null;
   from: string | null;
   to: string | null;
+  /** Coarse market this name belongs to. */
+  market: MarketGroup;
+  /** Score weight applied for this market at the current time of day. */
+  marketWeight: number;
   /** True when the AI and the rule set disagree on this name. */
   differs: boolean;
+};
+
+export type MarketStrengthCell = {
+  market: MarketGroup;
+  marketLabel: string;
+  /** All-day record. */
+  strength: number;
+  strengthLabel: "strong" | "moderate" | "weak" | "unproven";
+  samples: number;
+  hitRate: number | null;
+  meanNetBps: number | null;
+  /** Record in the session the latest decision was made in (when known). */
+  session: SessionBucket | null;
+  sessionLabel: string | null;
+  sessionStrength: number | null;
+  sessionStrengthLabel: "strong" | "moderate" | "weak" | "unproven" | null;
+  sessionSamples: number | null;
+  /** Blended weight the engine applies to this market's scores right now. */
+  weight: number;
 };
 
 export type DailyComparison = {
@@ -50,6 +85,8 @@ export type DailyComparison = {
   horizonDays: number;
   modelUsable: boolean;
   strengthsMeasured: number;
+  /** Signal strength by market at the current time of day. */
+  markets: MarketStrengthCell[];
   rows: ComparisonRow[];
 };
 
