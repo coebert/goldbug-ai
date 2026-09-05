@@ -336,6 +336,14 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
     ? Math.min(100, (row.filledQty / row.order.quantity) * 100)
     : 0;
 
+  // First and last fill timestamps — when the position actually entered the account.
+  const fillTimes = row.fills
+    .map(f => f.filled_at)
+    .filter((t): t is string => !!t)
+    .sort();
+  const firstFillAt = fillTimes[0] ?? null;
+  const lastFillAt = fillTimes[fillTimes.length - 1] ?? firstFillAt;
+
   const signedDelta = buy ? row.filledQty : -row.filledQty;
   const priorQty = row.holding ? row.holding.quantity - signedDelta : (signedDelta === 0 ? null : -signedDelta);
   const nowQty = row.holding?.quantity ?? (signedDelta === 0 ? 0 : signedDelta);
