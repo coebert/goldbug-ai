@@ -69,6 +69,14 @@ export type NetEdgeInput = {
   horizonDays?: number | null;
   /** Expected move must exceed round-trip cost by this factor. */
   safetyMultiple?: number;
+  /**
+   * The round-trip cost this account actually pays, in bps, measured ticket by
+   * ticket from real fills. When supplied, it acts as a FLOOR under the
+   * modelled friction: the tariff model routinely under-states what the book
+   * really loses to spread and slippage, so a buy must clear the measured
+   * figure too.
+   */
+  measuredRoundTripBps?: number | null;
 };
 
 export type NetEdgeAssessment = {
@@ -106,7 +114,12 @@ export function assessNetEdge(input: NetEdgeInput): NetEdgeAssessment {
   const safety = Number.isFinite(input.safetyMultiple) && Number(input.safetyMultiple) > 0
     ? Number(input.safetyMultiple)
     : DEFAULT_EDGE_SAFETY_MULTIPLE;
-  const roundTripBps = Number.isFinite(costs.roundTripBps) ? costs.roundTripBps : Infinity;
+  const modelledRoundTripBps = Number.isFinite(costs.roundTripBps) ? costs.roundTripBps : Infinity;
+  const measuredFloor =
+    Number.isFinite(input.measuredRoundTripBps) && Number(input.measuredRoundTripBps) > 0
+      ? Number(input.measuredRoundTripBps)
+      : 0;
+  const roundTripBps = Math.max(modelledRoundTripBps, measuredFloor);
   const netEdgeBps = moveBps - roundTripBps;
   const netEdgeValue = (netEdgeBps / 10_000) * costs.notional;
 
@@ -125,7 +138,11 @@ export function assessNetEdge(input: NetEdgeInput): NetEdgeAssessment {
   const note =
     `net edge ${netEdgeBps.toFixed(0)}bps ` +
     `(expected move ${moveBps.toFixed(0)}bps vs round-trip ${Number.isFinite(roundTripBps) ? roundTripBps.toFixed(0) : "∞"}bps: ` +
-    `commission ${costs.commissionBps.toFixed(0)}bps${stampNote}, spread ${costs.halfSpreadBps.toFixed(0)}bps/side)`;
+    `commission ${costs.commissionBps.toFixed(0)}bps${stampNote}, spread ${costs.halfSpreadBps.toFixed(0)}bps/side` +
+    (measuredFloor > modelledRoundTripBps
+      ? `; measured account cost floor ${measuredFloor.toFixed(0)}bps applied`
+      : "") +
+    `)`;
 
   const base = {
     costs,
