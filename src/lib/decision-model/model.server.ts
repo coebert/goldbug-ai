@@ -524,11 +524,18 @@ export function formatModelBlock(
     .join(", ");
   const strengthFor = (symbol: string): SymbolStrength | null =>
     strengths?.get(baseSymbol(symbol).replace(/\.L$/, "")) ?? null;
-  const top = [...scores].sort(
-    (a, b) =>
-      strengthAdjustedScore(b.score, strengthFor(b.symbol)?.strength) -
-      strengthAdjustedScore(a.score, strengthFor(a.symbol)?.strength),
-  );
+  const marketWeightFor = (symbol: string): number => {
+    if (!market || market.rows.length === 0) return 1;
+    const base = baseSymbol(symbol);
+    return marketSessionWeight({
+      market: classifyMarketGroup(base, market.assetClassBySymbol?.get(base)),
+      session: market.session,
+      rows: market.rows,
+    });
+  };
+  const adjustedScore = (s: SymbolScore): number =>
+    strengthAdjustedScore(s.score, strengthFor(s.symbol)?.strength) * marketWeightFor(s.symbol);
+  const top = [...scores].sort((a, b) => adjustedScore(b) - adjustedScore(a));
   const table = top
     .slice(0, 12)
     .map((s) => {
