@@ -647,12 +647,20 @@ export function filterUniverseByAffordability(args: {
   minTradeValue: number;
   currency: string;
   maxCandidates?: number;
+  /**
+   * Symbols that must stay visible when the candidate window is narrower than
+   * the universe — e.g. the cash-funded inverse ETFs the AI uses for shorts.
+   * They still have to pass the same affordability checks; this only reserves
+   * space in the final slice.
+   */
+  prioritySymbols?: string[];
 }): AffordabilityResult {
   const {
     fullUniverse, priceMap, heldSymbols, cash, totalValue,
     perSymbolCapPct, minTradeValue, currency,
   } = args;
   const maxCandidates = args.maxCandidates ?? 22;
+  const priority = new Set((args.prioritySymbols ?? []).map((s) => s.toUpperCase()));
   const perSymbolBudget = Math.min(totalValue * perSymbolCapPct, cash);
   const affordable: UniverseSymbol[] = [];
   const dropped: AffordabilityDrop[] = [];
@@ -691,7 +699,16 @@ export function filterUniverseByAffordability(args: {
       `No instruments affordable within per-symbol budget ${perSymbolBudget.toFixed(2)} ${currency}; showing 6 cheapest for reference. Add funds or widen the per-symbol cap to enable buys.`,
     );
   } else {
-    candidates = affordable.slice(0, maxCandidates);
+    // Stable partition: priority symbols keep their original relative order,
+    // then everything else does. Without this the inverse ETFs near the end of
+    // the curated universe silently fall outside the model's 22-name window.
+    const orderedAffordable = priority.size
+      ? [
+          ...affordable.filter((u) => priority.has(u.symbol.toUpperCase())),
+          ...affordable.filter((u) => !priority.has(u.symbol.toUpperCase())),
+        ]
+      : affordable;
+    candidates = orderedAffordable.slice(0, maxCandidates);
     if (dropped.length > 0) {
       notes.push(
         `Cash-aware filter kept ${candidates.length}/${fullUniverse.length} instruments; dropped ${dropped.length} priced above per-symbol budget ${perSymbolBudget.toFixed(2)} ${currency}.`,

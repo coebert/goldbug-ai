@@ -42,6 +42,7 @@ import { qk } from "@/lib/query-keys";
 import { TradingModeDriftNotice } from "@/components/trading-mode-drift-notice";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { writeCachedTradingMode } from "@/lib/trading-mode-store";
+import { SHORT_PROXIES } from "@/lib/short-sleeve";
 
 // The dial config lives in `@/lib/risk-presets` so the server-side sweep and
 // the live engine read exactly the same table this card writes.
@@ -156,6 +157,13 @@ function parseCfg(raw: unknown): RiskConfig {
       r.stamp_exempt_preference === "off" || r.stamp_exempt_preference === "strong"
         ? r.stamp_exempt_preference
         : "balanced",
+    shorts_enabled: bool("shorts_enabled", DEFAULTS.shorts_enabled),
+    short_sleeve_max_pct: num(
+      "short_sleeve_max_pct",
+      DEFAULTS.short_sleeve_max_pct,
+      0,
+      1,
+    ),
     trading_style: r.trading_style === "swing" ? "swing" : "position",
     swing_min_hold_days: Number.isFinite(Number(r.swing_min_hold_days))
       ? Math.max(0, Math.min(30, Math.floor(Number(r.swing_min_hold_days))))
@@ -238,6 +246,11 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
     "Stamp-exempt preference",
     prev.stamp_exempt_preference ?? "balanced",
     next.stamp_exempt_preference ?? "balanced",
+  );
+  push(
+    "Short selling",
+    prev.shorts_enabled ? `on (${fmtPct(prev.short_sleeve_max_pct)} sleeve cap)` : "off",
+    next.shorts_enabled ? `on (${fmtPct(next.short_sleeve_max_pct)} sleeve cap)` : "off",
   );
   push(
     "Trading style",
@@ -571,6 +584,53 @@ export function RiskControlsCard({
 
             {showAdvanced && (
             <>
+            <div className="rounded-md border border-border bg-background/40 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold">Short selling</h4>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Bearish positions use cash-funded inverse UCITS ETFs ({SHORT_PROXIES.map((p) => p.symbol).join(" / ")}). No borrowing, margin, CFDs, options, or naked stock shorts.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="shorts-enabled" className="text-xs font-medium">
+                    Short sleeve
+                  </Label>
+                  <Switch
+                    id="shorts-enabled"
+                    checked={cfg.shorts_enabled}
+                    onCheckedChange={(v) => setCfg((c) => ({ ...c, shorts_enabled: v }))}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
+                <div>
+                  <Label className="text-xs font-medium">Max short sleeve</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={100}
+                      step={5}
+                      disabled={!cfg.shorts_enabled}
+                      value={Number((cfg.short_sleeve_max_pct * 100).toFixed(0))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          short_sleeve_max_pct:
+                            Math.max(0, Math.min(100, Number(e.target.value) || 0)) / 100,
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% of portfolio value</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Inverse ETFs reset daily, so the engine treats them as tactical and reviews them frequently. Total long plus short exposure can never exceed 100% of portfolio value.
+                </p>
+              </div>
+            </div>
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
