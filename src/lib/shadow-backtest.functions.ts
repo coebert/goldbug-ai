@@ -12,21 +12,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const Input = z
-  .object({
-    portfolio_id: z.string().uuid(),
-    /** Trading days to replay, ending yesterday. */
-    days: z.number().int().min(3).max(45).default(30),
-    /** Keep the clone for inspection instead of deleting it. */
-    keep_clone: z.boolean().default(false),
-  })
-  .parse.bind(
-    z.object({
-      portfolio_id: z.string().uuid(),
-      days: z.number().int().min(3).max(45).default(30),
-      keep_clone: z.boolean().default(false),
-    }),
-  );
+const Shape = z.object({
+  portfolio_id: z.string().uuid(),
+  /** Trading days to replay, ending yesterday. Ignored when full_history. */
+  days: z.number().int().min(3).max(400).default(30),
+  /**
+   * Replay every day the book has existed (from its first equity snapshot or
+   * first trade) instead of a fixed trailing window.
+   */
+  full_history: z.boolean().default(false),
+  /** Keep the clone for inspection instead of deleting it. */
+  keep_clone: z.boolean().default(false),
+});
+const Input = Shape.parse.bind(Shape);
 
 function businessDaysEndingYesterday(count: number): string[] {
   const dates: string[] = [];
@@ -34,13 +32,27 @@ function businessDaysEndingYesterday(count: number): string[] {
   cursor.setUTCHours(0, 0, 0, 0);
   cursor.setUTCDate(cursor.getUTCDate() - 1);
   let guard = 0;
-  while (dates.length < count && guard++ < 400) {
+  while (dates.length < count && guard++ < 1200) {
     const dow = cursor.getUTCDay();
     if (dow !== 0 && dow !== 6) dates.unshift(cursor.toISOString().slice(0, 10));
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
   return dates;
 }
+
+function businessDaysBetween(fromDate: string, toDate: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${fromDate}T00:00:00Z`);
+  const end = new Date(`${toDate}T00:00:00Z`);
+  let guard = 0;
+  while (cursor <= end && guard++ < 3000) {
+    const dow = cursor.getUTCDay();
+    if (dow !== 0 && dow !== 6) dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
 
 export const runShadowBacktest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
