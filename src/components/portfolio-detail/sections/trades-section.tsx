@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { JargonText } from "@/components/jargon-text";
 import { ReconcileFillsCard } from "@/components/reconcile-fills-card";
+import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
@@ -16,6 +17,8 @@ export type TradeRow = {
   price: number | string;
   value: number | string;
   reason?: string | null;
+  /** Model self-rated confidence 0..1 recorded when the order was placed. */
+  conviction?: number | string | null;
 };
 
 type SortKey = "date" | "symbol" | "side" | "qty" | "price" | "value";
@@ -119,6 +122,7 @@ export function TradesSection({
                       </th>
                     );
                   })}
+                  <th className="px-3 py-2 text-left">Confidence</th>
                   <th className="px-3 py-2 text-left">Reason</th>
                 </tr>
               </thead>
@@ -136,6 +140,9 @@ export function TradesSection({
                       : null;
                   const zoneUk =
                     executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
+                  const conviction = t.conviction !== null && t.conviction !== undefined && Number.isFinite(Number(t.conviction))
+                    ? Number(t.conviction)
+                    : null;
                   return (
                     <tr key={t.id} className="border-t border-border">
                       <td className="px-3 py-2 tabular-nums whitespace-nowrap">
@@ -163,6 +170,16 @@ export function TradesSection({
                       <td className="px-3 py-2 text-right tabular-nums">
                         {Number(t.value).toFixed(2)}
                       </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {conviction === null ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <OrderConfidenceBadge
+                            side={t.side === "sell" ? "sell" : "buy"}
+                            conviction={conviction}
+                          />
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         <JargonText>{t.reason}</JargonText>
                       </td>
@@ -188,6 +205,9 @@ export function TradesSection({
                   : null;
               const zoneUk =
                 executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
+              const conviction = t.conviction !== null && t.conviction !== undefined && Number.isFinite(Number(t.conviction))
+                ? Number(t.conviction)
+                : null;
               return (
                 <details
                   key={t.id}
@@ -214,6 +234,12 @@ export function TradesSection({
                       <span>Qty {Number(t.quantity).toFixed(4)}</span>
                       <span>@ {Number(t.price).toFixed(2)}</span>
                     </div>
+                    {conviction !== null && (
+                      <OrderConfidenceBadge
+                        side={t.side === "sell" ? "sell" : "buy"}
+                        conviction={conviction}
+                      />
+                    )}
                     {t.reason && (
                       <p className="text-xs text-muted-foreground break-words">
                         <JargonText>{t.reason}</JargonText>

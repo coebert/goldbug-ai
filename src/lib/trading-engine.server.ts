@@ -3111,6 +3111,7 @@ export async function runDailyTick(
         executed_at: executedAt,
         trade_date: asOf,
         reason: t.reason + (t.rejected ? ` [REJECTED: ${t.rejected}]` : ""),
+        conviction: Number.isFinite(t.conviction) ? Number(t.conviction) : null,
         instrument_ccy: instrumentCcyFor(t.symbol, t.instrument_ccy ?? null, inferSaxoCurrency(t.symbol)),
       }));
     if (tradesRows.length > 0) await admin.from("trades").insert(tradesRows);
