@@ -35,6 +35,13 @@ export const DecisionSchema = z.object({
    * gateway was unreachable). Sizing downstream is deliberately tightened.
    */
   ai_unavailable: z.boolean().optional(),
+  /**
+   * Which engine actually produced this decision: a gateway model id, or
+   * `learned-model` / `heuristic` when the gateway was unreachable. Recorded
+   * so the decision history stops claiming a model that never ran.
+   */
+  model_used: z.string().optional(),
+
   fx_conversions: z.array(FxConversionOrderSchema).optional(),
   fx_intents: z.array(FxIntentSchema).optional(),
 });

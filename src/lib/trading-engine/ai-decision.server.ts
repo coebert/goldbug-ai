@@ -305,7 +305,8 @@ If no action is warranted, return an empty orders array.`;
       if (i > 0) {
         console.warn(`AI decision succeeded on ${attempt.note} attempt (${attempt.model})`);
       }
-      return output;
+      return { ...output, model_used: attempt.model };
+
     } catch (error) {
       lastError = error;
       const status = (error as { statusCode?: number } | null)?.statusCode;
