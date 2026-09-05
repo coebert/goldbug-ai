@@ -29,12 +29,18 @@ export const DEFAULT_EDGE_SAFETY_MULTIPLE = 1.25;
 
 /**
  * Headroom applied to the account's fill-measured round-trip cost before it is
- * used as a floor. The same sweep peaked with an effective floor near 130bps
- * against a measured 90bps: the measured figure is an average, and the tickets
- * the gate should refuse are the expensive tail of it. Above ~190bps effective
- * the gate starts refusing profitable trades and P&L falls away.
+ * used as a floor.
+ *
+ * Re-tuned Sep 2026 on a shorter, more recent tape (2025-09 → 2026-09, churn
+ * cadence, realistic assumptions). On that window P&L peaks at an effective
+ * hurdle of ~135bps (5.90%) and the best return-per-drawdown cell is 120bps
+ * floor x 1.25 safety = 150bps effective (5.85% / 4.89%DD). Above ~190bps the
+ * gate refuses profitable trades (4.2% at 240bps, negative at 400bps).
+ * 90bps measured x 1.33 x 1.25 safety lands on that 150bps effective hurdle,
+ * down from the 1.45 headroom fitted on the longer 2021-2026 tape.
  */
-export const MEASURED_FLOOR_HEADROOM = 1.45;
+export const MEASURED_FLOOR_HEADROOM = 1.33;
+
 
 /** Used when a symbol has no ATR reading (conservative daily range). */
 export const FALLBACK_ATR_PCT = 0.015;
