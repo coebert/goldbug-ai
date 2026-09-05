@@ -477,7 +477,7 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
   const labelLine =
     cov.label_mode === "price"
       ? `the realised ${model.horizon_days}-day forward return`
-      : `the realised ${model.horizon_days}-day forward return NET of the round-trip dealing cost this account actually pays (${cov.round_trip_cost_bps ?? "?"}bps, measured from ${cov.cost_calibrated_symbols ?? 0} symbols' invoiced fills), divided by the risk the name was carrying — i.e. what this book could actually have banked per unit of risk`;
+      : `the realised ${model.horizon_days}-day forward return NET of the round-trip dealing cost this account actually pays (${cov.round_trip_cost_bps ?? "?"}bps, priced ticket by ticket from ${cov.cost_fills ?? 0} real fills across ${cov.cost_calibrated_symbols ?? 0} symbols), divided by the risk the name was carrying — i.e. what this book could actually have banked per unit of risk`;
   return `LEARNED MODEL — FITTED ON THIS ACCOUNT'S OWN HISTORY (${cov.samples} observations, ${cov.dates} trading days ${cov.from ?? "?"} → ${cov.to ?? "?"}; ${cov.traded_samples ?? 0} of them days you actually dealt the name, ${cov.held_samples ?? 0} where you already held it):
 - This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day — plus the state of THIS book that day (position size, unrealised P&L, holding age, cash share, drawdown, recent realised loss on the name) — against ${labelLine}, demeaned within each day so it measures SELECTION skill, not market direction. Days where real money went in are weighted more heavily than days the name was merely screened.
 

@@ -221,7 +221,7 @@ export async function buildHistoryBrief(args: {
 
   const text = [
     `ACCOUNT HISTORY EVIDENCE — ${data.samples.length} observations of ${data.symbols.length} instruments over ${data.dates.length} trading days (${data.from ?? "?"} → ${data.to ?? "?"}).`,
-    `Outcome measured on every row: the realised ${horizonDays}-trading-day return NET of the round-trip dealing cost this account actually pays (${data.roundTripCostBps.toFixed(0)}bps on average — ${data.costFeeBps.toFixed(1)}bps of invoiced charges plus ${data.costSlippageBps.toFixed(1)}bps of realised slippage per ticket, measured per symbol and per side across ${data.costFills} real fills), divided by the risk the name was carrying, then expressed relative to that same day's average across the candidate list. So it measures SELECTION, not market direction. ${data.tradedSamples} rows are days real money went into the name; ${data.heldSamples} are days it was already held.${
+    `Outcome measured on every row: the realised ${horizonDays}-trading-day return NET of the round-trip dealing cost this account actually pays (${data.roundTripCostBps.toFixed(0)}bps on average — ${data.costFeeBps.toFixed(1)}bps of dealing charges priced on the real ticket size plus ${data.costSlippageBps.toFixed(1)}bps of realised slippage per ticket, measured per symbol and per side across ${data.costFills} real fills), divided by the risk the name was carrying, then expressed relative to that same day's average across the candidate list. So it measures SELECTION, not market direction. ${data.tradedSamples} rows are days real money went into the name; ${data.heldSamples} are days it was already held.${
       data.historySamples
         ? ` A further ${data.historySamples} rows rebuild the same technical snapshot on these instruments back to ${data.historyFrom ?? "?"}, before this engine kept records — those rows carry no news, no book state and a smaller weight, so they show the long-run behaviour of the names without overruling this account's own record.`
         : ""
@@ -243,7 +243,7 @@ export async function buildHistoryBrief(args: {
     `- Best: ${bestSymbols.map((s) => `${s.symbol} ${s.meanBps >= 0 ? "+" : ""}${s.meanBps.toFixed(0)}bps (${(s.hitPct * 100).toFixed(0)}% up, n=${s.n})`).join("; ") || "n/a"}`,
     `- Worst: ${worstSymbols.map((s) => `${s.symbol} ${s.meanBps >= 0 ? "+" : ""}${s.meanBps.toFixed(0)}bps (${(s.hitPct * 100).toFixed(0)}% up, n=${s.n})`).join("; ") || "n/a"}`,
     "",
-    `COST REALITY: a round trip costs about ${data.roundTripCostBps.toFixed(0)}bps here (${data.costFeeBps.toFixed(1)}bps charges + ${data.costSlippageBps.toFixed(1)}bps slippage each way, and more on UK single stocks that pay stamp duty on the buy), so any setup whose measured edge is smaller than that is a losing trade however good the signal looks.`,
+    `COST REALITY: a round trip costs about ${data.roundTripCostBps.toFixed(0)}bps here (${data.costFeeBps.toFixed(1)}bps of commission/stamp/levy on the actual ticket + ${data.costSlippageBps.toFixed(1)}bps slippage each way, and more on UK single stocks that pay stamp duty on the buy), so any setup whose measured edge is smaller than that is a losing trade however good the signal looks.`,
   ]
     .filter((l) => l !== "")
     .join("\n");
