@@ -403,6 +403,8 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
 
   const bySide = new Map<string, { fills: number; chargeW: number; chargeBps: number; slips: number[] }>();
   const allCharge: number[] = [];
+  let chargeNotional = 0;
+  let chargeWeighted = 0;
   const allSlip: number[] = [];
   let invoicedFills = 0;
   let slippageFills = 0;
@@ -442,6 +444,8 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
       cur.chargeW += notionalNative;
       cur.chargeBps += chargeBps * notionalNative;
       allCharge.push(chargeBps);
+      chargeNotional += notionalNative;
+      chargeWeighted += chargeBps * notionalNative;
     }
 
     if (close !== null) {
@@ -456,7 +460,13 @@ async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
     bySide.set(key, cur);
   }
 
-  const accountCharge = median(allCharge) ?? DEFAULT_ONE_WAY_COST_BPS;
+  // Weighted by notional, not per ticket: what this book pays per pound put to
+  // work. A handful of £10 test tickets pay enormous rates but move no money,
+  // and should not set the hurdle for every future trade.
+  const accountCharge =
+    chargeNotional > 0
+      ? chargeWeighted / chargeNotional
+      : (median(allCharge) ?? DEFAULT_ONE_WAY_COST_BPS);
   // Slippage is two-sided noise around a real average cost; the median keeps a
   // single bad print from setting the price of every future trade.
   const accountSlip = Math.max(0, median(allSlip) ?? 0);
