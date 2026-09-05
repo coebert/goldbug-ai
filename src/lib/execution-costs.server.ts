@@ -26,7 +26,7 @@ import { priceSymbolVariants } from "./price-symbol";
 import { estimateTradeCosts } from "./trade-viability-gate";
 import { inferSaxoCurrency } from "./saxo-fees";
 
-export const DEFAULT_ONE_WAY_COST_BPS = 27.3;
+export const DEFAULT_ONE_WAY_COST_BPS = 15;
 
 export function baseSymbol(symbol: string): string {
   return (symbol.split(":")[0] ?? symbol).trim().toUpperCase();
@@ -220,6 +220,11 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   }
 
   const bySide = new Map<string, { fills: number; chargeW: number; chargeBps: number; slips: number[] }>();
+  /** Ticket counts and the window of activity, per symbol. */
+  const meta = new Map<
+    string,
+    { tickets: number; invoiced: number; first: string | null; last: string | null }
+  >();
   const allCharge: number[] = [];
   let chargeNotional = 0;
   let chargeWeighted = 0;
@@ -231,6 +236,14 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     const key = `${f.symbol}|${f.side}`;
     const cur = bySide.get(key) ?? { fills: 0, chargeW: 0, chargeBps: 0, slips: [] };
     cur.fills++;
+    const m = meta.get(f.symbol) ?? { tickets: 0, invoiced: 0, first: null, last: null };
+    m.tickets++;
+    if (f.invoicedCharge !== null) m.invoiced++;
+    if (f.date) {
+      if (m.first === null || f.date < m.first) m.first = f.date;
+      if (m.last === null || f.date > m.last) m.last = f.date;
+    }
+    meta.set(f.symbol, m);
 
     const rawClose = f.date ? closeByKey.get(`${f.symbol}|${f.date}`) : undefined;
     const close = rawClose === undefined ? null : alignUnits(f.price, rawClose);
@@ -306,10 +319,15 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     const buys = bySide.get(`${sym}|buy`)?.fills ?? 0;
     const sells = bySide.get(`${sym}|sell`)?.fills ?? 0;
     if (buys + sells === 0) continue;
+    const m = meta.get(sym);
     bySymbol.set(sym, {
       buyBps: sideCost(sym, "buy"),
       sellBps: sideCost(sym, "sell"),
       fills: buys + sells,
+      tickets: m?.tickets ?? buys + sells,
+      invoicedFills: m?.invoiced ?? 0,
+      firstFillAt: m?.first ?? null,
+      lastFillAt: m?.last ?? null,
     });
   }
 
