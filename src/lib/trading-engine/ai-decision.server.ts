@@ -61,8 +61,8 @@ export async function callAiForDecision(args: {
   fearLabel?: string | null;
   /** Cash-funded short sleeve (inverse ETFs) and its live room. */
   shortSleeveBlock?: string | null;
-  /** Weights fitted on this account's own history + today's model ranking. */
-  learnedModelBlock?: string | null;
+  /** Playbook the AI wrote from this account's own recorded results. */
+  playbookBlock?: string | null;
   /** Realised risk/return profile of this exact book, from its own records. */
   riskProfileBlock?: string | null;
 
@@ -187,7 +187,7 @@ ${args.cashPolicyBlock ?? ""}
 
 ${args.shortSleeveBlock ?? ""}
 
-${args.learnedModelBlock ?? ""}
+${args.playbookBlock ?? ""}
 
 ${args.riskProfileBlock ?? ""}
 
@@ -357,41 +357,6 @@ If no action is warranted, return an empty orders array.`;
     console.warn(
       `AI decision unavailable — falling back (${parseFail ? "parse" : "gateway"}: ${msg.slice(0, 160)})`,
     );
-
-    // FIRST fallback: the model fitted on this account's own history. Only
-    // used when it passed its out-of-sample test; otherwise we carry on to
-    // the hand-written heuristic below.
-    try {
-      const { buildLearnedFallback } = await import("../decision-model/fallback.server");
-      const learned = await buildLearnedFallback({
-        userId: (args.portfolio as { user_id?: string | null }).user_id ?? null,
-        rows: args.features as unknown as Array<Record<string, unknown>>,
-        holdings: args.holdings.map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
-        fearLabel: args.fearLabel ?? null,
-        reason: msg,
-        portfolioId: (args.portfolio as { id?: string | null }).id ?? null,
-        totalValue: args.totalValue,
-        cash: args.cashValue,
-
-      });
-      if (learned) {
-        console.warn(
-          `[decision-model] learned fallback used — ${learned.orders.length} orders from model ${learned.model.id.slice(0, 8)}`,
-        );
-        return {
-          briefing: learned.briefing,
-          rationale: learned.rationale,
-          ai_unavailable: true,
-          model_used: "learned-model",
-          orders: learned.orders as DecisionOutput["orders"],
-        };
-      }
-    } catch (learnedErr) {
-      console.warn(
-        `[decision-model] learned fallback unavailable — ${learnedErr instanceof Error ? learnedErr.message : String(learnedErr)}`,
-      );
-    }
-
 
     try {
       const { buildHeuristicDecision } = await import("../heuristic-decision");

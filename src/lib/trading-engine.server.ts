@@ -1037,35 +1037,21 @@ export async function runDailyTick(
     srvLog.info(`[trading-engine] AI decision skipped — ${materiality!.reason}`);
   }
 
-  // Weights fitted on this account's own decision history, plus today's
-  // candidates pre-scored by that model. Best-effort: never break the tick.
-  const learnedModelBlock = await (async () => {
+  // The playbook the AI wrote from this account's own recorded results —
+  // what actually paid here, net of the costs this book pays. This replaced
+  // the ridge fit, which never cleared its out-of-sample bar on so short a
+  // history. Best-effort: never break the tick.
+  const playbookBlock = await (async () => {
     if (breakerTripped || allVenuesClosed || skipAiForQuietTick) return null;
     try {
-      const { loadLatestModel, scoreCandidates, formatModelBlock } = await import(
-        "./decision-model/model.server"
+      const { loadLatestPlaybook, formatPlaybookBlock } = await import(
+        "./decision-model/playbook.server"
       );
       const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
       if (!userId) return null;
-      const model = await loadLatestModel(userId);
-      if (!model) return null;
-      // The model was fitted with this account's own book state as features,
-      // so today's book has to be handed in the same way.
-      const { loadBookSnapshot } = await import("./decision-model/book-state.server");
-      const book = await loadBookSnapshot({
-        portfolioId,
-        totalValue: totalValue,
-        cash,
-        asOf,
-      }).catch(() => null);
-      const scores = scoreCandidates(
-        model,
-        features as unknown as Array<Record<string, unknown>>,
-        book,
-      );
-      return formatModelBlock(model, scores);
+      return formatPlaybookBlock(await loadLatestPlaybook(userId));
     } catch (e) {
-      srvLog.warn("learned decision model unavailable for prompt", e);
+      srvLog.warn("account playbook unavailable for prompt", e);
       return null;
     }
   })();
@@ -1162,7 +1148,7 @@ export async function runDailyTick(
         cashPolicyBlock: cashPolicy.enabled
           ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
           : null,
-        learnedModelBlock,
+        playbookBlock,
         riskProfileBlock,
 
         shortSleeveBlock: formatShortSleeveBlock({
