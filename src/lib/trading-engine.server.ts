@@ -2757,6 +2757,7 @@ export async function runDailyTick(
           conviction: typeof order.conviction === "number" ? order.conviction : null,
           atrPct: featExec?.atr_pct ?? null,
           horizonDays,
+          measuredRoundTripBps,
         });
         if (!netEdge.pass) {
           executed.push({
