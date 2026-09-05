@@ -31,9 +31,38 @@ export type BacktestVsRealResult = BacktestVsReal & {
     risk_level: string | null;
     days: number;
   }>;
+  /** Actual trades the chosen run's engine dealt, when the run stored them. */
+  runTrades: Array<{
+    trade_date: string;
+    side: "buy" | "sell";
+    symbol: string;
+    quantity: number;
+    price: number;
+    value: number;
+  }>;
   /** Set when there is a run but no usable equity curve stored on it. */
   note: string | null;
 };
+
+function tradesFromStored(raw: unknown): BacktestVsRealResult["runTrades"] {
+  const log = (raw as { trade_log?: unknown } | null)?.trade_log;
+  if (!Array.isArray(log)) return [];
+  return log
+    .map((t) => {
+      const r = t as Record<string, unknown>;
+      const quantity = Number(r["quantity"] ?? 0);
+      const price = Number(r["price"] ?? 0);
+      return {
+        trade_date: String(r["trade_date"] ?? ""),
+        side: (r["side"] === "sell" ? "sell" : "buy") as "buy" | "sell",
+        symbol: String(r["symbol"] ?? ""),
+        quantity,
+        price,
+        value: Number.isFinite(Number(r["value"])) ? Number(r["value"]) : quantity * price,
+      };
+    })
+    .filter((t) => t.symbol && t.trade_date);
+}
 
 type StoredEquityPoint = { snapshot_date?: string; date?: string; total_value?: number; value?: number };
 
@@ -58,7 +87,7 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
 
     const { data: runs, error: runErr } = await supabase
       .from("backtest_runs")
-      .select("id, ran_at, risk_level, days, equity")
+      .select("id, ran_at, risk_level, days, equity, metrics")
       .eq("portfolio_id", data.portfolioId)
       .order("ran_at", { ascending: false })
       .limit(25);
@@ -83,6 +112,7 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
       runRiskLevel: (chosen?.risk_level as string | null | undefined) ?? null,
       runDays: chosen ? Number(chosen.days ?? 0) : null,
       availableRuns: available,
+      runTrades: tradesFromStored(chosen?.metrics ?? null),
     };
 
     if (!chosen) {

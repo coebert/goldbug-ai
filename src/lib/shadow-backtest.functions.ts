@@ -106,7 +106,7 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
     // so the two curves are measured on the same money.
     const { data: firstSnap } = await supabase
       .from("equity_snapshots")
-      .select("snapshot_date, total_value")
+      .select("snapshot_date, total_value, cash")
       .eq("portfolio_id", data.portfolio_id)
       .gte("snapshot_date", from)
       .order("snapshot_date", { ascending: true })
@@ -153,13 +153,18 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       avg_cost: number;
       instrument_ccy: string | null;
     };
+    // Live holdings are broker-native (`VWRL:xlon`) while trades are recorded on
+    // universe symbols (`VWRL.L`), so both sides must be keyed the same way or the
+    // unwind cancels positions against the wrong ledger.
+    const { engineSymbolKey } = await import("./price-symbol");
     const seeds = new Map<string, Seed>();
     const { data: liveHoldings } = await supabase
       .from("holdings")
       .select("symbol, asset_class, quantity, avg_cost, instrument_ccy")
       .eq("portfolio_id", data.portfolio_id);
     for (const h of liveHoldings ?? []) {
-      seeds.set(h.symbol as string, {
+      const key = engineSymbolKey(h.symbol as string);
+      seeds.set(key, {
         symbol: h.symbol as string,
         asset_class: (h.asset_class ?? "stock") as Seed["asset_class"],
         quantity: Number(h.quantity ?? 0),
@@ -167,14 +172,19 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         instrument_ccy: (h.instrument_ccy as string | null) ?? null,
       });
     }
+    // Walk the ledger BACKWARDS from today, clamping at zero after each step.
+    // A plain net-sum goes negative whenever a name was held at the start, sold,
+    // and later re-bought bigger — which is most of this book.
     const { data: laterTrades } = await supabase
       .from("trades")
-      .select("symbol, side, quantity, price")
+      .select("symbol, side, quantity, price, trade_date")
       .eq("portfolio_id", data.portfolio_id)
-      .gte("trade_date", from);
+      .gte("trade_date", from)
+      .order("trade_date", { ascending: false });
     for (const t of laterTrades ?? []) {
       const sym = t.symbol as string;
-      const prev = seeds.get(sym) ?? {
+      const key = engineSymbolKey(sym);
+      const prev = seeds.get(key) ?? {
         symbol: sym,
         asset_class: "stock" as const,
         quantity: 0,
@@ -182,19 +192,24 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         instrument_ccy: null,
       };
       const delta = (t.side === "buy" ? -1 : 1) * Number(t.quantity ?? 0);
-      seeds.set(sym, { ...prev, quantity: prev.quantity + delta });
+      seeds.set(key, { ...prev, quantity: Math.max(0, prev.quantity + delta) });
     }
-    const seeded = [...seeds.values()].filter((s) => s.quantity > 1e-8);
+    const candidates = [...seeds.values()].filter((s) => s.quantity > 1e-8);
 
+    // Only seed what the engine can actually price on the start day; anything it
+    // cannot value would silently vanish from equity, so hold it as cash instead.
+    const seeded: Seed[] = [];
     let invested = 0;
-    for (const s of seeded) {
+    for (const s of candidates) {
       let px: number | null = null;
       try {
         px = await getPriceOn(s.symbol, from);
       } catch {
         px = null;
       }
-      invested += s.quantity * (px ?? s.avg_cost);
+      if (px == null || !Number.isFinite(px) || px <= 0) continue;
+      seeded.push(s);
+      invested += s.quantity * px;
     }
     const seededCash = Math.max(0, startingCash - invested);
 
@@ -210,8 +225,8 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
           opened_at: new Date(`${from}T00:00:00Z`).toISOString(),
         })),
       );
-      await supabase.from("portfolios").update({ current_cash: seededCash }).eq("id", shadowId);
     }
+    await supabase.from("portfolios").update({ current_cash: seededCash }).eq("id", shadowId);
 
 
     let aiDays = 0;
@@ -230,6 +245,9 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       }
 
       // How often did the real model actually decide?
+      let ordersProposed = 0;
+      let ordersExecuted = 0;
+      const rejectReasons = new Map<string, number>();
       const { data: decisions } = await supabase
         .from("decisions")
         .select("run_date, model, raw")
@@ -245,7 +263,32 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
           model === "fallback";
         if (usedHeuristic) fallbackDays += 1;
         else aiDays += 1;
+        const orders = Array.isArray(raw["orders"]) ? (raw["orders"] as unknown[]) : [];
+        const executed = Array.isArray(raw["executed"]) ? (raw["executed"] as unknown[]) : [];
+        ordersProposed += orders.length;
+        ordersExecuted += executed.length;
+        for (const e of executed) {
+          const rec = e as Record<string, unknown>;
+          const why = rec["rejected"] ?? rec["reason"];
+          if (typeof why === "string" && why.trim()) {
+            const k = why.slice(0, 120);
+            rejectReasons.set(k, (rejectReasons.get(k) ?? 0) + 1);
+          }
+        }
       }
+      const diagnostics = {
+        ai_days: aiDays,
+        fallback_days: fallbackDays,
+        orders_proposed: ordersProposed,
+        orders_executed: ordersExecuted,
+        seeded_positions: seeded.length,
+        seeded_cash: Math.round(seededCash * 100) / 100,
+        reject_reasons: [...rejectReasons.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([reason, count]) => ({ reason, count })),
+        errors: failures.slice(0, 5),
+      };
 
       const { data: eq } = await supabase
         .from("equity_snapshots")
@@ -279,6 +322,17 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         [],
       );
 
+      // The clone is deleted below, so the actual sizes the engine dealt in
+      // only survive if we store them on the run itself.
+      const tradeLog = (trades ?? []).map((t) => ({
+        trade_date: String(t.trade_date),
+        side: t.side as "buy" | "sell",
+        symbol: String(t.symbol),
+        quantity: Number(t.quantity ?? 0),
+        price: Number(t.price ?? 0),
+        value: Number(t.quantity ?? 0) * Number(t.price ?? 0),
+      }));
+
       // Attach the run to the LIVE portfolio so the comparison card sees it.
       const { data: saved } = await supabase
         .from("backtest_runs")
@@ -292,7 +346,9 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
             shadow: true,
             ai_days: aiDays,
             fallback_days: fallbackDays,
-            trades: (trades ?? []).length,
+            trades: tradeLog.length,
+            diagnostics,
+            trade_log: tradeLog.slice(0, 300),
           },
           equity: curve,
           ran_at: new Date().toISOString(),
@@ -309,7 +365,8 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         days: dates.length,
         aiDays,
         fallbackDays,
-        trades: (trades ?? []).length,
+        trades: tradeLog.length,
+        tradeLog,
         startingCash,
         finalValue: curve.length ? curve[curve.length - 1]!.total_value : startingCash,
         metrics,
