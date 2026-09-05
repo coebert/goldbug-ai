@@ -41,6 +41,8 @@ export type NormalisedSample = {
   z: number[];
   y: number;
   w: number;
+  /** Decision timestamp, carried through for time-of-day bucketing. */
+  at?: string | null;
 };
 
 
@@ -106,6 +108,7 @@ export function normaliseByDate(samples: Sample[], featureCount: number, minPerD
         z,
         y: r.y - ym,
         w: Number.isFinite(r.w) && (r.w ?? 1) > 0 ? Math.min(8, r.w!) : 1,
+        at: r.at ?? null,
       });
     }
   }
