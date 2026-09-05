@@ -125,11 +125,12 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
   },
   {
     to: "/decision-model",
-    label: "Decision model",
-    hint: "The signal weights fitted from your own trading history.",
+    label: "Trading playbook",
+    hint: "The rules the AI wrote from your own trading record.",
     icon: Brain,
     area: "research",
-    keywords: "learned model weights fit signals edge",
+    keywords: "playbook rules learned history edge signals",
+
   },
 
   {
