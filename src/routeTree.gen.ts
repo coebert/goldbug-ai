@@ -28,6 +28,7 @@ import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SymbolsIndexRouteImport } from './routes/symbols.index'
 import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
 import { Route as MarketSymbolRouteImport } from './routes/market.$symbol'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
@@ -164,6 +165,11 @@ const AdminRoute = AdminRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SymbolsIndexRoute = SymbolsIndexRouteImport.update({
+  id: '/symbols/',
+  path: '/symbols/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
@@ -421,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
   '/walk-forward/$id': typeof WalkForwardIdRoute
+  '/symbols/': typeof SymbolsIndexRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
@@ -484,6 +491,7 @@ export interface FileRoutesByTo {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
   '/walk-forward/$id': typeof WalkForwardIdRoute
+  '/symbols': typeof SymbolsIndexRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
@@ -548,6 +556,7 @@ export interface FileRoutesById {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/market/$symbol': typeof MarketSymbolRoute
   '/walk-forward/$id': typeof WalkForwardIdRoute
+  '/symbols/': typeof SymbolsIndexRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
@@ -613,6 +622,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/market/$symbol'
     | '/walk-forward/$id'
+    | '/symbols/'
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
@@ -676,6 +686,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/market/$symbol'
     | '/walk-forward/$id'
+    | '/symbols'
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
@@ -739,6 +750,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/market/$symbol'
     | '/walk-forward/$id'
+    | '/symbols/'
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
@@ -803,6 +815,7 @@ export interface RootRouteChildren {
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   MarketSymbolRoute: typeof MarketSymbolRoute
   WalkForwardIdRoute: typeof WalkForwardIdRoute
+  SymbolsIndexRoute: typeof SymbolsIndexRoute
   ApiBrokerBlocksClearRoute: typeof ApiBrokerBlocksClearRoute
   ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
@@ -977,6 +990,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/symbols/': {
+      id: '/symbols/'
+      path: '/symbols'
+      fullPath: '/symbols/'
+      preLoaderRoute: typeof SymbolsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/walk-forward/$id': {
@@ -1299,6 +1319,7 @@ const rootRouteChildren: RootRouteChildren = {
   LongHorizonIdRoute: LongHorizonIdRoute,
   MarketSymbolRoute: MarketSymbolRoute,
   WalkForwardIdRoute: WalkForwardIdRoute,
+  SymbolsIndexRoute: SymbolsIndexRoute,
   ApiBrokerBlocksClearRoute: ApiBrokerBlocksClearRoute,
   ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
