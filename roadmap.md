@@ -50,3 +50,4 @@
 - [x] P&L comparison chart: real vs shadow backtest, net of fees and taxes (/pnl dashboard).
 - Shadow backtest must actually trade (currently zero new positions).
 - Shadow replay: US names (JNJ/SPY/MSFT) bought with GBP cash at USD prices but valued after FX -> false ~21% loss. Fix currency conversion on shadow fills before trusting the gap chart.
+- [ ] Cost dashboard page: per-symbol avg fill cost, slippage, cost floor + adjustable hurdle slider (persisted, wired into net-edge gate)
