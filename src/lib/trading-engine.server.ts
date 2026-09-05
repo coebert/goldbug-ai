@@ -1203,6 +1203,7 @@ export async function runDailyTick(
         playbookBlock,
       riskProfileBlock,
       modelBlock,
+      measuredRoundTripBps,
 
         shortSleeveBlock: formatShortSleeveBlock({
 
