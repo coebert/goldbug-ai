@@ -1104,7 +1104,10 @@ function PortfolioPage() {
                   runBtPending={runBt.isPending}
                   resetPending={reset.isPending}
                   onRunDay={() => runDay.mutate()}
-                  onRunBacktest={() => runBt.mutate()}
+                  onRunBacktest={() => runBt.mutate(undefined)}
+                  onRunFullHistoryBacktest={
+                    isLiveBook ? () => runBt.mutate({ fullHistory: true }) : undefined
+                  }
                   onReset={() => setConfirmReset(true)}
                 />
 
