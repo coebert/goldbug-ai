@@ -42,3 +42,10 @@
 - [x] Historical Saxo price backfill for the backtest window (broker daily bars into the price cache, both symbol spellings)
 - [x] Live risk dashboard: position weights, concentration, cash at risk and FX legs (/portfolio/$id/risk)
 - [ ] Place a small real trade and confirm it in holdings and P&L against live Saxo prices (needs the owner to confirm the ticket — two-factor required)
+
+## Open
+- Conviction-tiered sizing: small stake on strong signal, full stake on very strong signal.
+- Daily comparison: model's top picks vs rule set (names + sizes that differ).
+- Per-symbol measured round-trip cost from fills/slippage, surfaced in the AI prompt.
+- P&L comparison chart: real vs shadow backtest, net of fees and taxes.
+- Shadow backtest must actually trade (currently zero new positions).

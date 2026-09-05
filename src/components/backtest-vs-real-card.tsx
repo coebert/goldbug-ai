@@ -340,6 +340,64 @@ export function BacktestVsRealCard({
               />
             </div>
 
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <div className="text-xs font-medium">Trades the engine dealt in this run</div>
+                <div className="text-[11px] text-muted-foreground tabular-nums">
+                  {c.runTrades.length} {c.runTrades.length === 1 ? "trade" : "trades"}
+                  {c.runTrades.length > 0 &&
+                    ` · ${money(
+                      c.runTrades.reduce((s, t) => s + Math.abs(t.value), 0),
+                      currency,
+                    )} dealt`}
+                </div>
+              </div>
+              {c.runTrades.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  This run placed no trades — the engine held the positions it started with.
+                </p>
+              ) : (
+                <div className="max-h-56 overflow-y-auto rounded-lg border">
+                  <table className="w-full text-[11px]">
+                    <thead className="sticky top-0 bg-muted/60 text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-1 text-left font-medium">Date</th>
+                        <th className="px-2 py-1 text-left font-medium">Side</th>
+                        <th className="px-2 py-1 text-left font-medium">Symbol</th>
+                        <th className="px-2 py-1 text-right font-medium">Quantity</th>
+                        <th className="px-2 py-1 text-right font-medium">Price</th>
+                        <th className="px-2 py-1 text-right font-medium">Size</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {c.runTrades.map((t, i) => (
+                        <tr key={`${t.trade_date}-${t.symbol}-${i}`} className="border-t">
+                          <td className="px-2 py-1 tabular-nums">{t.trade_date}</td>
+                          <td
+                            className={`px-2 py-1 uppercase ${
+                              t.side === "buy" ? "text-emerald-500" : "text-rose-400"
+                            }`}
+                          >
+                            {t.side}
+                          </td>
+                          <td className="px-2 py-1">{t.symbol}</td>
+                          <td className="px-2 py-1 text-right tabular-nums">
+                            {t.quantity.toLocaleString("en-GB", { maximumFractionDigits: 4 })}
+                          </td>
+                          <td className="px-2 py-1 text-right tabular-nums">
+                            {t.price.toLocaleString("en-GB", { maximumFractionDigits: 4 })}
+                          </td>
+                          <td className="px-2 py-1 text-right tabular-nums">
+                            {money(Math.abs(t.value), currency)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               The chart is an indexed shape comparison for readability. The money tiles keep the
               live curve in its exact flow-netted currency: shadow equity applies the backtest's
