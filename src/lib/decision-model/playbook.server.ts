@@ -19,7 +19,6 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { buildHistoryBrief, type HistoryBrief } from "./history-brief.server";
-import { srvLog } from "@/lib/log";
 
 const PRIMARY_MODEL = process.env["AI_DECISION_MODEL"] || "google/gemini-3.6-flash";
 const BACKUP_MODEL = "google/gemini-2.5-flash";
@@ -74,9 +73,9 @@ async function callModel(model: string, brief: string, apiKey: string): Promise<
     maxOutputTokens: 16_000,
     system: SYSTEM,
     prompt: brief,
-    experimental_output: Output.object({ schema: PlaybookSchema }),
+    output: Output.object({ schema: PlaybookSchema }),
   });
-  return (await result.experimental_output) as Playbook;
+  return (await result.output) as Playbook;
 }
 
 /**
@@ -158,7 +157,7 @@ export async function loadLatestPlaybook(userId: string): Promise<StoredPlaybook
   if (error || !data) return null;
   const parsed = PlaybookSchema.safeParse(data.playbook);
   if (!parsed.success) {
-    srvLog.warn("stored playbook failed schema check", parsed.error.message);
+    console.warn("[playbook] stored playbook failed schema check", parsed.error.message);
     return null;
   }
   return {
