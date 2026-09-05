@@ -25,6 +25,8 @@ import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { loadAvgCostFromFills } from "@/lib/holdings-cost-from-fills.server";
+import { engineSymbolKey } from "@/lib/price-symbol";
 import { writeEquitySnapshot } from "@/lib/valuation/write-snapshot.server";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
