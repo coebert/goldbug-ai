@@ -41,6 +41,7 @@ import { Route as PortfolioIdPerformanceRouteImport } from './routes/portfolio.$
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdFxRiskRouteImport } from './routes/portfolio.$id.fx-risk'
 import { Route as PortfolioIdDailyPnlRouteImport } from './routes/portfolio.$id.daily-pnl'
+import { Route as PortfolioIdDailyComparisonRouteImport } from './routes/portfolio.$id.daily-comparison'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
 import { Route as ApiPublicSetupScanCronRouteImport } from './routes/api/public/setup-scan-cron'
@@ -230,6 +231,12 @@ const PortfolioIdDailyPnlRoute = PortfolioIdDailyPnlRouteImport.update({
   path: '/portfolio/$id/daily-pnl',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortfolioIdDailyComparisonRoute =
+  PortfolioIdDailyComparisonRouteImport.update({
+    id: '/portfolio/$id/daily-comparison',
+    path: '/portfolio/$id/daily-comparison',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
   id: '/portfolio/$id/attribution',
   path: '/portfolio/$id/attribution',
@@ -420,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/api/public/setup-scan-cron': typeof ApiPublicSetupScanCronRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
+  '/portfolio/$id/daily-comparison': typeof PortfolioIdDailyComparisonRoute
   '/portfolio/$id/daily-pnl': typeof PortfolioIdDailyPnlRoute
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
@@ -482,6 +490,7 @@ export interface FileRoutesByTo {
   '/api/public/setup-scan-cron': typeof ApiPublicSetupScanCronRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
+  '/portfolio/$id/daily-comparison': typeof PortfolioIdDailyComparisonRoute
   '/portfolio/$id/daily-pnl': typeof PortfolioIdDailyPnlRoute
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
@@ -545,6 +554,7 @@ export interface FileRoutesById {
   '/api/public/setup-scan-cron': typeof ApiPublicSetupScanCronRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
+  '/portfolio/$id/daily-comparison': typeof PortfolioIdDailyComparisonRoute
   '/portfolio/$id/daily-pnl': typeof PortfolioIdDailyPnlRoute
   '/portfolio/$id/fx-risk': typeof PortfolioIdFxRiskRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
@@ -609,6 +619,7 @@ export interface FileRouteTypes {
     | '/api/public/setup-scan-cron'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
+    | '/portfolio/$id/daily-comparison'
     | '/portfolio/$id/daily-pnl'
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
@@ -671,6 +682,7 @@ export interface FileRouteTypes {
     | '/api/public/setup-scan-cron'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
+    | '/portfolio/$id/daily-comparison'
     | '/portfolio/$id/daily-pnl'
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
@@ -733,6 +745,7 @@ export interface FileRouteTypes {
     | '/api/public/setup-scan-cron'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
+    | '/portfolio/$id/daily-comparison'
     | '/portfolio/$id/daily-pnl'
     | '/portfolio/$id/fx-risk'
     | '/portfolio/$id/optimizer'
@@ -796,6 +809,7 @@ export interface RootRouteChildren {
   ApiPublicSetupScanCronRoute: typeof ApiPublicSetupScanCronRoute
   PortfolioIdAnalyticsRoute: typeof PortfolioIdAnalyticsRoute
   PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
+  PortfolioIdDailyComparisonRoute: typeof PortfolioIdDailyComparisonRoute
   PortfolioIdDailyPnlRoute: typeof PortfolioIdDailyPnlRoute
   PortfolioIdFxRiskRoute: typeof PortfolioIdFxRiskRoute
   PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
@@ -1056,6 +1070,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdDailyPnlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portfolio/$id/daily-comparison': {
+      id: '/portfolio/$id/daily-comparison'
+      path: '/portfolio/$id/daily-comparison'
+      fullPath: '/portfolio/$id/daily-comparison'
+      preLoaderRoute: typeof PortfolioIdDailyComparisonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portfolio/$id/attribution': {
       id: '/portfolio/$id/attribution'
       path: '/portfolio/$id/attribution'
@@ -1284,6 +1305,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSetupScanCronRoute: ApiPublicSetupScanCronRoute,
   PortfolioIdAnalyticsRoute: PortfolioIdAnalyticsRoute,
   PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
+  PortfolioIdDailyComparisonRoute: PortfolioIdDailyComparisonRoute,
   PortfolioIdDailyPnlRoute: PortfolioIdDailyPnlRoute,
   PortfolioIdFxRiskRoute: PortfolioIdFxRiskRoute,
   PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
