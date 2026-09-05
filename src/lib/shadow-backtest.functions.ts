@@ -141,6 +141,78 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
     const shadowId = clone.id as string;
 
     const { runDailyTick, snapshotPortfolio } = await import("./trading-engine.server");
+    const { getPriceOn } = await import("./market-data.server");
+
+    // Seed the shadow book with the positions the live book actually held on the
+    // first replay day, reconstructed by unwinding every trade made since then.
+    // Without this the shadow starts 100% cash and the comparison is unfair.
+    type Seed = {
+      symbol: string;
+      asset_class: "stock" | "etf" | "crypto" | "commodity" | "fx";
+      quantity: number;
+      avg_cost: number;
+      instrument_ccy: string | null;
+    };
+    const seeds = new Map<string, Seed>();
+    const { data: liveHoldings } = await supabase
+      .from("holdings")
+      .select("symbol, asset_class, quantity, avg_cost, instrument_ccy")
+      .eq("portfolio_id", data.portfolio_id);
+    for (const h of liveHoldings ?? []) {
+      seeds.set(h.symbol as string, {
+        symbol: h.symbol as string,
+        asset_class: (h.asset_class ?? "stock") as Seed["asset_class"],
+        quantity: Number(h.quantity ?? 0),
+        avg_cost: Number(h.avg_cost ?? 0),
+        instrument_ccy: (h.instrument_ccy as string | null) ?? null,
+      });
+    }
+    const { data: laterTrades } = await supabase
+      .from("trades")
+      .select("symbol, side, quantity, price")
+      .eq("portfolio_id", data.portfolio_id)
+      .gte("trade_date", from);
+    for (const t of laterTrades ?? []) {
+      const sym = t.symbol as string;
+      const prev = seeds.get(sym) ?? {
+        symbol: sym,
+        asset_class: "stock" as const,
+        quantity: 0,
+        avg_cost: Number(t.price ?? 0),
+        instrument_ccy: null,
+      };
+      const delta = (t.side === "buy" ? -1 : 1) * Number(t.quantity ?? 0);
+      seeds.set(sym, { ...prev, quantity: prev.quantity + delta });
+    }
+    const seeded = [...seeds.values()].filter((s) => s.quantity > 1e-8);
+
+    let invested = 0;
+    for (const s of seeded) {
+      let px: number | null = null;
+      try {
+        px = await getPriceOn(s.symbol, from);
+      } catch {
+        px = null;
+      }
+      invested += s.quantity * (px ?? s.avg_cost);
+    }
+    const seededCash = Math.max(0, startingCash - invested);
+
+    if (seeded.length > 0) {
+      await supabase.from("holdings").insert(
+        seeded.map((s) => ({
+          portfolio_id: shadowId,
+          symbol: s.symbol,
+          asset_class: s.asset_class,
+          quantity: s.quantity,
+          avg_cost: s.avg_cost,
+          instrument_ccy: s.instrument_ccy,
+          opened_at: new Date(`${from}T00:00:00Z`).toISOString(),
+        })),
+      );
+      await supabase.from("portfolios").update({ current_cash: seededCash }).eq("id", shadowId);
+    }
+
 
     let aiDays = 0;
     let fallbackDays = 0;
