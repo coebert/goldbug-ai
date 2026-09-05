@@ -41,6 +41,18 @@ function strengthTone(label: string): "default" | "secondary" | "outline" {
   return label === "strong" ? "default" : label === "moderate" ? "secondary" : "outline";
 }
 
+function marketLabel(market: string): string {
+  return market === "equities"
+    ? "Shares & ETFs"
+    : market === "crypto"
+      ? "Crypto"
+      : market === "forex"
+        ? "Forex"
+        : market === "commodities"
+          ? "Commodities"
+          : market;
+}
+
 function DailyComparisonPage() {
   const { id } = Route.useParams();
   const load = useServerFn(getDailyComparison);
@@ -106,6 +118,78 @@ function DailyComparisonPage() {
           </Card>
         ) : (
           <div className="space-y-6">
+            {(data.markets ?? []).some((mk) => mk.samples > 0) ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Signal strength by market and time of day</CardTitle>
+                  <CardDescription>
+                    How reliably each market's signals have predicted your results — all day, and
+                    in the part of the day the latest review ran
+                    {data.markets?.[0]?.sessionLabel ? ` (${data.markets[0].sessionLabel}, London time)` : ""}.
+                    The AI scales each market's scores by the weight shown.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <table className="w-full min-w-[40rem] text-sm">
+                    <thead className="text-left text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="py-2 pr-3">Market</th>
+                        <th className="py-2 pr-3">All day</th>
+                        <th className="py-2 pr-3">Right</th>
+                        <th className="py-2 pr-3">Avg result</th>
+                        <th className="py-2 pr-3">This session</th>
+                        <th className="py-2 pr-3">Score weight</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.markets ?? []).map((mk) => (
+                        <tr key={mk.market} className="border-t border-border">
+                          <td className="py-2 pr-3 font-medium">{mk.marketLabel}</td>
+                          <td className="py-2 pr-3">
+                            {mk.samples > 0 ? (
+                              <>
+                                <Badge variant={strengthTone(mk.strengthLabel)} className="capitalize">
+                                  {mk.strengthLabel}
+                                </Badge>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {mk.samples} observations
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">not measured yet</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">{pct(mk.hitRate)}</td>
+                          <td className="py-2 pr-3">
+                            {mk.meanNetBps == null
+                              ? "—"
+                              : `${mk.meanNetBps >= 0 ? "+" : ""}${(mk.meanNetBps / 100).toFixed(2)}%`}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {mk.sessionStrengthLabel && mk.sessionStrength != null ? (
+                              <>
+                                <Badge
+                                  variant={strengthTone(mk.sessionStrengthLabel)}
+                                  className="capitalize"
+                                >
+                                  {mk.sessionStrengthLabel}
+                                </Badge>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {mk.sessionSamples} observations
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">×{mk.weight.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            ) : null}
             <Card>
               <CardHeader>
                 <CardTitle>
@@ -125,6 +209,7 @@ function DailyComparisonPage() {
                   <thead className="text-left text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="py-2 pr-3">Instrument</th>
+                      <th className="py-2 pr-3">Market</th>
                       <th className="py-2 pr-3">Track record</th>
                       <th className="py-2 pr-3">Right</th>
                       <th className="py-2 pr-3">Avg result</th>
@@ -142,6 +227,12 @@ function DailyComparisonPage() {
                         <td className="py-2 pr-3">
                           <div className="font-medium">{r.symbol}</div>
                           <div className="text-xs text-muted-foreground">{r.name}</div>
+                        </td>
+                        <td className="py-2 pr-3">
+                          <div>{marketLabel(r.market)}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            score ×{r.marketWeight.toFixed(2)}
+                          </div>
                         </td>
                         <td className="py-2 pr-3">
                           <Badge variant={strengthTone(r.strengthLabel)} className="capitalize">

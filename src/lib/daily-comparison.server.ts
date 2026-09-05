@@ -12,6 +12,18 @@ import { buildHeuristicBuys, buildHeuristicSells, type HeuristicFeature } from "
 import { loadLatestModel, loadScoringContext, scoreCandidates } from "./decision-model/model.server";
 import { loadSymbolStrengths, strengthSymbolKey } from "./decision-model/symbol-strength.server";
 import { strengthAdjustedScore, strengthLabel, NEUTRAL_STRENGTH } from "./decision-model/symbol-strength";
+import { loadMarketStrengths } from "./decision-model/symbol-strength.server";
+import {
+  classifyMarketGroup,
+  marketSessionWeight,
+  sessionForTimestamp,
+  MARKET_GROUPS,
+  MARKET_LABELS,
+  SESSION_LABELS,
+  type MarketGroup,
+  type SessionBucket,
+} from "./decision-model/market-strength";
+import { UNIVERSE } from "./universe.server";
 
 export type ComparisonRow = {
   symbol: string;
@@ -38,8 +50,31 @@ export type ComparisonRow = {
   ic: number | null;
   from: string | null;
   to: string | null;
+  /** Coarse market this name belongs to. */
+  market: MarketGroup;
+  /** Score weight applied for this market at the current time of day. */
+  marketWeight: number;
   /** True when the AI and the rule set disagree on this name. */
   differs: boolean;
+};
+
+export type MarketStrengthCell = {
+  market: MarketGroup;
+  marketLabel: string;
+  /** All-day record. */
+  strength: number;
+  strengthLabel: "strong" | "moderate" | "weak" | "unproven";
+  samples: number;
+  hitRate: number | null;
+  meanNetBps: number | null;
+  /** Record in the session the latest decision was made in (when known). */
+  session: SessionBucket | null;
+  sessionLabel: string | null;
+  sessionStrength: number | null;
+  sessionStrengthLabel: "strong" | "moderate" | "weak" | "unproven" | null;
+  sessionSamples: number | null;
+  /** Blended weight the engine applies to this market's scores right now. */
+  weight: number;
 };
 
 export type DailyComparison = {
@@ -50,6 +85,8 @@ export type DailyComparison = {
   horizonDays: number;
   modelUsable: boolean;
   strengthsMeasured: number;
+  /** Signal strength by market at the current time of day. */
+  markets: MarketStrengthCell[];
   rows: ComparisonRow[];
 };
 
@@ -73,6 +110,7 @@ export async function buildDailyComparison(args: {
     horizonDays,
     modelUsable: false,
     strengthsMeasured: 0,
+    markets: [],
     rows: [],
   };
 
@@ -182,11 +220,45 @@ export async function buildDailyComparison(args: {
   // ---- historical signal strength --------------------------------------
   const strengths = await loadSymbolStrengths(args.userId, horizonDays);
 
+  // ---- market × time-of-day strength ------------------------------------
+  const marketRows = await loadMarketStrengths(args.userId, horizonDays).catch(() => []);
+  const session = sessionForTimestamp(decision?.created_at ? String(decision.created_at) : null);
+  const assetClassBySymbol = new Map(
+    UNIVERSE.map((u) => [u.symbol.toUpperCase(), u.asset_class as string]),
+  );
+  const marketOf = (symbol: string): MarketGroup => {
+    const base = symbol.split(":")[0]!.trim().toUpperCase();
+    return classifyMarketGroup(base, assetClassBySymbol.get(base) ?? null);
+  };
+  const markets: MarketStrengthCell[] = MARKET_GROUPS.map((g) => {
+    const all = marketRows.find((r) => r.market === g && r.session === "all")?.strength ?? null;
+    const now =
+      session == null
+        ? null
+        : (marketRows.find((r) => r.market === g && r.session === session)?.strength ?? null);
+    return {
+      market: g,
+      marketLabel: MARKET_LABELS[g],
+      strength: all?.strength ?? 0,
+      strengthLabel: strengthLabel(all?.strength ?? 0),
+      samples: all?.samples ?? 0,
+      hitRate: all?.hitRate ?? null,
+      meanNetBps: all?.meanNetBps ?? null,
+      session,
+      sessionLabel: session ? SESSION_LABELS[session] : null,
+      sessionStrength: now?.strength ?? null,
+      sessionStrengthLabel: now ? strengthLabel(now.strength) : null,
+      sessionSamples: now?.samples ?? null,
+      weight: marketSessionWeight({ market: g, session, rows: marketRows }),
+    };
+  });
+
   const rows: ComparisonRow[] = signals.map((s) => {
     const symbol = String(s["symbol"] ?? "");
     const hist = strengths.get(strengthSymbolKey(symbol)) ?? null;
     const strength = hist?.strength ?? NEUTRAL_STRENGTH;
     const m = modelScores.get(symbol) ?? null;
+    const market = marketOf(symbol);
     const rule = ruleBySymbol.get(symbol) ?? null;
     const ai = aiBySymbol.get(symbol) ?? null;
     return {
@@ -209,16 +281,20 @@ export async function buildDailyComparison(args: {
       ic: hist?.ic ?? null,
       from: hist?.from ?? null,
       to: hist?.to ?? null,
+      market,
+      marketWeight: marketSessionWeight({ market, session, rows: marketRows }),
       differs: (ai?.side ?? null) !== (rule?.side ?? null),
     };
   });
 
-  // Strongest historical signal first; within that, the best model score.
+  // Strongest historical signal first; within that, the best model score —
+  // with each name's score also weighted by how reliable its market's
+  // signals have been at this time of day.
   rows.sort((a, b) => {
     if (b.strength !== a.strength) return b.strength - a.strength;
     return (
-      strengthAdjustedScore(b.modelScore ?? 0, b.strength) -
-      strengthAdjustedScore(a.modelScore ?? 0, a.strength)
+      strengthAdjustedScore(b.modelScore ?? 0, b.strength) * b.marketWeight -
+      strengthAdjustedScore(a.modelScore ?? 0, a.strength) * a.marketWeight
     );
   });
 
@@ -229,6 +305,7 @@ export async function buildDailyComparison(args: {
     horizonDays,
     modelUsable,
     strengthsMeasured: [...strengths.values()].length,
+    markets,
     rows,
   };
 }
