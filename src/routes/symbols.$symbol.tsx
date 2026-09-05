@@ -155,6 +155,7 @@ function SymbolDetailPage() {
             <Link
               to="/market/$symbol"
               params={{ symbol: row?.symbol ?? symbol }}
+              search={{ range: "6m" }}
               className="hover:text-foreground"
             >
               Chart
