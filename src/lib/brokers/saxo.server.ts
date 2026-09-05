@@ -1794,20 +1794,9 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     }
 
-
-    // Saxo rejects the `+`-for-space form URLSearchParams produces, so encode
-    // the bearer value by hand.
-    const wsUrl = `${STREAMING_BASE[this.env]}/streamingws/connect`
-      + `?authorization=${encodeURIComponent(`Bearer ${this.token}`)}`
-      + `&contextId=${encodeURIComponent(contextId)}`;
-    return {
-      contextId,
-      wsUrl,
-      env: this.env,
-      inactivityTimeoutSec,
-      subscriptions,
-    };
+    return { inactivityTimeoutSec, subscriptions };
   }
+
 
   /** Drop every subscription on a streaming context (best effort). */
   async closeStreamingContext(contextId: string): Promise<void> {
