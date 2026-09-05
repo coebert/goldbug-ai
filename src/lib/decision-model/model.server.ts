@@ -582,5 +582,6 @@ export function formatModelBlock(
 - Strongest fitted drivers: ${drivers}.
 ${table ? `\nTODAY'S MODEL RANKING (higher = better expected ${model.horizon_days}d relative return):\n${table}\nWeakest: ${worst}.` : ""}
 ${strengths && strengths.size > 0 ? "- The ranking above is ordered by TRACK RECORD FIRST: each name's mdl score is discounted by how reliably that instrument's signals have predicted this account's own cost-adjusted outcomes. Trade the strongest track records first; a high mdl score on an 'unproven' name is a weaker reason than a moderate score on a 'strong' one, and deserves a smaller stake." : ""}
+${marketBlock}
 - A BUY on a bottom-quartile mdl score needs an explicit reason in the rationale for overriding the fitted evidence.`;
 }
