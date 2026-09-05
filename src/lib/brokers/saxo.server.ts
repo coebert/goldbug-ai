@@ -1658,13 +1658,40 @@ export class SaxoAdapter implements BrokerAdapter {
    * returned only to the authenticated owner of the account and kept in memory
    * on the page (never persisted).
    */
-  async openInfoPriceStream(
+  /**
+   * Connect URL for a streaming context. The socket must be OPEN before
+   * subscriptions are created, otherwise Saxo has nowhere to push the first
+   * deltas and the page sits on the snapshot forever.
+   */
+  buildStreamingUrl(contextId: string): string {
+    // Saxo rejects the `+`-for-space form URLSearchParams produces, so encode
+    // the bearer value by hand.
+    return `${STREAMING_BASE[this.env]}/streamingws/connect`
+      + `?authorization=${encodeURIComponent(`Bearer ${this.token}`)}`
+      + `&contextId=${encodeURIComponent(contextId)}`;
+  }
+
+  /** Fresh contextId for a streaming session (max 50 chars, alphanumeric). */
+  newStreamingContextId(): string {
+    return `aegis${Math.random().toString(36).slice(2, 10)}${Date.now() % 1_000_000}`;
+  }
+
+  /**
+   * Re-authorize an open socket after the access token is refreshed; without
+   * it Saxo drops the connection when the original token expires.
+   */
+  async reauthorizeStream(contextId: string): Promise<void> {
+    await this.req("PUT", "/streamingws/authorize", {
+      query: { contextid: contextId },
+      maxAttempts: 1,
+    });
+  }
+
+  async createInfoPriceSubscriptions(
+    contextId: string,
     symbols: string[],
     opts?: { refreshRateMs?: number },
   ): Promise<{
-    contextId: string;
-    wsUrl: string;
-    env: BrokerEnv;
     inactivityTimeoutSec: number;
     subscriptions: Array<{
       referenceId: string;
@@ -1678,9 +1705,9 @@ export class SaxoAdapter implements BrokerAdapter {
       at: string;
     }>;
   }> {
-    const contextId = `aegis${Math.random().toString(36).slice(2, 10)}${Date.now() % 1_000_000}`;
     const accountKey = await this.getDefaultAccountKey();
     const refreshRate = Math.max(500, Math.min(60_000, opts?.refreshRateMs ?? 1000));
+
     const subscriptions: Array<{
       referenceId: string; symbol: string; uic: number; assetType: string;
       currency: string; price: number | null; bid: number | null; ask: number | null; at: string;
@@ -1767,20 +1794,9 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     }
 
-
-    // Saxo rejects the `+`-for-space form URLSearchParams produces, so encode
-    // the bearer value by hand.
-    const wsUrl = `${STREAMING_BASE[this.env]}/streamingws/connect`
-      + `?authorization=${encodeURIComponent(`Bearer ${this.token}`)}`
-      + `&contextId=${encodeURIComponent(contextId)}`;
-    return {
-      contextId,
-      wsUrl,
-      env: this.env,
-      inactivityTimeoutSec,
-      subscriptions,
-    };
+    return { inactivityTimeoutSec, subscriptions };
   }
+
 
   /** Drop every subscription on a streaming context (best effort). */
   async closeStreamingContext(contextId: string): Promise<void> {
