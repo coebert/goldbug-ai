@@ -385,7 +385,12 @@ export async function runDailyTick(
   // their venue is closed (they'll only fill on the next open, but keeping
   // them in the universe lets risk logic still see the position). Always-open
   // venues (crypto, FX) pass through untouched.
-  {
+  // Historical runs (backtests / shadow replays) must NOT use the live clock:
+  // replaying a weekday from a Saturday closed every equity venue and left the
+  // AI with only always-open crypto/FX rows, which is why replays never traded.
+  const isHistoricalRun =
+    portfolio.mode === "backtest" || asOf < new Date().toISOString().slice(0, 10);
+  if (!isHistoricalRun) {
     const { getMarketStatusForSymbol } = await import("./market-hours");
     const heldSet = new Set((holdings ?? []).map((h) => h.symbol));
     const closedSkipped: string[] = [];

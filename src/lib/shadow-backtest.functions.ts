@@ -130,7 +130,10 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         holding_dd_autoclose: live.holding_dd_autoclose,
         concentration_cap_pct: live.concentration_cap_pct,
         concentration_autotrim: live.concentration_autotrim,
-        fx_enabled: false,
+        // Mirror the live book: with FX off the engine rejects most of its own
+        // preferred setups ("FX wallet disabled"), which is not how the real
+        // account trades and makes the replay hold cash for weeks.
+        fx_enabled: live.fx_enabled ?? false,
         mode: "backtest",
         broker: null,
         status: "active",
@@ -258,9 +261,11 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
       let daysWithCandidates = 0;
       const rejectReasons = new Map<string, number>();
       const budgetNotes = new Map<string, number>();
+      const haltNotes = new Map<string, number>();
+      const explanations: string[] = [];
       const { data: decisions } = await supabase
         .from("decisions")
-        .select("run_date, model, raw")
+        .select("run_date, model, raw, briefing, rationale")
         .eq("portfolio_id", shadowId);
       for (const row of decisions ?? []) {
         const raw = (row.raw ?? {}) as Record<string, unknown>;
@@ -279,7 +284,8 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         ordersExecuted += executed.length;
         // Affordability/universe context explains a "no candidates" silence,
         // which looks identical to the AI simply choosing to hold.
-        const aff = (raw["affordability"] ?? {}) as Record<string, unknown>;
+        const guard = (raw["guardrails"] ?? {}) as Record<string, unknown>;
+        const aff = ((raw["affordability"] ?? guard["affordability"]) ?? {}) as Record<string, unknown>;
         const kept = Number(aff["candidates_kept"] ?? 0);
         candidatesSeen += Number.isFinite(kept) ? kept : 0;
         universeSeen = Math.max(universeSeen, Number(aff["universe_total"] ?? 0) || 0);
@@ -290,6 +296,22 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
             const k = n.slice(0, 120);
             budgetNotes.set(k, (budgetNotes.get(k) ?? 0) + 1);
           }
+        }
+        const halts = guard["halts"];
+        if (halts && typeof halts === "object") {
+          for (const [k, v] of Object.entries(halts as Record<string, unknown>)) {
+            if (v === true || (typeof v === "string" && v.trim())) {
+              const key = typeof v === "string" ? `${k}: ${v.slice(0, 80)}` : k;
+              haltNotes.set(key, (haltNotes.get(key) ?? 0) + 1);
+            }
+          }
+        }
+        const why =
+          (typeof raw["plain_explanation"] === "string" ? (raw["plain_explanation"] as string) : "") ||
+          (typeof row.rationale === "string" ? row.rationale : "") ||
+          (typeof row.briefing === "string" ? row.briefing : "");
+        if (why.trim() && explanations.length < 3) {
+          explanations.push(`${String(row.run_date)}: ${why.slice(0, 400)}`);
         }
         for (const e of executed) {
           const rec = e as Record<string, unknown>;
@@ -317,6 +339,8 @@ export const runShadowBacktest = createServerFn({ method: "POST" })
         candidates_total: candidatesSeen,
         days_with_candidates: daysWithCandidates,
         budget_notes: topOf(budgetNotes),
+        halts: topOf(haltNotes),
+        explanations,
         reject_reasons: topOf(rejectReasons),
         errors: failures.slice(0, 5),
       };
