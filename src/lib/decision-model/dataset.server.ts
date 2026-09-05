@@ -24,6 +24,7 @@
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Candle } from "../market-data.server";
 import { priceSymbolVariants } from "../price-symbol";
 import {
   extractFeatureVector,
@@ -52,6 +53,13 @@ export type DatasetOptions = {
   realMoneyOnly?: boolean;
   /** `risk_net` (default) = cost- and risk-adjusted; `price` = raw forward return. */
   labelMode?: LabelMode;
+  /**
+   * How many years of bar history to rebuild behind the first recorded
+   * decision. 0 = recorded decisions only (the old behaviour).
+   */
+  historyYears?: number;
+  /** Sampling stride, in trading days, for the rebuilt history. */
+  historyStrideDays?: number;
 };
 
 export type DatasetResult = {
@@ -75,14 +83,28 @@ export type DatasetResult = {
   costCalibratedSymbols: number;
   meanWeight: number;
   tradesScanned: number;
+  /** Rows rebuilt from bars before the first recorded decision. */
+  historySamples: number;
+  /** Earliest date the rebuilt history reaches. */
+  historyFrom: string | null;
 };
 
 const REAL_MONEY_MODES = new Set(["live_prod", "live_sim"]);
 const LOSS_MEMORY_HALFLIFE_DAYS = 30;
 const DEFAULT_ONE_WAY_COST_BPS = 15;
+const DEFAULT_HISTORY_YEARS = 10;
+const DEFAULT_HISTORY_STRIDE = 5;
+/**
+ * Weight of a rebuilt pre-engine row relative to a real recorded decision day.
+ * Low on purpose: these rows have no news, no book state and no macro context,
+ * so they inform the price/trend relationships without overruling how this
+ * account has actually behaved.
+ */
+const HISTORY_SAMPLE_WEIGHT = 0.35;
+
 
 /** Close prices for one symbol, ordered by date, keyed by the engine symbol. */
-type PriceSeries = { dates: string[]; closes: number[] };
+type PriceSeries = { dates: string[]; closes: number[]; candles: Candle[] };
 
 function baseSymbol(symbol: string): string {
   return (symbol.split(":")[0] ?? symbol).trim().toUpperCase();
@@ -100,7 +122,7 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
 
   const keys = Array.from(wanted.keys());
   const CHUNK = 120;
-  const rowsBySymbol = new Map<string, Array<{ d: string; c: number }>>();
+  const rowsBySymbol = new Map<string, Candle[]>();
 
   for (let i = 0; i < keys.length; i += CHUNK) {
     const slice = keys.slice(i, i + CHUNK);
@@ -109,7 +131,7 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
     for (;;) {
       const { data, error } = await supabaseAdmin
         .from("price_cache")
-        .select("symbol, price_date, close")
+        .select("symbol, price_date, open, high, low, close, volume")
         .in("symbol", slice)
         .gte("price_date", from)
         .order("price_date", { ascending: true })
@@ -121,7 +143,14 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
         const close = Number(r.close);
         if (!Number.isFinite(close) || close <= 0) continue;
         const arr = rowsBySymbol.get(engine);
-        const row = { d: r.price_date as string, c: close };
+        const row: Candle = {
+          date: r.price_date as string,
+          open: Number(r.open) || close,
+          high: Number(r.high) || close,
+          low: Number(r.low) || close,
+          close,
+          volume: Number(r.volume) || 0,
+        };
         if (arr) arr.push(row);
         else rowsBySymbol.set(engine, [row]);
       }
@@ -131,16 +160,18 @@ async function loadPriceSeries(symbols: string[], from: string): Promise<Map<str
   }
 
   for (const [symbol, rows] of rowsBySymbol) {
-    rows.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     // De-duplicate variants landing on the same date (keep the first seen).
     const dates: string[] = [];
     const closes: number[] = [];
+    const candles: Candle[] = [];
     for (const r of rows) {
-      if (dates[dates.length - 1] === r.d) continue;
-      dates.push(r.d);
-      closes.push(r.c);
+      if (dates[dates.length - 1] === r.date) continue;
+      dates.push(r.date);
+      closes.push(r.close);
+      candles.push(r);
     }
-    out.set(symbol, { dates, closes });
+    out.set(symbol, { dates, closes, candles });
   }
   return out;
 }
@@ -330,7 +361,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     samples: [], dates: [], symbols: [], decisionsScanned: 0, snapshotsScanned: 0,
     skippedNoForwardPrice: 0, horizonDays, from: null, to: null, labelMode,
     tradedSamples: 0, heldSamples: 0, roundTripCostBps: 0, costCalibratedSymbols: 0,
-    meanWeight: 0, tradesScanned: 0,
+    meanWeight: 0, tradesScanned: 0, historySamples: 0, historyFrom: null,
   };
   if (ids.length === 0) return empty;
 
@@ -535,6 +566,8 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     weight: number;
     traded: boolean;
     held: boolean;
+    /** True for rows rebuilt from bars before the first recorded decision. */
+    history?: boolean;
   };
   const byKey = new Map<string, Candidate>();
   let snapshotsScanned = 0;
@@ -643,21 +676,67 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     }
   }
 
-  const symbols = Array.from(new Set(Array.from(byKey.values()).map((v) => v.symbol)));
-  const prices = await loadPriceSeries(symbols, firstDate);
+  // Symbols worth carrying long history for: everything the engine has looked
+  // at, plus everything this account has actually traded.
+  const symbols = Array.from(
+    new Set([
+      ...Array.from(byKey.values()).map((v) => v.symbol),
+      ...trades.map((t) => t.symbol),
+    ]),
+  );
+
+  const historyYears = Math.max(0, Math.min(25, opts.historyYears ?? DEFAULT_HISTORY_YEARS));
+  const historyFrom =
+    historyYears > 0
+      ? new Date(Date.parse(firstDate) - historyYears * 365.25 * 86_400_000)
+          .toISOString()
+          .slice(0, 10)
+      : firstDate;
+
+  const prices = await loadPriceSeries(symbols, historyFrom);
+
+  // Rebuild the same technical snapshot on every Nth bar before the engine's
+  // first recorded decision, so the fit sees years of behaviour, not weeks.
+  const historyCandidates: Candidate[] = [];
+  if (historyYears > 0) {
+    const candlesBySymbol = new Map<string, Candle[]>();
+    for (const [symbol, series] of prices) {
+      if (series.candles.length >= 120) candlesBySymbol.set(symbol, series.candles);
+    }
+    const { buildHistoricalCandidates } = await import("./history-extension.server");
+    for (const h of buildHistoricalCandidates({
+      candlesBySymbol,
+      from: historyFrom,
+      before: firstDate,
+      strideDays: Math.max(1, opts.historyStrideDays ?? DEFAULT_HISTORY_STRIDE),
+    })) {
+      historyCandidates.push({
+        date: h.date,
+        symbol: h.symbol,
+        row: h.row,
+        priority: 0,
+        weight: HISTORY_SAMPLE_WEIGHT,
+        traded: false,
+        held: false,
+        history: true,
+      });
+    }
+  }
 
   const samples: Sample[] = [];
   let skippedNoForwardPrice = 0;
   let tradedSamples = 0;
   let heldSamples = 0;
   let weightSum = 0;
+  let historySamples = 0;
 
-  for (const c of byKey.values()) {
+  for (const c of [...byKey.values(), ...historyCandidates]) {
     const series = prices.get(c.symbol);
     if (!series) {
       skippedNoForwardPrice++;
       continue;
     }
+
     const i0 = indexOnOrAfter(series, c.date);
     const i1 = i0 < 0 ? -1 : i0 + horizonDays;
     if (i0 < 0 || i1 >= series.dates.length) {
@@ -686,6 +765,7 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
 
     if (c.traded) tradedSamples++;
     if (c.held) heldSamples++;
+    if (c.history) historySamples++;
     weightSum += c.weight;
     samples.push({ date: c.date, symbol: c.symbol, x: extractFeatureVector(c.row), y, w: c.weight });
   }
@@ -708,6 +788,8 @@ export async function buildDataset(opts: DatasetOptions): Promise<DatasetResult>
     costCalibratedSymbols: costs.calibrated,
     meanWeight: samples.length ? Math.round((weightSum / samples.length) * 100) / 100 : 0,
     tradesScanned: trades.length,
+    historySamples,
+    historyFrom: historyYears > 0 ? historyFrom : null,
   };
 }
 

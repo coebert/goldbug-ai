@@ -91,12 +91,15 @@ export async function fitAndStoreModel(args: {
   realMoneyOnly?: boolean;
   /** `risk_net` (default): forward return net of this account's dealing costs, per unit of risk. */
   labelMode?: "risk_net" | "price";
+  /** Years of bar history rebuilt behind the first recorded decision (0 = off). */
+  historyYears?: number;
 }): Promise<StoredModel> {
   const data = await buildDataset({
     userId: args.userId,
     horizonDays: args.horizonDays ?? 5,
     realMoneyOnly: args.realMoneyOnly ?? false,
     labelMode: args.labelMode ?? "risk_net",
+    ...(args.historyYears === undefined ? {} : { historyYears: args.historyYears }),
   });
 
 
@@ -165,6 +168,8 @@ export async function fitAndStoreModel(args: {
       cost_calibrated_symbols: data.costCalibratedSymbols,
       mean_weight: data.meanWeight,
       trades_scanned: data.tradesScanned,
+      history_samples: data.historySamples,
+      history_from: data.historyFrom,
     },
 
     usable,
