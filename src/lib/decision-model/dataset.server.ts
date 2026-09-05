@@ -212,56 +212,205 @@ function horizonRisk(series: PriceSeries, i0: number, horizonDays: number, lookb
 
 // --------------------------------------------------------------------------
 // Dealing costs actually paid on this account
+//
+// A trade costs more than its commission. What this book really loses on a
+// round trip is (a) the invoiced charges on the contract note — commission,
+// exchange fees, stamp duty and the rest — plus (b) the gap between the price
+// the tape printed that day and the price this account was actually filled at.
+// Both are measured here from `live_fills`, per symbol and per side, because a
+// UK single stock pays stamp duty on the way in and an ETF does not.
 // --------------------------------------------------------------------------
 
-type CostModel = { bySymbol: Map<string, number>; medianBps: number; calibrated: number };
+type SideCost = { feeBps: number; slipBps: number; fills: number };
+type SymbolCost = { buyBps: number; sellBps: number; fills: number };
+
+type CostModel = {
+  bySymbol: Map<string, SymbolCost>;
+  /** Account-wide one-way cost used where a symbol has no fills of its own. */
+  medianBps: number;
+  /** Account-wide split, for reporting. */
+  feeBps: number;
+  slippageBps: number;
+  calibrated: number;
+  fills: number;
+  invoicedFills: number;
+  slippageFills: number;
+};
+
+/** Fills at least this many before a symbol's own cost is trusted outright. */
+const COST_SHRINK_FILLS = 4;
+const MAX_ONE_WAY_BPS = 400;
+
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)]!;
+}
+
+/**
+ * Fills are booked in the instrument's own currency; LSE closes are quoted in
+ * pence. Rescale when the two are a clean factor of 100 apart so a currency
+ * convention never masquerades as 9,900bps of slippage.
+ */
+function alignUnits(fill: number, close: number): number | null {
+  if (!(fill > 0) || !(close > 0)) return null;
+  const r = close / fill;
+  if (r > 50 && r < 200) return close / 100;
+  if (r > 1 / 200 && r < 1 / 50) return close * 100;
+  if (r > 0.5 && r < 2) return close;
+  return null; // too far apart to trust — skip this fill
+}
 
 async function loadCostModel(portfolioIds: string[]): Promise<CostModel> {
-  const bySymbol = new Map<string, number>();
-  const agg = new Map<string, { fee: number; notional: number }>();
+  type FillRow = {
+    symbol: string;
+    side: string;
+    date: string;
+    notional: number;
+    feeBps: number;
+    price: number;
+    invoiced: boolean;
+  };
+  const fills: FillRow[] = [];
 
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
       .from("live_fills")
-      .select("symbol, quantity, fill_price, fee")
+      .select(
+        "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, filled_at",
+      )
       .in("portfolio_id", portfolioIds)
       .range(page * 1000, page * 1000 + 999);
     if (error) break; // costs are a refinement, never a reason to fail the fit
     for (const r of data ?? []) {
       const qty = Math.abs(Number(r.quantity) || 0);
       const px = Number(r.fill_price) || 0;
-      const fee = Math.abs(Number(r.fee) || 0);
       const notional = qty * px;
       if (!(notional > 0)) continue;
-      const key = baseSymbol(String(r.symbol ?? ""));
-      const cur = agg.get(key) ?? { fee: 0, notional: 0 };
-      cur.fee += fee;
-      cur.notional += notional;
-      agg.set(key, cur);
+
+      // Prefer the broker's itemised charges; fall back to the modelled fee.
+      const parts = [r.fee_commission, r.fee_exchange, r.fee_tax, r.fee_other]
+        .map((v) => Math.abs(Number(v) || 0))
+        .reduce((a, b) => a + b, 0);
+      const source = String(r.fee_source ?? "").toLowerCase();
+      const invoiced = parts > 0 && source !== "" && source !== "none" && source !== "modelled";
+      const fee = invoiced ? parts : Math.abs(Number(r.fee) || 0);
+
+      const at = r.filled_at ? new Date(r.filled_at as string) : null;
+      fills.push({
+        symbol: baseSymbol(String(r.symbol ?? "")),
+        side: String(r.side ?? "").toLowerCase() === "sell" ? "sell" : "buy",
+        date: at && !Number.isNaN(at.getTime()) ? at.toISOString().slice(0, 10) : "",
+        notional,
+        feeBps: (fee / notional) * 10_000,
+        price: px,
+        invoiced,
+      });
     }
     if ((data?.length ?? 0) < 1000) break;
   }
 
-  const perSymbolBps: number[] = [];
-  for (const [sym, v] of agg) {
-    if (v.notional <= 0) continue;
-    const bps = (v.fee / v.notional) * 10_000;
-    if (!Number.isFinite(bps) || bps <= 0 || bps > 400) continue;
-    bySymbol.set(sym, bps);
-    perSymbolBps.push(bps);
+  // --- the day's tape, to measure what the fill actually gave up -----------
+  const closeByKey = new Map<string, number>();
+  const symbols = Array.from(new Set(fills.map((f) => f.symbol))).filter(Boolean);
+  const dates = Array.from(new Set(fills.map((f) => f.date))).filter(Boolean).sort();
+  if (symbols.length > 0 && dates.length > 0) {
+    const variants = Array.from(new Set(symbols.flatMap((s) => priceSymbolVariants(s))));
+    for (let page = 0; ; page++) {
+      const { data, error } = await supabaseAdmin
+        .from("price_cache")
+        .select("symbol, price_date, close")
+        .in("symbol", variants)
+        .gte("price_date", dates[0]!)
+        .lte("price_date", dates[dates.length - 1]!)
+        .range(page * 1000, page * 1000 + 999);
+      if (error) break;
+      for (const r of data ?? []) {
+        const close = Number(r.close) || 0;
+        if (!(close > 0)) continue;
+        closeByKey.set(`${baseSymbol(String(r.symbol))}|${String(r.price_date)}`, close);
+      }
+      if ((data?.length ?? 0) < 1000) break;
+    }
   }
-  perSymbolBps.sort((a, b) => a - b);
-  const medianBps = perSymbolBps.length
-    ? perSymbolBps[Math.floor(perSymbolBps.length / 2)]!
-    : DEFAULT_ONE_WAY_COST_BPS;
 
-  return { bySymbol, medianBps, calibrated: bySymbol.size };
+  const bySide = new Map<string, SideCost & { feeW: number; slips: number[] }>();
+  const allFee: number[] = [];
+  const allSlip: number[] = [];
+  let invoicedFills = 0;
+  let slippageFills = 0;
+
+  for (const f of fills) {
+    if (f.invoiced) invoicedFills++;
+    const key = `${f.symbol}|${f.side}`;
+    const cur = bySide.get(key) ?? { feeBps: 0, slipBps: 0, fills: 0, feeW: 0, slips: [] };
+    cur.fills++;
+    cur.feeW += f.notional;
+    cur.feeBps += f.feeBps * f.notional;
+
+    const rawClose = f.date ? closeByKey.get(`${f.symbol}|${f.date}`) : undefined;
+    const close = rawClose === undefined ? null : alignUnits(f.price, rawClose);
+    if (close !== null) {
+      const signed = f.side === "buy" ? f.price - close : close - f.price;
+      const bps = (signed / close) * 10_000;
+      if (Number.isFinite(bps) && Math.abs(bps) <= MAX_ONE_WAY_BPS) {
+        cur.slips.push(bps);
+        allSlip.push(bps);
+        slippageFills++;
+      }
+    }
+    bySide.set(key, cur);
+    if (Number.isFinite(f.feeBps) && f.feeBps >= 0 && f.feeBps < MAX_ONE_WAY_BPS) allFee.push(f.feeBps);
+  }
+
+  const accountFee = median(allFee) ?? DEFAULT_ONE_WAY_COST_BPS;
+  // Slippage is two-sided noise around a real average cost; the median keeps a
+  // single bad print from setting the price of every future trade.
+  const accountSlip = Math.max(0, median(allSlip) ?? 0);
+  const accountOneWay = Math.min(MAX_ONE_WAY_BPS, accountFee + accountSlip);
+
+  const sideCost = (symbol: string, side: string): number => {
+    const v = bySide.get(`${symbol}|${side}`);
+    if (!v || v.fills === 0) return accountOneWay;
+    const fee = v.feeW > 0 ? v.feeBps / v.feeW : accountFee;
+    const slip = Math.max(0, median(v.slips) ?? accountSlip);
+    const own = fee + slip;
+    // Shrink a thin sample toward what the account pays on average.
+    const w = v.fills / (v.fills + COST_SHRINK_FILLS);
+    return Math.min(MAX_ONE_WAY_BPS, w * own + (1 - w) * accountOneWay);
+  };
+
+  const bySymbol = new Map<string, SymbolCost>();
+  for (const sym of symbols) {
+    const buys = bySide.get(`${sym}|buy`)?.fills ?? 0;
+    const sells = bySide.get(`${sym}|sell`)?.fills ?? 0;
+    if (buys + sells === 0) continue;
+    bySymbol.set(sym, {
+      buyBps: sideCost(sym, "buy"),
+      sellBps: sideCost(sym, "sell"),
+      fills: buys + sells,
+    });
+  }
+
+  return {
+    bySymbol,
+    medianBps: accountOneWay,
+    feeBps: Math.round(accountFee * 10) / 10,
+    slippageBps: Math.round(accountSlip * 10) / 10,
+    calibrated: bySymbol.size,
+    fills: fills.length,
+    invoicedFills,
+    slippageFills,
+  };
 }
 
+/** Round trip = what this account pays getting in, plus what it pays getting out. */
 function roundTripCostFrac(costs: CostModel, symbol: string): number {
-  const oneWay = costs.bySymbol.get(baseSymbol(symbol)) ?? costs.medianBps;
-  return Math.min(0.02, Math.max(0.0005, (oneWay * 2) / 10_000));
+  const v = costs.bySymbol.get(baseSymbol(symbol));
+  const bps = v ? v.buyBps + v.sellBps : costs.medianBps * 2;
+  return Math.min(0.03, Math.max(0.0005, bps / 10_000));
 }
+
 
 // --------------------------------------------------------------------------
 // Rebuilding the book as it stood on each decision day
