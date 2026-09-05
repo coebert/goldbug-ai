@@ -1,9 +1,30 @@
 // Costs dashboard data: what this account really pays to deal each symbol,
-// and the operator-adjustable hurdle the net-edge gate applies on top.
+// the broker's published tariff behind those charges, the reserve rules that
+// ration tickets, and the operator-adjustable hurdle the net-edge gate applies.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MEASURED_FLOOR_HEADROOM, DEFAULT_EDGE_SAFETY_MULTIPLE } from "./net-edge-gate";
+import { SAXO_FEE_SCHEDULE } from "./saxo-fees";
+import {
+  UK_STAMP_DUTY_BPS,
+  PTM_LEVY_GBP,
+  PTM_LEVY_THRESHOLD_GBP,
+} from "./trade-viability-gate";
+import {
+  governorForNav,
+  minTicketBase,
+  DEFAULT_MAX_POSITION_PCT_OF_NAV,
+  DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+  RESERVE_EDGE_MULTIPLE,
+  RESERVE_MIN_CONVICTION,
+  STALL_DAYS,
+  STALL_RESERVE_EDGE_MULTIPLE,
+  STALL_RESERVE_MIN_CONVICTION,
+  CHURN_WINDOW_DAYS,
+  CHURN_CALM_FILLS,
+  MIN_BUDGET_TICKETS,
+} from "./cost-governor";
 
 export type SymbolCostRow = {
   symbol: string;
