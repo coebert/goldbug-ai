@@ -71,6 +71,14 @@ export type StoredModel = {
     cost_calibrated_symbols?: number;
     mean_weight?: number;
     trades_scanned?: number;
+    /** Rows rebuilt from bars before the engine kept records. */
+    history_samples?: number;
+    history_from?: string | null;
+    /** Split of the measured round-trip cost. */
+    cost_fee_bps?: number;
+    cost_slippage_bps?: number;
+    cost_fills?: number;
+    cost_invoiced_fills?: number;
   };
 
   /** True when out-of-sample evidence says the fit is worth trading. */
@@ -170,6 +178,10 @@ export async function fitAndStoreModel(args: {
       trades_scanned: data.tradesScanned,
       history_samples: data.historySamples,
       history_from: data.historyFrom,
+      cost_fee_bps: data.costFeeBps,
+      cost_slippage_bps: data.costSlippageBps,
+      cost_fills: data.costFills,
+      cost_invoiced_fills: data.costInvoicedFills,
     },
 
     usable,
@@ -465,7 +477,7 @@ export function formatModelBlock(model: StoredModel | null, scores: SymbolScore[
   const labelLine =
     cov.label_mode === "price"
       ? `the realised ${model.horizon_days}-day forward return`
-      : `the realised ${model.horizon_days}-day forward return NET of the round-trip dealing cost this account actually pays (${cov.round_trip_cost_bps ?? "?"}bps, measured from ${cov.cost_calibrated_symbols ?? 0} symbols' invoiced fills), divided by the risk the name was carrying — i.e. what this book could actually have banked per unit of risk`;
+      : `the realised ${model.horizon_days}-day forward return NET of the round-trip dealing cost this account actually pays (${cov.round_trip_cost_bps ?? "?"}bps, priced ticket by ticket from ${cov.cost_fills ?? 0} real fills across ${cov.cost_calibrated_symbols ?? 0} symbols), divided by the risk the name was carrying — i.e. what this book could actually have banked per unit of risk`;
   return `LEARNED MODEL — FITTED ON THIS ACCOUNT'S OWN HISTORY (${cov.samples} observations, ${cov.dates} trading days ${cov.from ?? "?"} → ${cov.to ?? "?"}; ${cov.traded_samples ?? 0} of them days you actually dealt the name, ${cov.held_samples ?? 0} where you already held it):
 - This is not a prior or a rule of thumb: it is a ridge regression of the exact signal snapshots you were shown on each past day — plus the state of THIS book that day (position size, unrealised P&L, holding age, cash share, drawdown, recent realised loss on the name) — against ${labelLine}, demeaned within each day so it measures SELECTION skill, not market direction. Days where real money went in are weighted more heavily than days the name was merely screened.
 
