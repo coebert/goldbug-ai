@@ -1110,6 +1110,23 @@ export async function runDailyTick(
 
       });
 
+  /**
+   * What actually produced this decision — a gateway model id, the learned
+   * model, or the heuristic. Previously hardcoded, which made the history
+   * claim a model that may never have run.
+   */
+  const decisionModelLabel =
+    (decision as { model_used?: string }).model_used ??
+    (breakerTripped
+      ? "circuit-breaker"
+      : allVenuesClosed
+      ? "venues-closed"
+      : skipAiForQuietTick
+      ? "skipped-quiet-tick"
+      : "unknown");
+
+
+
 
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
   // not just in the prompt. If the regime bucket is risk_off, strip any AI
