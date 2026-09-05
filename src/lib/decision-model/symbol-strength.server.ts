@@ -79,6 +79,7 @@ export async function computeAndStoreSymbolStrengths(args: {
 
   const normalised = normaliseByDate(ds.samples, FEATURE_KEYS.length);
   const bySymbol = new Map<string, StrengthObservation[]>();
+  const allObs: Array<StrengthObservation & { symbol: string; at?: string | null }> = [];
   for (const row of normalised) {
     // With no fitted model, fall back to the account's own measured bucket
     // proxy: the row's trend feature. Better than refusing to answer.
@@ -88,6 +89,7 @@ export async function computeAndStoreSymbolStrengths(args: {
     const list = bySymbol.get(row.symbol) ?? [];
     list.push({ date: row.date, score, y: row.y, w: row.w });
     bySymbol.set(row.symbol, list);
+    allObs.push({ date: row.date, score, y: row.y, w: row.w, symbol: row.symbol, at: row.at ?? null });
   }
 
   const rows = [...bySymbol.entries()]
