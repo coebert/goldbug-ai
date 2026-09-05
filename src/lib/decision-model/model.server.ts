@@ -80,12 +80,16 @@ export async function fitAndStoreModel(args: {
   userId: string;
   horizonDays?: number;
   realMoneyOnly?: boolean;
+  /** `risk_net` (default): forward return net of this account's dealing costs, per unit of risk. */
+  labelMode?: "risk_net" | "price";
 }): Promise<StoredModel> {
   const data = await buildDataset({
     userId: args.userId,
     horizonDays: args.horizonDays ?? 5,
     realMoneyOnly: args.realMoneyOnly ?? false,
+    labelMode: args.labelMode ?? "risk_net",
   });
+
 
   if (data.samples.length < 200) {
     throw new Error(
