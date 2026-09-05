@@ -166,11 +166,11 @@ ${tradingStylePrompt(cfg)}
 ${buildTradingCostBlock({
   currency: args.portfolio.currency,
   stampExemptPreference: cfg.stamp_exempt_preference,
-  liveQuoteBlock: args.liveQuoteBlock ?? null,
   measuredRoundTripBps: args.measuredRoundTripBps ?? null,
   symbolCosts: args.symbolCosts ?? null,
 })}
 
+${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
 
 ${regimeBlock}
 
