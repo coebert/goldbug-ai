@@ -205,13 +205,65 @@ export type SymbolScore = {
 };
 
 /**
- * Apply the stored model to today's candidate rows. Normalisation matches the
- * training path exactly: z-scored across today's candidates, winsorised.
+ * Today's book, so the portfolio features see the same shape at scoring time
+ * as the dataset builder gave them during the fit.
  */
-export function scoreCandidates(model: StoredModel, rows: AnyRow[]): SymbolScore[] {
+export type BookSnapshot = {
+  totalValue: number;
+  cash: number;
+  /** Highest total value the book has reached; enables the drawdown feature. */
+  peakValue?: number | null;
+  holdings: Array<{
+    symbol: string;
+    quantity: number;
+    avg_cost?: number | null;
+    opened_at?: string | null;
+  }>;
+  /** Decayed realised loss per symbol as a fraction of the book (<= 0). */
+  lossMemory?: Record<string, number>;
+  asOf?: string;
+};
+
+function baseSymbol(symbol: string): string {
+  return (symbol.split(":")[0] ?? symbol).trim().toUpperCase();
+}
+
+/** Account-state block for one candidate row, from today's book. */
+export function pfFor(book: BookSnapshot | null | undefined, row: AnyRow): PfContext {
+  if (!book || !(book.totalValue > 0)) return NEUTRAL_PF;
+  const symbol = String(row["symbol"] ?? "");
+  const key = baseSymbol(symbol);
+  const h = book.holdings.find((x) => baseSymbol(x.symbol) === key);
+  const price = Number(row["price"]) || 0;
+  const qty = Number(h?.quantity) || 0;
+  const avgCost = Number(h?.avg_cost) || 0;
+  const held = qty > 0;
+  const asOf = book.asOf ?? new Date().toISOString().slice(0, 10);
+  const openedAt = h?.opened_at ? String(h.opened_at).slice(0, 10) : null;
+  const holdDays =
+    held && openedAt ? Math.max(0, Math.round((Date.parse(asOf) - Date.parse(openedAt)) / 86_400_000)) : 0;
+  const peak = Number(book.peakValue) || book.totalValue;
+
+  return {
+    position_weight: held && price > 0 ? Math.min(1, (qty * price) / book.totalValue) : 0,
+    unrealised_pct: held && avgCost > 0 && price > 0 ? Math.max(-0.9, Math.min(3, price / avgCost - 1)) : 0,
+    hold_days: holdDays,
+    loss_memory: Math.max(-1, Math.min(0, Number(book.lossMemory?.[key]) || 0)),
+    cash_weight: Math.max(0, Math.min(1, book.cash / book.totalValue)),
+    book_drawdown: peak > 0 ? Math.max(-0.9, Math.min(0, book.totalValue / peak - 1)) : 0,
+  };
+}
+
+/**
+ * Apply the stored model to today's candidate rows. Normalisation matches the
+ * training path exactly: z-scored across today's candidates, winsorised. Pass
+ * `book` so the portfolio-state features are populated as they were in training.
+ */
+export function scoreCandidates(model: StoredModel, rows: AnyRow[], book?: BookSnapshot | null): SymbolScore[] {
   if (rows.length < 3 || model.coefficients.length !== FEATURE_KEYS.length) return [];
 
-  const vectors = rows.map((r) => extractFeatureVector(r));
+  const vectors = rows.map((r) => extractFeatureVector(book ? withPf(r, pfFor(book, r)) : r));
+
   const n = FEATURE_KEYS.length;
 
   const stats: Array<{ m: number; sd: number }> = [];
