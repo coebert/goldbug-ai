@@ -25,7 +25,21 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { priceSymbolVariants } from "../price-symbol";
-import { extractFeatureVector, FEATURE_KEYS, NEUTRAL_PF, withPf, type AnyRow, type PfContext } from "./features";
+import {
+  extractFeatureVector,
+  FEATURE_KEYS,
+  NEUTRAL_PF,
+  NEUTRAL_MX,
+  NEUTRAL_SX,
+  regimeRiskOn,
+  withContext,
+  withPf,
+  type AnyRow,
+  type MxContext,
+  type PfContext,
+  type SxContext,
+} from "./features";
+import { symbolSector } from "../sector-rotation.server";
 import type { Sample } from "./fit";
 
 export type LabelMode = "risk_net" | "price";
