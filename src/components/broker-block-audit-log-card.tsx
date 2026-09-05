@@ -9,6 +9,7 @@ const REASON_LABEL: Record<string, string> = {
   suitability: "Suitability test required",
   not_tradable: "Not tradable",
   not_permitted: "Permission missing",
+  kid_unavailable: "No KID (retail-restricted)",
 };
 
 function fmtWhen(iso: string): string {

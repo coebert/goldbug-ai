@@ -20,7 +20,8 @@
 export type BrokerBlockReason =
   | "suitability" // appropriateness/suitability test not taken
   | "not_tradable" // instrument not tradable on this account type
-  | "not_permitted"; // account lacks permission for this product
+  | "not_permitted" // account lacks permission for this product
+  | "kid_unavailable"; // no PRIIPs Key Information Document for retail clients
 
 export type BrokerBlockClassification = {
   block: boolean;
@@ -41,6 +42,23 @@ const NOT_TRADABLE_PATTERNS = [
   /not tradable on this account/i,
   /trading in this instrument is not allowed/i,
 ];
+
+// PRIIPs: EU/UK retail clients cannot buy a fund with no Key Information
+// Document (classic case: US-domiciled ETFs such as SPY). This never clears by
+// retrying — the document simply does not exist for that share class.
+const KID_PATTERNS = [
+  /key information document/i,
+  /\bKID\b.*not available/i,
+  /not available.*\bKID\b/i,
+  /cannot trade this instrument as a retail client/i,
+  /\bPRIIPs?\b/i,
+];
+
+const KID_CODES = new Set([
+  "kidnotavailable",
+  "kiidnotavailable",
+  "priipskidmissing",
+]);
 
 const NOT_PERMITTED_PATTERNS = [
   /not permitted to trade/i,
@@ -88,6 +106,14 @@ export function classifyBrokerBlock(
         detail: "Instrument is not tradable on this broker account.",
       };
     }
+    if (KID_CODES.has(code)) {
+      return {
+        block: true,
+        reason: "kid_unavailable",
+        detail:
+          "No Key Information Document (KID) for this instrument, so retail clients cannot buy it.",
+      };
+    }
     if (NOT_PERMITTED_CODES.has(code)) {
       return {
         block: true,
@@ -105,6 +131,14 @@ export function classifyBrokerBlock(
       block: true,
       reason: "suitability",
       detail: "Broker suitability/appropriateness test not completed for this product type.",
+    };
+  }
+  if (KID_PATTERNS.some((re) => re.test(text))) {
+    return {
+      block: true,
+      reason: "kid_unavailable",
+      detail:
+        "No Key Information Document (KID) for this instrument, so retail clients cannot buy it.",
     };
   }
   if (NOT_TRADABLE_PATTERNS.some((re) => re.test(text))) {
@@ -155,6 +189,8 @@ export function recommendedActionFor(reason: BrokerBlockReason | string): string
       return "Complete Saxo's appropriateness/suitability test for this product category (Account → Profile → Investor profile), then clear the block in Blocked instruments.";
     case "not_tradable":
       return "Check the instrument is available for your Saxo account type and that you hold the required exchange/market-data subscription, then clear the block.";
+    case "kid_unavailable":
+      return "This instrument has no Key Information Document, so it cannot be bought by a retail client — use a UCITS equivalent (e.g. VUSA/CSPX instead of SPY). Only clear the block if Saxo confirms a KID is now published.";
     case "not_permitted":
       return "Request the missing trading permission for this product in your Saxo account, then clear the block once approved.";
     default:
