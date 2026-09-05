@@ -76,10 +76,9 @@ export async function callAiForDecision(args: {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
   const gateway = createLovableAiGatewayProvider(key, { structuredOutputs: true });
-  // Current-generation decision model; the deprecated 2.5-flash stays only as
-  // a last-resort backup so a primary outage still gets a real AI decision.
-  const PRIMARY_MODEL = process.env.AI_DECISION_MODEL || "google/gemini-3.6-flash";
-  const BACKUP_MODEL = "google/gemini-2.5-flash";
+  // Workspace-standard decision model. Keep the identifier literal so the
+  // Decision model page records exactly what produced each decision.
+  const PRIMARY_MODEL = "openai/gpt-5.6-sol";
 
   const risk = riskProfile(args.portfolio.risk_level);
   const cfg = parseRiskConfig(args.portfolio.risk_config);
@@ -295,7 +294,7 @@ If no action is warranted, return an empty orders array.`;
   const attempts: Array<{ model: string; note: string }> = [
     { model: PRIMARY_MODEL, note: "primary" },
     { model: PRIMARY_MODEL, note: "retry" },
-    { model: BACKUP_MODEL, note: "backup" },
+    { model: PRIMARY_MODEL, note: "final retry" },
   ];
 
   let lastError: unknown = null;
@@ -306,7 +305,13 @@ If no action is warranted, return an empty orders array.`;
         system,
         prompt: user,
         output: Output.object({ schema: DecisionSchema }),
-        maxOutputTokens: 16_000,
+        providerOptions: {
+          lovable: {
+            // GPT-5.6 chat calls must explicitly disable reasoning; the gateway
+            // otherwise defaults it on and may reject structured decision calls.
+            reasoningEffort: "none",
+          },
+        },
         maxRetries: 0,
       });
       const output = await result.output;

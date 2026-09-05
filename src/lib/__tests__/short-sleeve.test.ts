@@ -167,8 +167,10 @@ describe("prompt block", () => {
       maxSleevePct: 0.5,
       currency: "GBP",
     });
-    expect(block).toMatch(/no margin, no borrowing/);
+    expect(block).toMatch(/no margin, no borrowing, no naked stock shorts/);
     expect(block).toContain("XSPS.L");
+    expect(block).toContain("side=buy on the proxy");
+    expect(block).toContain("never side=sell on an unheld stock");
     expect(block).toMatch(/short 10% NAV/);
     expect(block).toMatch(/net 40%/);
   });
