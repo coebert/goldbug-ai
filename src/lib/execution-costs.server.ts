@@ -65,7 +65,12 @@ export type CostModel = {
   fills: number;
   invoicedFills: number;
   slippageFills: number;
+  /** Rate the broker actually invoiced, per pound dealt; null with no notes in. */
+  invoicedChargeBps: number | null;
+  /** Share of dealt notional covered by real contract notes (0-1). */
+  invoicedNotionalShare: number;
 };
+
 
 /** Fills at least this many before a symbol's own cost is trusted outright. */
 const COST_SHRINK_FILLS = 4;
