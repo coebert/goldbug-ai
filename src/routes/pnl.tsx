@@ -348,6 +348,8 @@ function PnlDashboard() {
                 </CardContent>
               </Card>
 
+              {selectedId && <RealMoneyCostPanel portfolioId={selectedId} />}
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">What dealing actually cost</CardTitle>
