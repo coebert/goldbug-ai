@@ -1326,11 +1326,25 @@ export async function runDailyTick(
       modelBlock,
       liveQuoteBlock: liveOverlay?.block ?? null,
       measuredRoundTripBps,
+      costProvenance,
+      reserveRules: (() => {
+        const gov = governorForNav(totalValue);
+        return {
+          minTicketBase: minTicketBase({ navBase: totalValue, ...gov }),
+          maxBuysPerDay: gov.maxBuysPerDay,
+          costBudgetPctOfNav: gov.costBudgetPctOfNav,
+          addCooldownDays: gov.addCooldownDays,
+          maxPositionPctOfNav: gov.maxPositionPctOfNav ?? DEFAULT_MAX_POSITION_PCT_OF_NAV,
+          highEdgeReserveTickets:
+            gov.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+        };
+      })(),
       symbolCosts: symbolCosts
         ? Array.from(symbolCosts.values())
             .filter((c) => c.measured)
             .map((c) => ({ symbol: c.symbol, roundTripBps: c.roundTripBps, tickets: c.tickets }))
         : null,
+
 
         shortSleeveBlock: formatShortSleeveBlock({
 
