@@ -29,7 +29,7 @@ import {
 import { listPortfolios } from "@/lib/portfolios.functions";
 import { getPortfolioPositions, type PositionRow } from "@/lib/portfolio-positions.functions";
 import { RealMoneyCostPanel } from "@/components/real-money-cost-panel";
-import { formatUk } from "@/lib/uk-time";
+import { formatUk, formatUkDate, formatUkTime } from "@/lib/uk-time";
 
 export const Route = createFileRoute("/positions")({
   component: PositionsPage,
@@ -104,16 +104,15 @@ function PositionsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <PageShell className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">Portfolio positions</h1>
-            <p className="text-sm text-muted-foreground">
-              {data
-                ? `${data.portfolioName} · ${data.rows.length} open position${data.rows.length === 1 ? "" : "s"} · ${data.brokerPriced} priced off the broker's tape`
-                : "Each symbol's size, cost and P&L."}
-            </p>
-          </div>
+      <PageShell
+        width="wide"
+        title="Portfolio positions"
+        purpose={
+          data
+            ? `${data.portfolioName} · ${data.rows.length} open position${data.rows.length === 1 ? "" : "s"} · ${data.brokerPriced} priced off the broker's tape`
+            : "Each symbol's size, cost and P&L."
+        }
+        actions={
           <div className="flex items-center gap-2">
             {list.length > 1 && (
               <Select value={portfolioId ?? ""} onValueChange={(v) => setSelectedId(v)}>
@@ -137,7 +136,10 @@ function PositionsPage() {
               </Button>
             )}
           </div>
-        </div>
+        }
+      >
+        <div className="space-y-6">
+
 
         {isLoading && (
           <p className="text-sm text-muted-foreground">Loading positions…</p>
@@ -315,6 +317,7 @@ function PositionsPage() {
             <RealMoneyCostPanel portfolioId={data.portfolioId} />
           </>
         )}
+        </div>
       </PageShell>
     </div>
   );
