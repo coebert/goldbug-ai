@@ -29,7 +29,7 @@ import {
 import { listPortfolios } from "@/lib/portfolios.functions";
 import { getPortfolioPositions, type PositionRow } from "@/lib/portfolio-positions.functions";
 import { RealMoneyCostPanel } from "@/components/real-money-cost-panel";
-import { formatUk, formatUkDate, formatUkTime } from "@/lib/uk-time";
+import { formatUkDate, formatUkTime } from "@/lib/uk-time";
 
 export const Route = createFileRoute("/positions")({
   component: PositionsPage,
@@ -274,7 +274,7 @@ function PositionsPage() {
                           {r.price != null ? money(r.price, r.currency, r.price < 1 ? 4 : 2) : "—"}
                           <div className="text-[10px] text-muted-foreground">
                             {PRICE_SOURCE_LABEL[r.priceSource]}
-                            {r.pricedAt ? ` · ${formatUk(r.pricedAt, "HH:mm")}` : ""}
+                            {r.pricedAt ? ` · ${formatUkTime(r.pricedAt)}` : ""}
                           </div>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
