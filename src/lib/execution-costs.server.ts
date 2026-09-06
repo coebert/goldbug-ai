@@ -462,7 +462,9 @@ function snapshotFrom(costs: CostModel): LiveCostSnapshot {
     slippageBps: costs.slippageBps,
     fills: costs.fills,
     invoicedFills: costs.invoicedFills,
-    computedAt: new Date().toISOString(),
+    invoicedChargeBps: costs.invoicedChargeBps,
+    invoicedNotionalShare: costs.invoicedNotionalShare,
+
   };
 }
 
