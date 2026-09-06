@@ -433,7 +433,12 @@ export type LiveCostSnapshot = {
   slippageBps: number;
   fills: number;
   invoicedFills: number;
+  /** Rate the broker actually invoiced, per pound dealt; null with no notes in. */
+  invoicedChargeBps: number | null;
+  /** Share of dealt notional covered by real contract notes (0-1). */
+  invoicedNotionalShare: number;
   computedAt: string;
+
 };
 
 function snapshotFrom(costs: CostModel): LiveCostSnapshot {
