@@ -74,6 +74,24 @@ export async function callAiForDecision(args: {
   measuredRoundTripBps?: number | null;
   /** Per-instrument round-trip costs measured live from this account's fills. */
   symbolCosts?: Array<{ symbol: string; roundTripBps: number; tickets: number }> | null;
+  /** Where the cost floor came from: real broker invoices vs the published tariff. */
+  costProvenance?: {
+    invoicedChargeBps: number | null;
+    invoicedNotionalShare: number;
+    invoicedFills: number;
+    slippageBps: number | null;
+  } | null;
+  /** Ticket-size and cadence reserve rules the cost governor will enforce. */
+  reserveRules?: {
+    minTicketBase: number;
+    maxBuysPerDay: number;
+    costBudgetPctOfNav: number;
+    addCooldownDays: number;
+    maxPositionPctOfNav: number;
+    highEdgeReserveTickets: number;
+  } | null;
+
+
 
 
 
