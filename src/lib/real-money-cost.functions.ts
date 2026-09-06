@@ -67,10 +67,7 @@ export const getRealMoneyCostPanel = createServerFn({ method: "POST" })
     const db = context.supabase;
 
     const [{ data: symbolRows }, { data: controls }, { data: snap }] = await Promise.all([
-      db
-        .from("symbol_execution_costs")
-        .select("round_trip_bps, fee_bps, slippage_bps, tickets")
-        .eq("portfolio_id", data.portfolioId),
+      db.from("symbol_execution_costs").select("round_trip_bps, fee_bps, slippage_bps, tickets"),
       db.from("trading_controls").select("cost_hurdle_multiple").eq("id", true).maybeSingle(),
       db
         .from("equity_snapshots")
