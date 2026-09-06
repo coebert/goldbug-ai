@@ -64,6 +64,26 @@ function CostsDashboard() {
 
   const [slider, setSlider] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const runSync = useServerFn(backfillBrokerChargesFn);
+
+  const onSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await runSync({ data: {} });
+      await queryClient.invalidateQueries({ queryKey: ["cost-dashboard"] });
+      toast.success(
+        res.newlyInvoiced > 0
+          ? `${res.newlyInvoiced} trades now priced with the broker's own charges.`
+          : "No new broker charges available yet.",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not sync broker charges");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
 
   const multiple = slider ?? data?.hurdleMultiple ?? 1.25;
   const dirty = data != null && Math.abs(multiple - data.hurdleMultiple) > 1e-9;
@@ -212,10 +232,14 @@ function CostsDashboard() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-base">Broker charges and slippage</CardTitle>
+            <Button size="sm" variant="outline" onClick={onSync} disabled={syncing}>
+              {syncing ? "Syncing…" : "Sync broker charges"}
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+
             {data && (
               <div className="grid gap-3 sm:grid-cols-3">
                 <Stat
