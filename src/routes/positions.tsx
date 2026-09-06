@@ -260,7 +260,7 @@ function PositionsPage() {
                           </div>
                           {r.openedAt && (
                             <div className="text-[11px] text-muted-foreground">
-                              opened {formatUk(r.openedAt, "d MMM")}
+                              opened {formatUkDate(r.openedAt)}
                             </div>
                           )}
                         </TableCell>
