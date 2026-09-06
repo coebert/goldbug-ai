@@ -241,7 +241,10 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
         return b && b.qty > 0 && b.cost > 0 ? b.cost / b.qty : 0;
       })();
       const avgCost = storedAvg > 0 ? storedAvg : fillAvg;
-      const costBasis = Math.abs(qty) * avgCost;
+      // FX spot legs are P&L-only: the currency they bought already sits in
+      // the cash wallet, so their notional is not a cost basis or a value.
+      const isFxLeg = isFxLegHolding({ asset_class: assetClass });
+      const costBasis = isFxLeg ? 0 : Math.abs(qty) * avgCost;
 
       const hit = priceOf.get(symbol);
       const price = hit ? normalizeLseDisplayPriceToBase(symbol, hit.price, assetClass) : null;
@@ -250,9 +253,13 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
         warnings.push(`${symbol}: no live or cached price — valued at cost.`);
       }
 
-      const marketValue = price != null && price > 0 ? qty * price : null;
+      const marketValue =
+        price != null && price > 0
+          ? holdingNativeValue({ assetClass, quantity: qty, price, avgCost })
+          : null;
       const unrealizedPnl =
-        marketValue != null && avgCost > 0 ? marketValue - qty * avgCost : null;
+        marketValue == null ? null : isFxLeg ? marketValue : avgCost > 0 ? marketValue - qty * avgCost : null;
+
       const b = book.get(key);
       const realizedPnl = b?.realized ?? 0;
       const feesPaid = b?.fees ?? 0;
