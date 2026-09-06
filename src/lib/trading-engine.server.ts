@@ -196,7 +196,13 @@ import { scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt, formatBreakou
 import { unifiedVolSize } from "./sizing/unified-vol-size";
 import { alphaConvictionBonus } from "./alpha/sizing";
 import { desiredWeight, targetWeightSpend } from "./sizing/target-weight";
-import { minTicketBase, governorForNav } from "./cost-governor";
+import {
+  minTicketBase,
+  governorForNav,
+  DEFAULT_MAX_POSITION_PCT_OF_NAV,
+  DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+} from "./cost-governor";
+
 import {
   planOrderSlices,
   todExecutionAdjustment,
@@ -1129,6 +1135,15 @@ export async function runDailyTick(
   // over-prices a tight index fund; the gate below uses each name's own floor
   // and only falls back to the account figure where there are no fills yet.
   let symbolCosts: Map<string, LiveSymbolCost> | null = null;
+  // Where the floor came from: real broker invoices, or the tariff standing in
+  // until the contract notes land. Told to the AI so it never reasons from the
+  // published tariff when real billed money is available.
+  let costProvenance: {
+    invoicedChargeBps: number | null;
+    invoicedNotionalShare: number;
+    invoicedFills: number;
+    slippageBps: number | null;
+  } | null = null;
   {
     const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
     if (userId) {
@@ -1140,6 +1155,14 @@ export async function runDailyTick(
         symbolCosts = res.snapshot
           ? res.snapshot.bySymbol
           : await loadSymbolExecutionCosts(userId);
+        if (res.snapshot) {
+          costProvenance = {
+            invoicedChargeBps: res.snapshot.invoicedChargeBps,
+            invoicedNotionalShare: res.snapshot.invoicedNotionalShare,
+            invoicedFills: res.snapshot.invoicedFills,
+            slippageBps: res.snapshot.slippageBps,
+          };
+        }
         if (measuredRoundTripBps == null && res.snapshot?.accountRoundTripBps) {
           measuredRoundTripBps = res.snapshot.accountRoundTripBps;
         }
@@ -1148,6 +1171,7 @@ export async function runDailyTick(
       }
     }
   }
+
 
   // Operator-set cost hurdle (Costs page slider). Drives how far above the
   // round-trip friction a buy's expected move must clear; null keeps the
@@ -1169,8 +1193,14 @@ export async function runDailyTick(
         await import("./decision-model/model.server");
       const model = await loadLatestModel(userId);
       if (!model || model.coefficients.length === 0) return null;
+      // The model's fit-time cost is a historical average; the live fill tape
+      // (including real broker invoices) is the harder number. Take whichever
+      // is higher so a stale fit can never soften the floor.
       const rt = Number(model.coverage?.round_trip_cost_bps);
-      if (Number.isFinite(rt) && rt > 0) measuredRoundTripBps = rt;
+      if (Number.isFinite(rt) && rt > 0) {
+        measuredRoundTripBps = Math.max(rt, measuredRoundTripBps ?? 0);
+      }
+
       const ctx = await loadScoringContext(asOf);
       const lossMemoryLive: Record<string, number> = {};
       for (const [sym, pm] of lossMemory) lossMemoryLive[sym] = pm.penalty;
@@ -1302,11 +1332,25 @@ export async function runDailyTick(
       modelBlock,
       liveQuoteBlock: liveOverlay?.block ?? null,
       measuredRoundTripBps,
+      costProvenance,
+      reserveRules: (() => {
+        const gov = governorForNav(totalValue);
+        return {
+          minTicketBase: minTicketBase({ navBase: totalValue, ...gov }),
+          maxBuysPerDay: gov.maxBuysPerDay,
+          costBudgetPctOfNav: gov.costBudgetPctOfNav,
+          addCooldownDays: gov.addCooldownDays,
+          maxPositionPctOfNav: gov.maxPositionPctOfNav ?? DEFAULT_MAX_POSITION_PCT_OF_NAV,
+          highEdgeReserveTickets:
+            gov.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+        };
+      })(),
       symbolCosts: symbolCosts
         ? Array.from(symbolCosts.values())
             .filter((c) => c.measured)
             .map((c) => ({ symbol: c.symbol, roundTripBps: c.roundTripBps, tickets: c.tickets }))
         : null,
+
 
         shortSleeveBlock: formatShortSleeveBlock({
 

@@ -65,7 +65,12 @@ export type CostModel = {
   fills: number;
   invoicedFills: number;
   slippageFills: number;
+  /** Rate the broker actually invoiced, per pound dealt; null with no notes in. */
+  invoicedChargeBps: number | null;
+  /** Share of dealt notional covered by real contract notes (0-1). */
+  invoicedNotionalShare: number;
 };
+
 
 /** Fills at least this many before a symbol's own cost is trusted outright. */
 const COST_SHRINK_FILLS = 4;
@@ -231,11 +236,23 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   const allSlip: number[] = [];
   let invoicedFills = 0;
   let slippageFills = 0;
+  // What the broker actually invoiced, kept apart from the tariff estimate so
+  // the real contract notes can set the floor for tickets that have none.
+  let invoicedNotional = 0;
+  let invoicedWeighted = 0;
+  let modelledNotional = 0;
+
+  /** Every ticket priced once, so invoiced reality can be applied afterwards. */
+  type PricedTicket = {
+    ticket: Ticket;
+    notionalNative: number;
+    chargeBps: number;
+    invoiced: boolean;
+    close: number | null;
+  };
+  const priced: PricedTicket[] = [];
 
   for (const f of fills) {
-    const key = `${f.symbol}|${f.side}`;
-    const cur = bySide.get(key) ?? { fills: 0, chargeW: 0, chargeBps: 0, slips: [] };
-    cur.fills++;
     const m = meta.get(f.symbol) ?? { tickets: 0, invoiced: 0, first: null, last: null };
     m.tickets++;
     if (f.invoicedCharge !== null) m.invoiced++;
@@ -254,9 +271,14 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     // carries the fixed floor it genuinely pays.
     const notionalNative = f.quantity * f.price;
     let chargeBps: number;
-    if (f.invoicedCharge !== null) {
+    const invoiced = f.invoicedCharge !== null;
+    if (invoiced) {
       invoicedFills++;
-      chargeBps = (f.invoicedCharge / notionalNative) * 10_000;
+      chargeBps = (f.invoicedCharge! / notionalNative) * 10_000;
+      if (Number.isFinite(chargeBps) && chargeBps >= 0 && chargeBps <= MAX_ONE_WAY_BPS) {
+        invoicedNotional += notionalNative;
+        invoicedWeighted += chargeBps * notionalNative;
+      }
     } else {
       // Commission floors are set in major currency units; LSE prices are in
       // pence, so convert before pricing the ticket or the floor disappears.
@@ -270,18 +292,38 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
         assetClass: null,
       });
       chargeBps = Number.isFinite(modelled.oneWayBps) ? modelled.oneWayBps : DEFAULT_ONE_WAY_COST_BPS;
+      if (Number.isFinite(chargeBps) && chargeBps >= 0) modelledNotional += notionalNative;
     }
+    priced.push({ ticket: f, notionalNative, chargeBps, invoiced, close });
+  }
+
+  // The rate the broker really charged, per pound dealt. Whenever the invoices
+  // are in, they — not the published tariff — set the floor for tickets that
+  // have not been invoiced yet: the tariff systematically under-states what
+  // this account is billed, and a gate priced on the tariff lets through
+  // trades that cannot pay for themselves.
+  const invoicedChargeBps = invoicedNotional > 0 ? invoicedWeighted / invoicedNotional : null;
+
+  for (const p of priced) {
+    const f = p.ticket;
+    const key = `${f.symbol}|${f.side}`;
+    const cur = bySide.get(key) ?? { fills: 0, chargeW: 0, chargeBps: 0, slips: [] };
+    cur.fills++;
+    const chargeBps =
+      !p.invoiced && invoicedChargeBps !== null
+        ? Math.max(p.chargeBps, invoicedChargeBps)
+        : p.chargeBps;
     if (Number.isFinite(chargeBps) && chargeBps >= 0 && chargeBps <= MAX_ONE_WAY_BPS) {
-      cur.chargeW += notionalNative;
-      cur.chargeBps += chargeBps * notionalNative;
+      cur.chargeW += p.notionalNative;
+      cur.chargeBps += chargeBps * p.notionalNative;
       allCharge.push(chargeBps);
-      chargeNotional += notionalNative;
-      chargeWeighted += chargeBps * notionalNative;
+      chargeNotional += p.notionalNative;
+      chargeWeighted += chargeBps * p.notionalNative;
     }
 
-    if (close !== null) {
-      const signed = f.side === "buy" ? f.price - close : close - f.price;
-      const bps = (signed / close) * 10_000;
+    if (p.close !== null) {
+      const signed = f.side === "buy" ? f.price - p.close : p.close - f.price;
+      const bps = (signed / p.close) * 10_000;
       if (Number.isFinite(bps) && Math.abs(bps) <= MAX_ONE_WAY_BPS) {
         cur.slips.push(bps);
         allSlip.push(bps);
@@ -290,6 +332,7 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     }
     bySide.set(key, cur);
   }
+
 
   // Weighted by notional, not per ticket: what this book pays per pound put to
   // work. A handful of £10 test tickets pay enormous rates but move no money,
@@ -341,8 +384,15 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     fills: rawFills.length,
     invoicedFills,
     slippageFills,
+    invoicedChargeBps:
+      invoicedChargeBps === null ? null : Math.round(invoicedChargeBps * 10) / 10,
+    invoicedNotionalShare:
+      invoicedNotional + modelledNotional > 0
+        ? invoicedNotional / (invoicedNotional + modelledNotional)
+        : 0,
   };
 }
+
 
 /** Round trip = what this account pays getting in, plus what it pays getting out. */
 export function roundTripCostFrac(costs: CostModel, symbol: string): number {
@@ -383,7 +433,12 @@ export type LiveCostSnapshot = {
   slippageBps: number;
   fills: number;
   invoicedFills: number;
+  /** Rate the broker actually invoiced, per pound dealt; null with no notes in. */
+  invoicedChargeBps: number | null;
+  /** Share of dealt notional covered by real contract notes (0-1). */
+  invoicedNotionalShare: number;
   computedAt: string;
+
 };
 
 function snapshotFrom(costs: CostModel): LiveCostSnapshot {
@@ -407,8 +462,11 @@ function snapshotFrom(costs: CostModel): LiveCostSnapshot {
     slippageBps: costs.slippageBps,
     fills: costs.fills,
     invoicedFills: costs.invoicedFills,
+    invoicedChargeBps: costs.invoicedChargeBps,
+    invoicedNotionalShare: costs.invoicedNotionalShare,
     computedAt: new Date().toISOString(),
   };
+
 }
 
 /** Portfolios belonging to a user — the fill scope for their cost model. */

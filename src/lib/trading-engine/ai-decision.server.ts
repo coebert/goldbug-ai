@@ -74,6 +74,24 @@ export async function callAiForDecision(args: {
   measuredRoundTripBps?: number | null;
   /** Per-instrument round-trip costs measured live from this account's fills. */
   symbolCosts?: Array<{ symbol: string; roundTripBps: number; tickets: number }> | null;
+  /** Where the cost floor came from: real broker invoices vs the published tariff. */
+  costProvenance?: {
+    invoicedChargeBps: number | null;
+    invoicedNotionalShare: number;
+    invoicedFills: number;
+    slippageBps: number | null;
+  } | null;
+  /** Ticket-size and cadence reserve rules the cost governor will enforce. */
+  reserveRules?: {
+    minTicketBase: number;
+    maxBuysPerDay: number;
+    costBudgetPctOfNav: number;
+    addCooldownDays: number;
+    maxPositionPctOfNav: number;
+    highEdgeReserveTickets: number;
+  } | null;
+
+
 
 
 
@@ -168,7 +186,10 @@ ${buildTradingCostBlock({
   stampExemptPreference: cfg.stamp_exempt_preference,
   measuredRoundTripBps: args.measuredRoundTripBps ?? null,
   symbolCosts: args.symbolCosts ?? null,
+  costProvenance: args.costProvenance ?? null,
+  reserveRules: args.reserveRules ?? null,
 })}
+
 
 ${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
 

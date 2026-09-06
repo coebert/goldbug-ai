@@ -28,7 +28,33 @@ export function buildTradingCostBlock(args: {
    * price each candidate against its own figure.
    */
   symbolCosts?: Array<{ symbol: string; roundTripBps: number; tickets: number }> | null;
+  /**
+   * Where the cost floor came from. When the broker's contract notes have been
+   * synced, the floor is real invoiced money — not the published tariff, which
+   * systematically under-states what this account is billed.
+   */
+  costProvenance?: {
+    invoicedChargeBps: number | null;
+    invoicedNotionalShare: number;
+    invoicedFills: number;
+    slippageBps: number | null;
+  } | null;
+  /**
+   * The reserve rules the cost governor will enforce after the model answers:
+   * ticket floor, daily buy cap, rolling friction budget, add cooldown, and
+   * the single-name cap. Telling the model up front stops it proposing trades
+   * that the governor will simply throw away.
+   */
+  reserveRules?: {
+    minTicketBase: number;
+    maxBuysPerDay: number;
+    costBudgetPctOfNav: number;
+    addCooldownDays: number;
+    maxPositionPctOfNav: number;
+    highEdgeReserveTickets: number;
+  } | null;
 }): string {
+
   const safety = args.safetyMultiple ?? DEFAULT_EDGE_SAFETY_MULTIPLE;
   const pref = args.stampExemptPreference ?? "balanced";
   const measured = Number(args.measuredRoundTripBps);
@@ -50,7 +76,29 @@ export function buildTradingCostBlock(args: {
           )
           .join("\n") +
         `\n  Names not listed have no fills on this account yet — assume the account average above. Prefer the cheaper venue/instrument when two candidates express the same view.`;
-  return `TRADING COSTS — PRICE THESE IN BEFORE PROPOSING ANY TRADE:${measuredLine}${symbolLines}
+  const prov = args.costProvenance ?? null;
+  const invoiced = Number(prov?.invoicedChargeBps);
+  const provenanceLine = !prov
+    ? ""
+    : Number.isFinite(invoiced) && invoiced > 0
+      ? `\n- SOURCE OF THESE COSTS: the broker's own contract notes. ${(prov.invoicedNotionalShare * 100).toFixed(0)}% of the money dealt on this account has been invoiced (${prov.invoicedFills} ticket${prov.invoicedFills === 1 ? "" : "s"}), and the invoiced charge is ~${invoiced.toFixed(0)}bps per side${
+          Number.isFinite(Number(prov.slippageBps)) && Number(prov.slippageBps) > 0
+            ? `, on top of ~${Number(prov.slippageBps).toFixed(0)}bps of measured slippage between the printed close and the price actually filled`
+            : ""
+        }. Tickets not yet invoiced are priced at NO LESS than that real rate. Do not reason from the published tariff — it under-states what this account is billed.`
+      : `\n- SOURCE OF THESE COSTS: the broker has not yet returned contract notes for these fills, so charges are the published tariff plus ~${Number.isFinite(Number(prov.slippageBps)) ? Number(prov.slippageBps).toFixed(0) : "0"}bps of measured slippage. Treat the figure as a FLOOR, not a best case — real invoices have historically come in higher.`;
+  const r = args.reserveRules ?? null;
+  const reserveLines = !r
+    ? ""
+    : `\nRESERVE RULES (enforced automatically after you answer — proposals that break them are discarded):\n` +
+      `- Minimum ticket: ${Math.round(r.minTicketBase).toLocaleString()} ${args.currency.toUpperCase()}. Anything smaller cannot carry the fixed commission floor and is rejected outright.\n` +
+      `- At most ${r.maxBuysPerDay} buy${r.maxBuysPerDay === 1 ? "" : "s"} per day. Spend them on your strongest ideas; a weak buy burns a slot.\n` +
+      `- Rolling dealing budget: ${(r.costBudgetPctOfNav * 10_000).toFixed(0)}bps of account value over 30 days. Once spent, only ${r.highEdgeReserveTickets} high-conviction reserve ticket${r.highEdgeReserveTickets === 1 ? "" : "s"} can still get through, so keep room for the best setup.\n` +
+      `- Adding to a name you already hold is blocked for ${r.addCooldownDays} day${r.addCooldownDays === 1 ? "" : "s"} after the last buy in it. Size to target in ONE ticket.\n` +
+      `- No single position above ${(r.maxPositionPctOfNav * 100).toFixed(0)}% of account value.\n` +
+      `- Sells are never restricted by any of this: exits can always fire.`;
+  return `TRADING COSTS — PRICE THESE IN BEFORE PROPOSING ANY TRADE:${measuredLine}${provenanceLine}${symbolLines}
+
 - Every buy pays real money before it can make any: broker commission (roughly 8-10bps of notional, but with a per-side MINIMUM of about £3 UK / $1 US / €3 EU, which dominates small tickets), half the bid/ask spread on entry AND again on exit, and on UK single shares a further ${UK_STAMP_DUTY_BPS}bps (0.5%) of UK stamp duty on the BUY.
 - UK tickets above £${PTM_LEVY_THRESHOLD_GBP.toLocaleString()} also pay the £${PTM_LEVY_GBP} PTM levy.
 - Round-trip friction is therefore commission ×2 + spread ×2 + stamp duty. A small UK single-stock ticket can easily cost 100-200bps round-trip: the price has to rise that much before the position is level.
@@ -62,5 +110,5 @@ export function buildTradingCostBlock(args: {
       : ` The account is configured to ${pref === "strong" ? "strongly prefer" : "prefer"} stamp-exempt instruments when signals are comparable — when a UK share and an ETF express a similar view with similar strength, take the ETF.`
   }
 - Churn is expensive: do not sell and re-buy the same exposure for a marginal reason, and do not add to a position in small increments. Size to the target in one ticket.
-- When you state a rationale, say what move you expect (in %) so the size can be checked against the cost of getting in and out. All values in ${args.currency.toUpperCase()}.`;
+- When you state a rationale, say what move you expect (in %) so the size can be checked against the cost of getting in and out. All values in ${args.currency.toUpperCase()}.${reserveLines}`;
 }
