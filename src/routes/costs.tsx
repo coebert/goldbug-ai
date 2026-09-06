@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCostDashboard, saveCostHurdle } from "@/lib/cost-dashboard.functions";
+import { backfillBrokerChargesFn } from "@/lib/broker-cost-backfill.functions";
 import { formatUk } from "@/lib/uk-time";
 
 export const Route = createFileRoute("/costs")({
@@ -73,9 +74,9 @@ function CostsDashboard() {
       const res = await runSync({ data: {} });
       await queryClient.invalidateQueries({ queryKey: ["cost-dashboard"] });
       toast.success(
-        res.newlyInvoiced > 0
-          ? `${res.newlyInvoiced} trades now priced with the broker's own charges.`
-          : "No new broker charges available yet.",
+        res.totals.fillsUpdated > 0
+          ? `${res.totals.fillsUpdated} trades now priced with the broker's own charges.`
+          : res.message,
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not sync broker charges");
