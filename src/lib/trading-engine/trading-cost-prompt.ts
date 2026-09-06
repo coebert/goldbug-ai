@@ -28,7 +28,33 @@ export function buildTradingCostBlock(args: {
    * price each candidate against its own figure.
    */
   symbolCosts?: Array<{ symbol: string; roundTripBps: number; tickets: number }> | null;
+  /**
+   * Where the cost floor came from. When the broker's contract notes have been
+   * synced, the floor is real invoiced money — not the published tariff, which
+   * systematically under-states what this account is billed.
+   */
+  costProvenance?: {
+    invoicedChargeBps: number | null;
+    invoicedNotionalShare: number;
+    invoicedFills: number;
+    slippageBps: number | null;
+  } | null;
+  /**
+   * The reserve rules the cost governor will enforce after the model answers:
+   * ticket floor, daily buy cap, rolling friction budget, add cooldown, and
+   * the single-name cap. Telling the model up front stops it proposing trades
+   * that the governor will simply throw away.
+   */
+  reserveRules?: {
+    minTicketBase: number;
+    maxBuysPerDay: number;
+    costBudgetPctOfNav: number;
+    addCooldownDays: number;
+    maxPositionPctOfNav: number;
+    highEdgeReserveTickets: number;
+  } | null;
 }): string {
+
   const safety = args.safetyMultiple ?? DEFAULT_EDGE_SAFETY_MULTIPLE;
   const pref = args.stampExemptPreference ?? "balanced";
   const measured = Number(args.measuredRoundTripBps);
