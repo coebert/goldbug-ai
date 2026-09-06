@@ -232,6 +232,10 @@ function CostsDashboard() {
           </CardContent>
         </Card>
 
+        <BrokerStatementImportCard />
+
+
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-base">Broker charges and slippage</CardTitle>
