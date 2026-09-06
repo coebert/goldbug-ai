@@ -379,8 +379,15 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     fills: rawFills.length,
     invoicedFills,
     slippageFills,
+    invoicedChargeBps:
+      invoicedChargeBps === null ? null : Math.round(invoicedChargeBps * 10) / 10,
+    invoicedNotionalShare:
+      invoicedNotional + modelledNotional > 0
+        ? invoicedNotional / (invoicedNotional + modelledNotional)
+        : 0,
   };
 }
+
 
 /** Round trip = what this account pays getting in, plus what it pays getting out. */
 export function roundTripCostFrac(costs: CostModel, symbol: string): number {
