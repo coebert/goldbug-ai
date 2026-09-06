@@ -166,7 +166,7 @@ export const getTradesDashboard = createServerFn({ method: "POST" })
       const bookedFee = sumFee((f) => f.fee);
       const splitTotal = commission + exchange + tax + otherSplit;
       const invoiced = orderFills.some(
-        (f) => (f.fee_source ?? "") !== "" && (f.fee_source ?? "") !== "modelled",
+        (f) => (f.fee_source ?? "") === "broker",
       );
       const charges = {
         total: splitTotal > 0 ? splitTotal : bookedFee,

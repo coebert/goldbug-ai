@@ -2212,7 +2212,7 @@ export async function routeOrdersToBroker(params: {
           currency: fillCcy,
           // Tariff estimate until the broker's charge report is matched;
           // the trade card labels it as estimated on the strength of this.
-          fee_source: "modelled",
+          fee_source: "model",
           broker_fill_id: brokerRes.brokerOrderId || null,
           filled_at: new Date().toISOString(),
         });
