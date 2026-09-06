@@ -1187,8 +1187,14 @@ export async function runDailyTick(
         await import("./decision-model/model.server");
       const model = await loadLatestModel(userId);
       if (!model || model.coefficients.length === 0) return null;
+      // The model's fit-time cost is a historical average; the live fill tape
+      // (including real broker invoices) is the harder number. Take whichever
+      // is higher so a stale fit can never soften the floor.
       const rt = Number(model.coverage?.round_trip_cost_bps);
-      if (Number.isFinite(rt) && rt > 0) measuredRoundTripBps = rt;
+      if (Number.isFinite(rt) && rt > 0) {
+        measuredRoundTripBps = Math.max(rt, measuredRoundTripBps ?? 0);
+      }
+
       const ctx = await loadScoringContext(asOf);
       const lossMemoryLive: Record<string, number> = {};
       for (const [sym, pm] of lossMemory) lossMemoryLive[sym] = pm.penalty;
