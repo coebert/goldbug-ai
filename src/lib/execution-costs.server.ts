@@ -156,7 +156,7 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
         .map((v) => Math.abs(Number(v) || 0))
         .reduce((a, b) => a + b, 0);
       const source = String(r.fee_source ?? "").toLowerCase();
-      const synced = source !== "" && source !== "none" && source !== "modelled";
+      const synced = source === "broker";
       const charge = parts > 0 ? parts : Math.abs(Number(r.fee) || 0);
 
       const at = r.filled_at ? new Date(r.filled_at as string) : null;

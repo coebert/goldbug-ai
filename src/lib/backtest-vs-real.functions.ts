@@ -218,7 +218,7 @@ export const getBacktestVsReal = createServerFn({ method: "GET" })
         exchange,
         other,
         slippage,
-        invoiced: Boolean(f.fee_source && f.fee_source !== "none" && f.fee_source !== "modelled"),
+        invoiced: f.fee_source === "broker",
       };
     });
 
