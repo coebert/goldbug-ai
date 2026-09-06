@@ -32,6 +32,7 @@ import { getBacktestVsReal } from "@/lib/backtest-vs-real.functions";
 import { verdictFor } from "@/lib/backtest-vs-real";
 import { formatUk } from "@/lib/uk-time";
 import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
+import { RealMoneyCostPanel } from "@/components/real-money-cost-panel";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
@@ -347,6 +348,8 @@ function PnlDashboard() {
                   </p>
                 </CardContent>
               </Card>
+
+              {selectedId && <RealMoneyCostPanel portfolioId={selectedId} />}
 
               <Card>
                 <CardHeader className="pb-2">
