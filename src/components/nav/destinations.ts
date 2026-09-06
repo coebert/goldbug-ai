@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   LifeBuoy,
   FileText,
+  Briefcase,
   type LucideIcon,
 } from "lucide-react";
 
@@ -160,6 +161,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     area: "trades",
     primary: true,
     keywords: "orders fills executions",
+  },
+  {
+    to: "/positions",
+    label: "Portfolio positions",
+    tabLabel: "Positions",
+    hint: "Each holding's size, cost, P&L and dealing-cost floor.",
+    icon: Briefcase,
+    area: "trades",
+    keywords: "portfolio holdings positions cost basis unrealised realised pnl weight",
   },
   {
     to: "/live-dashboard",
