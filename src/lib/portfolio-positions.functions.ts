@@ -12,6 +12,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { engineSymbolKey, priceSymbolVariants } from "@/lib/price-symbol";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { holdingNativeValue, isFxLegHolding } from "@/lib/fx-leg-value";
 
 export type PositionRow = {
   symbol: string;
