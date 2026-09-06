@@ -1129,6 +1129,15 @@ export async function runDailyTick(
   // over-prices a tight index fund; the gate below uses each name's own floor
   // and only falls back to the account figure where there are no fills yet.
   let symbolCosts: Map<string, LiveSymbolCost> | null = null;
+  // Where the floor came from: real broker invoices, or the tariff standing in
+  // until the contract notes land. Told to the AI so it never reasons from the
+  // published tariff when real billed money is available.
+  let costProvenance: {
+    invoicedChargeBps: number | null;
+    invoicedNotionalShare: number;
+    invoicedFills: number;
+    slippageBps: number | null;
+  } | null = null;
   {
     const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
     if (userId) {
@@ -1140,6 +1149,14 @@ export async function runDailyTick(
         symbolCosts = res.snapshot
           ? res.snapshot.bySymbol
           : await loadSymbolExecutionCosts(userId);
+        if (res.snapshot) {
+          costProvenance = {
+            invoicedChargeBps: res.snapshot.invoicedChargeBps,
+            invoicedNotionalShare: res.snapshot.invoicedNotionalShare,
+            invoicedFills: res.snapshot.invoicedFills,
+            slippageBps: res.snapshot.slippageBps,
+          };
+        }
         if (measuredRoundTripBps == null && res.snapshot?.accountRoundTripBps) {
           measuredRoundTripBps = res.snapshot.accountRoundTripBps;
         }
@@ -1148,6 +1165,7 @@ export async function runDailyTick(
       }
     }
   }
+
 
   // Operator-set cost hurdle (Costs page slider). Drives how far above the
   // round-trip friction a buy's expected move must clear; null keeps the
