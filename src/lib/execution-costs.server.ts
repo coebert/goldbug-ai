@@ -464,8 +464,9 @@ function snapshotFrom(costs: CostModel): LiveCostSnapshot {
     invoicedFills: costs.invoicedFills,
     invoicedChargeBps: costs.invoicedChargeBps,
     invoicedNotionalShare: costs.invoicedNotionalShare,
-
+    computedAt: new Date().toISOString(),
   };
+
 }
 
 /** Portfolios belonging to a user — the fill scope for their cost model. */
