@@ -1396,12 +1396,23 @@ export class SaxoAdapter implements BrokerAdapter {
     const clientKey = await this.getClientKey();
 
     const candidates: Array<{ path: string; query: Record<string, string | number> }> = [
+      // Booked costs first: the trades report answers on every environment but
+      // frequently carries no charge columns at all, which is how every fill
+      // ended up looking free. The bookings/closed-positions reports are the
+      // ones that actually carry the invoice.
       ...(clientKey
-        ? [{
-            path: `/cs/v1/reports/trades/${encodeURIComponent(clientKey)}`,
-            query: { FromDate: fromDate, ToDate: toDate, $top: 1000 },
-          }]
+        ? [
+            {
+              path: `/cs/v1/reports/bookings/${encodeURIComponent(clientKey)}`,
+              query: { FromDate: fromDate, ToDate: toDate, $top: 1000 },
+            },
+            {
+              path: `/cs/v1/reports/trades/${encodeURIComponent(clientKey)}`,
+              query: { FromDate: fromDate, ToDate: toDate, $top: 1000 },
+            },
+          ]
         : []),
+      { path: "/cs/v1/reports/bookings/me", query: { FromDate: fromDate, ToDate: toDate, $top: 1000 } },
       { path: "/cs/v1/reports/trades/me", query: { FromDate: fromDate, ToDate: toDate, $top: 1000 } },
       {
         path: "/cs/v1/audit/activities",
@@ -1415,6 +1426,9 @@ export class SaxoAdapter implements BrokerAdapter {
     ];
 
     const attempts: string[] = [];
+    // A report that answers but priced nothing is not the invoice; keep it as a
+    // fallback and carry on probing rather than declaring the trades free.
+    let moneyless: BrokerChargeReport | null = null;
     for (const c of candidates) {
       try {
         const res = await this.req<{ Data?: unknown[] } | unknown[]>("GET", c.path, {
@@ -1424,10 +1438,21 @@ export class SaxoAdapter implements BrokerAdapter {
         });
         const rows = Array.isArray(res) ? res : (res?.Data ?? []);
         const { mapSaxoChargeRows } = await import("./saxo-charges");
-        return { supported: true, endpoint: c.path, charges: mapSaxoChargeRows(rows) };
+        const charges = mapSaxoChargeRows(rows);
+        const report: BrokerChargeReport = { supported: true, endpoint: c.path, charges };
+        if (charges.some((ch) => Number(ch.total) > 0)) return report;
+        moneyless ??= report;
+        attempts.push(`${c.path}: ${charges.length} rows, no charge amounts`);
       } catch (e) {
         attempts.push(`${c.path}: ${redactedError(e).message}`);
       }
+    }
+
+    if (moneyless) {
+      return {
+        ...moneyless,
+        reason: `Saxo cost reports carried no charge amounts on ${this.env} (${attempts.join(" | ")})`,
+      };
     }
 
     return {
@@ -1436,6 +1461,7 @@ export class SaxoAdapter implements BrokerAdapter {
       charges: [],
       reason: `no Saxo cost report available on ${this.env} (${attempts.join(" | ")})`,
     };
+
   }
 
 
