@@ -196,7 +196,13 @@ import { scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt, formatBreakou
 import { unifiedVolSize } from "./sizing/unified-vol-size";
 import { alphaConvictionBonus } from "./alpha/sizing";
 import { desiredWeight, targetWeightSpend } from "./sizing/target-weight";
-import { minTicketBase, governorForNav } from "./cost-governor";
+import {
+  minTicketBase,
+  governorForNav,
+  DEFAULT_MAX_POSITION_PCT_OF_NAV,
+  DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+} from "./cost-governor";
+
 import {
   planOrderSlices,
   todExecutionAdjustment,
