@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/table";
 import { getCostDashboard, saveCostHurdle } from "@/lib/cost-dashboard.functions";
 import { backfillBrokerChargesFn } from "@/lib/broker-cost-backfill.functions";
+import { BrokerStatementImportCard } from "@/components/broker-statement-import-card";
+
 import { formatUk } from "@/lib/uk-time";
 
 export const Route = createFileRoute("/costs")({
@@ -231,6 +233,10 @@ function CostsDashboard() {
             </p>
           </CardContent>
         </Card>
+
+        <BrokerStatementImportCard />
+
+
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
