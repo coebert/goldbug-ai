@@ -110,5 +110,5 @@ export function buildTradingCostBlock(args: {
       : ` The account is configured to ${pref === "strong" ? "strongly prefer" : "prefer"} stamp-exempt instruments when signals are comparable — when a UK share and an ETF express a similar view with similar strength, take the ETF.`
   }
 - Churn is expensive: do not sell and re-buy the same exposure for a marginal reason, and do not add to a position in small increments. Size to the target in one ticket.
-- When you state a rationale, say what move you expect (in %) so the size can be checked against the cost of getting in and out. All values in ${args.currency.toUpperCase()}.`;
+- When you state a rationale, say what move you expect (in %) so the size can be checked against the cost of getting in and out. All values in ${args.currency.toUpperCase()}.${reserveLines}`;
 }
