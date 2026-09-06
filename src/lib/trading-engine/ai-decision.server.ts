@@ -186,7 +186,10 @@ ${buildTradingCostBlock({
   stampExemptPreference: cfg.stamp_exempt_preference,
   measuredRoundTripBps: args.measuredRoundTripBps ?? null,
   symbolCosts: args.symbolCosts ?? null,
+  costProvenance: args.costProvenance ?? null,
+  reserveRules: args.reserveRules ?? null,
 })}
+
 
 ${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
 
