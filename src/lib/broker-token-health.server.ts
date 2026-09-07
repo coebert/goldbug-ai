@@ -112,6 +112,21 @@ export function checkRefreshWindow(params: {
       const { supabaseAdmin } = await import(
         "@/integrations/supabase/client.server"
       );
+
+      // A healthy connection rotates its token every ~15 min, which keeps the
+      // window permanently "short". Suppress unless rotation itself has stopped.
+      if (secs > 0) {
+        const since = new Date(Date.now() - RECENT_SUCCESS_MS).toISOString();
+        const { data: recentOk } = await supabaseAdmin
+          .from("broker_token_events")
+          .select("id")
+          .eq("env", params.env)
+          .eq("ok", true)
+          .gte("created_at", since)
+          .limit(1);
+        if (recentOk && recentOk.length > 0) return;
+      }
+
       await supabaseAdmin.from("security_audit_log").insert({
         event: "broker_token",
         op: `refresh-window:${params.env}`,
