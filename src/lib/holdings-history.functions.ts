@@ -13,6 +13,7 @@ export type HoldingSeries = {
   avg_cost: number;
   quantity: number;
   closes: number[]; // ordered oldest -> newest
+  dailyAt: string[]; // ISO dates aligned with `closes`
   hourly: number[]; // hour-bucketed prices, oldest -> newest
   hourlyAt: string[]; // ISO timestamps aligned with `hourly`
   currentPrice: number | null;

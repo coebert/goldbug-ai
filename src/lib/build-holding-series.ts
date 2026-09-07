@@ -23,6 +23,8 @@ export type BuiltHoldingSeries = {
   avg_cost: number;
   quantity: number;
   closes: number[];
+  /** ISO dates aligned 1:1 with `closes`. */
+  dailyAt: string[];
   /** Hour-bucketed prices since purchase, same normalisation as `closes`. */
   hourly: number[];
   /** ISO timestamps aligned 1:1 with `hourly`. */
@@ -70,6 +72,10 @@ export function buildHoldingSeries(
   );
 
   const closes = avg > 0 ? [avg, ...postCloses] : postCloses;
+  const dailyAt =
+    avg > 0
+      ? [openedAt ?? postPurchase[0]?.date ?? new Date().toISOString(), ...postPurchase.map((p) => p.date)]
+      : postPurchase.map((p) => p.date);
 
   const postIntraday = (openedDate
     ? intraday.filter((p) => String(p.at).slice(0, 10) >= openedDate)
@@ -128,6 +134,7 @@ export function buildHoldingSeries(
     avg_cost: avg,
     quantity: Number(h.quantity),
     closes,
+    dailyAt,
     hourly,
     hourlyAt,
     currentPrice,
