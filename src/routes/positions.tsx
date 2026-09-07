@@ -247,7 +247,15 @@ function PositionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.rows.map((r) => (
+                    {data.rows.flatMap((r) => {
+                      const chargeLabel = r.brokerFeesBase > 0
+                        ? r.estimatedFeesBase > 0
+                          ? `${money(r.brokerFeesBase, data.currency)} billed · ${money(r.estimatedFeesBase, data.currency)} estimated`
+                          : `${money(r.brokerFeesBase, data.currency)} broker billed`
+                        : r.feesBase > 0
+                          ? `${money(r.feesBase, data.currency)} estimated`
+                          : `${money(0, data.currency)} recorded`;
+                      return [
                       <TableRow key={r.symbol} className="border-b-0">
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -300,19 +308,7 @@ function PositionsPage() {
                             </div>
                           )}
                         </TableCell>
-                      </TableRow>
-                    )).flatMap((row, index) => {
-                      const r = data.rows[index];
-                      if (!r) return [row];
-                      const chargeLabel = r.brokerFeesBase > 0
-                        ? r.estimatedFeesBase > 0
-                          ? `${money(r.brokerFeesBase, data.currency)} billed · ${money(r.estimatedFeesBase, data.currency)} estimated`
-                          : `${money(r.brokerFeesBase, data.currency)} broker billed`
-                        : r.feesBase > 0
-                          ? `${money(r.feesBase, data.currency)} estimated`
-                          : `${money(0, data.currency)} recorded`;
-                      return [
-                        row,
+                      </TableRow>,
                         <TableRow key={`${r.symbol}-money`} className="bg-muted/25 hover:bg-muted/25">
                           <TableCell colSpan={10} className="px-4 py-2">
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
@@ -333,7 +329,7 @@ function PositionsPage() {
                           </TableCell>
                         </TableRow>,
                       ];
-                    ))}
+                    ]})}
                     {data.rows.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={10} className="text-center text-muted-foreground">
