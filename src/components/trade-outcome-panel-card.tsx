@@ -27,6 +27,7 @@ import {
   Target,
   AlertTriangle,
 } from "lucide-react";
+import { explainOrderOutcome, isExpectedNonFill } from "@/lib/order-cancel-explain";
 import { formatUkTime } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,7 @@ interface Props {
   active?: boolean;
 }
 
-type Bucket = "all" | "working" | "filled" | "failed";
+type Bucket = "all" | "working" | "filled" | "unfilled" | "failed";
 
 const STATUS_STYLE: Record<
   string,
@@ -83,10 +84,10 @@ const STATUS_STYLE: Record<
   },
 };
 
-function bucketOf(status: string): Bucket {
+function bucketOf(status: string, reason?: string | null): Bucket {
   if (status === "filled" || status === "partially_filled") return "filled";
   if (status === "rejected" || status === "error") return "failed";
-  if (status === "cancelled") return "failed";
+  if (status === "cancelled") return isExpectedNonFill(status, reason) ? "unfilled" : "failed";
   return "working";
 }
 
@@ -225,11 +226,15 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   }, [active, portfolioId, qc]);
 
   const rows = query.data?.rows ?? [];
-  const counts = query.data?.counts ?? {};
   const summary = useMemo(() => summarizeOutcomes(rows), [rows]);
+  const bucketCounts = useMemo(() => {
+    const acc = { working: 0, filled: 0, unfilled: 0, failed: 0 };
+    for (const r of rows) acc[bucketOf(r.status, r.rejectReason) as keyof typeof acc] += 1;
+    return acc;
+  }, [rows]);
   const filtered = useMemo(() => {
     if (bucket === "all") return rows;
-    return rows.filter((r) => bucketOf(r.status) === bucket);
+    return rows.filter((r) => bucketOf(r.status, r.rejectReason) === bucket);
   }, [rows, bucket]);
 
   const WINDOWS: { hours: number; label: string }[] = [
@@ -330,12 +335,16 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
               { key: "all", label: `All (${rows.length})` },
               {
                 key: "working",
-                label: `Working (${(counts.working ?? 0) + (counts.partial ?? 0)})`,
+                label: `Working (${bucketCounts.working})`,
               },
-              { key: "filled", label: `Filled (${counts.filled ?? 0})` },
+              { key: "filled", label: `Filled (${bucketCounts.filled})` },
+              {
+                key: "unfilled",
+                label: `Not filled (${bucketCounts.unfilled})`,
+              },
               {
                 key: "failed",
-                label: `Failed (${(counts.failed ?? 0) + (counts.cancelled ?? 0)})`,
+                label: `Failed (${bucketCounts.failed})`,
               },
             ] as const
           ).map((b) => (
@@ -385,11 +394,19 @@ function OutcomeRow({
   row: TradeOutcomeRow;
   flashing: boolean;
 }) {
-  const style = STATUS_STYLE[row.status] ?? {
+  const explain = explainOrderOutcome(row.status, row.rejectReason);
+  const baseStyle = STATUS_STYLE[row.status] ?? {
     label: row.status,
     className: "bg-muted text-muted-foreground border-border",
     Icon: CircleDashed,
   };
+  const style = explain
+    ? {
+        label: explain.label,
+        className: "bg-muted text-muted-foreground border-border",
+        Icon: CircleDashed,
+      }
+    : baseStyle;
   const Icon = style.Icon;
   const isBuy = row.side === "buy";
   const lastEventAt = row.fills.at(-1)?.filledAt ?? row.updatedAt;
@@ -472,7 +489,21 @@ function OutcomeRow({
         </div>
       )}
 
-      {row.rejectReason && (
+      {explain && (
+        <div className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">
+            No trade happened — this is not an error.{" "}
+          </span>
+          {explain.plain}
+          {row.rejectReason && (
+            <span className="mt-1 block break-all font-mono text-[10px] opacity-70">
+              {truncateReason(row.rejectReason, 160)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {!explain && row.rejectReason && (
         <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
           <span className="font-semibold">Reason: </span>
           <span className="break-all font-mono text-[11px]">
@@ -543,19 +574,26 @@ function maybeToastTransition(args: {
   toastedRef.current.add(key);
 
   const sideLabel = side ? side.toUpperCase() : "";
+  const expected = explainOrderOutcome(next, rejectReason);
   const title = nowSuccess
     ? `${sideLabel} ${symbol} ${next === "partially_filled" ? "partially filled" : "filled"}`
-    : `${sideLabel} ${symbol} ${next === "cancelled" ? "cancelled" : "failed"}`;
+    : expected
+      ? `${sideLabel} ${symbol} — ${expected.label.toLowerCase()}`
+      : `${sideLabel} ${symbol} failed`;
 
   const brokerLine = brokerOrderId
     ? `Broker order: ${brokerOrderId}`
     : "Broker order: (none assigned)";
-  const description = rejectReason
-    ? `${brokerLine} · ${truncateReason(rejectReason, 140)}`
-    : brokerLine;
+  const description = expected
+    ? `${expected.plain} ${brokerLine}`
+    : rejectReason
+      ? `${brokerLine} · ${truncateReason(rejectReason, 140)}`
+      : brokerLine;
 
   if (nowSuccess) {
     toast.success(title, { description, duration: 6000 });
+  } else if (expected) {
+    toast.info(title, { description, duration: 7000 });
   } else {
     toast.error(title, { description, duration: 8000 });
   }
@@ -620,7 +658,7 @@ function SummaryTiles({
         value={String(summary.errorCount)}
         sub={
           summary.cancelledCount > 0
-            ? `${summary.cancelledCount} cancelled`
+            ? `${summary.cancelledCount} cancelled (not errors)`
             : "rejected + error"
         }
         valueClassName={errorTone}
