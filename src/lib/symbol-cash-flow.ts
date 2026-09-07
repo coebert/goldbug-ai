@@ -1,4 +1,5 @@
 import { roundMoney } from "./format-money";
+import { engineSymbolKey } from "./price-symbol";
 
 export type SymbolCashFlowFill = {
   symbol: string;
@@ -43,7 +44,7 @@ export function buildSymbolCashFlow(
       estimatedFees: 0,
       netCashUsed: 0,
       fills: 0,
-      held: heldSymbols.has(symbol),
+      held: heldSymbols.has(engineSymbolKey(symbol)),
     };
     const notional = quantity * price;
     if (fill.side === "sell") current.sellCash += notional;

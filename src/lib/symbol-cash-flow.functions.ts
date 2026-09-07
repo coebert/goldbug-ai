@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildSymbolCashFlow, type SymbolCashFlowFill } from "./symbol-cash-flow";
 import { normalizeMarketPriceForTrading } from "./market-price-units";
+import { engineSymbolKey } from "./price-symbol";
 
 export const getSymbolCashFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -28,7 +29,7 @@ export const getSymbolCashFlow = createServerFn({ method: "POST" })
     const heldSymbols = new Set(
       (holdingsResult.data ?? [])
         .filter((holding) => Math.abs(Number(holding.quantity ?? 0)) > 0)
-        .map((holding) => String(holding.symbol ?? "")),
+        .map((holding) => engineSymbolKey(String(holding.symbol ?? ""))),
     );
     const { convertAmount } = await import("./fx.server");
     const fxRates = new Map<string, number>();

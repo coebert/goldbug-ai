@@ -9,7 +9,7 @@ describe("buildSymbolCashFlow", () => {
         { symbol: "TSLA:xnas", side: "buy", quantity: 1, fillPriceBase: 110, feeBase: 2, feeSource: "model" },
         { symbol: "TSLA:xnas", side: "sell", quantity: 1, fillPriceBase: 120, feeBase: 1, feeSource: "broker" },
       ],
-      new Set(["TSLA:xnas"]),
+      new Set(["TSLA"]),
     );
 
     expect(rows).toEqual([{
