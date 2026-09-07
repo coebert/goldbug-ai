@@ -34,9 +34,9 @@ describe("buildHoldingEquityChangeRows", () => {
     expect(result.symbols).toEqual(["AAA", "BBB"]);
     expect(result.rows).toEqual([
       { at: "2026-01-01T09:00:00Z", AAA: 0 },
-      { at: "2026-01-02", AAA: 10.000000000000009 },
+      { at: "2026-01-02", AAA: 10 },
       { at: "2026-01-02T10:00:00Z", BBB: 0 },
-      { at: "2026-01-03", AAA: -9.999999999999998, BBB: -19.999999999999996 },
+      { at: "2026-01-03", AAA: -10, BBB: -20 },
     ]);
   });
 

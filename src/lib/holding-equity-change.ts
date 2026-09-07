@@ -25,7 +25,7 @@ export function buildHoldingEquityChangeRows(series: HoldingSeries[]): {
       if (!at || !Number.isFinite(price) || price <= 0) return;
       const key = String(at);
       const row = byTime.get(key) ?? { at: key };
-      row[holding.symbol] = ((price / holding.avg_cost) - 1) * 100;
+      row[holding.symbol] = Number((((price / holding.avg_cost) - 1) * 100).toFixed(8));
       byTime.set(key, row);
     });
   }
