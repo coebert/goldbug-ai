@@ -200,6 +200,11 @@ const CashReserveHistoryChart = lazy(() =>
     default: m.CashReserveHistoryChart,
   })),
 );
+const SymbolCashFlowTable = lazy(() =>
+  import("@/components/symbol-cash-flow-table").then((m) => ({
+    default: m.SymbolCashFlowTable,
+  })),
+);
 
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
@@ -343,6 +348,7 @@ function PortfolioPage() {
         qc.invalidateQueries({ queryKey: ["holdings-history", id] });
         qc.invalidateQueries({ queryKey: ["live-orders", id] });
         qc.invalidateQueries({ queryKey: qk.trades.forPortfolio(id) });
+        qc.invalidateQueries({ queryKey: ["symbol-cash-flow", id] });
       } catch (e) {
         console.warn(`auto broker reconcile failed (${reason})`, e);
       }
@@ -1099,6 +1105,13 @@ function PortfolioPage() {
                     portfolioId={id}
                   />
                 </div>
+                {p.mode === "live_prod" && (
+                  <div className="mb-6">
+                    <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                      <SymbolCashFlowTable portfolioId={id} />
+                    </Suspense>
+                  </div>
+                )}
                 {p.mode === "live_prod" && (
                   <div className="mb-6">
                     <HoldingEquityChangeChart portfolioId={id} />
