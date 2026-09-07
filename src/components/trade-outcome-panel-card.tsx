@@ -36,7 +36,7 @@ interface Props {
   active?: boolean;
 }
 
-type Bucket = "all" | "working" | "filled" | "failed";
+type Bucket = "all" | "working" | "filled" | "unfilled" | "failed";
 
 const STATUS_STYLE: Record<
   string,
@@ -87,7 +87,7 @@ const STATUS_STYLE: Record<
 function bucketOf(status: string, reason?: string | null): Bucket {
   if (status === "filled" || status === "partially_filled") return "filled";
   if (status === "rejected" || status === "error") return "failed";
-  if (status === "cancelled") return isExpectedNonFill(status, reason) ? "working" : "failed";
+  if (status === "cancelled") return isExpectedNonFill(status, reason) ? "unfilled" : "failed";
   return "working";
 }
 
@@ -228,6 +228,11 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   const rows = query.data?.rows ?? [];
   const counts = query.data?.counts ?? {};
   const summary = useMemo(() => summarizeOutcomes(rows), [rows]);
+  const bucketCounts = useMemo(() => {
+    const acc = { working: 0, filled: 0, unfilled: 0, failed: 0 };
+    for (const r of rows) acc[bucketOf(r.status, r.rejectReason) as keyof typeof acc] += 1;
+    return acc;
+  }, [rows]);
   const filtered = useMemo(() => {
     if (bucket === "all") return rows;
     return rows.filter((r) => bucketOf(r.status, r.rejectReason) === bucket);
@@ -331,12 +336,16 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
               { key: "all", label: `All (${rows.length})` },
               {
                 key: "working",
-                label: `Working (${(counts.working ?? 0) + (counts.partial ?? 0)})`,
+                label: `Working (${bucketCounts.working})`,
               },
-              { key: "filled", label: `Filled (${counts.filled ?? 0})` },
+              { key: "filled", label: `Filled (${bucketCounts.filled})` },
+              {
+                key: "unfilled",
+                label: `Not filled (${bucketCounts.unfilled})`,
+              },
               {
                 key: "failed",
-                label: `Failed (${(counts.failed ?? 0) + (counts.cancelled ?? 0)})`,
+                label: `Failed (${bucketCounts.failed})`,
               },
             ] as const
           ).map((b) => (
@@ -650,7 +659,7 @@ function SummaryTiles({
         value={String(summary.errorCount)}
         sub={
           summary.cancelledCount > 0
-            ? `${summary.cancelledCount} cancelled`
+            ? `${summary.cancelledCount} cancelled (not errors)`
             : "rejected + error"
         }
         valueClassName={errorTone}
