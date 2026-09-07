@@ -83,10 +83,10 @@ const STATUS_STYLE: Record<
   },
 };
 
-function bucketOf(status: string): Bucket {
+function bucketOf(status: string, reason?: string | null): Bucket {
   if (status === "filled" || status === "partially_filled") return "filled";
   if (status === "rejected" || status === "error") return "failed";
-  if (status === "cancelled") return "failed";
+  if (status === "cancelled") return isExpectedNonFill(status, reason) ? "working" : "failed";
   return "working";
 }
 
