@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useChartPreset } from "@/lib/chart-axis";
 import { LineChart, RefreshCw } from "lucide-react";
-import { CHART_ROLE, CHART_SEQUENCE, LEGEND_PROPS, OKABE_ITO } from "@/lib/chart-palette";
+import { CHART_ROLE, LEGEND_PROPS, OKABE_ITO } from "@/lib/chart-palette";
 import {
   SAXO_AXIS,
   SAXO_GRID,
