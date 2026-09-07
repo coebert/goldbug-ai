@@ -15,8 +15,14 @@
 
 import { redactedError } from "@/lib/_server/redact";
 
-/** Refresh-token window below this is treated as "reauthorize now". */
-const REFRESH_WINDOW_WARN_MS = 6 * 60 * 60 * 1000;
+// Saxo mints refresh tokens with a ~60 minute life and we rotate them every
+// ~15 minutes, so a "short" window is the normal steady state — warning at 6h
+// fired on every single healthy rotation. Only a window that has fallen below
+// several rotation cycles (i.e. rotation has actually stopped working) is news.
+const ROTATION_INTERVAL_MS = 15 * 60 * 1000;
+const REFRESH_WINDOW_WARN_MS = 2.5 * ROTATION_INTERVAL_MS; // ~37 min
+/** If rotation succeeded this recently, the short window is expected, not a fault. */
+const RECENT_SUCCESS_MS = 2 * ROTATION_INTERVAL_MS; // 30 min
 
 /** One failed rotation is enough — this is a money path, not noisy telemetry. */
 const TOKEN_ALERT_THRESHOLD = 1;
