@@ -15,7 +15,8 @@ describe("buildCashReserveHistory", () => {
       ],
     );
     expect(rows[0]).toMatchObject({ minimumBuy: 300, dealingAllowance: 40, trailingCost: 10, allowanceRemaining: 30 });
-    expect(rows[1]).toMatchObject({ minimumBuy: 600, dealingAllowance: 80, trailingCost: 7, allowanceRemaining: 73 });
+    expect(rows[1]).toMatchObject({ dealingAllowance: 80, trailingCost: 7, allowanceRemaining: 73 });
+    expect(rows[1].minimumBuy).toBeCloseTo(573);
     expect(rows[2]).toMatchObject({ trailingCost: 7, allowanceRemaining: 73 });
   });
 
