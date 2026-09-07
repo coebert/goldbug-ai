@@ -329,7 +329,7 @@ function PositionsPage() {
                           </TableCell>
                         </TableRow>,
                       ];
-                    ]})}
+                    })}
                     {data.rows.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={10} className="text-center text-muted-foreground">
