@@ -386,11 +386,19 @@ function OutcomeRow({
   row: TradeOutcomeRow;
   flashing: boolean;
 }) {
-  const style = STATUS_STYLE[row.status] ?? {
+  const explain = explainOrderOutcome(row.status, row.rejectReason);
+  const baseStyle = STATUS_STYLE[row.status] ?? {
     label: row.status,
     className: "bg-muted text-muted-foreground border-border",
     Icon: CircleDashed,
   };
+  const style = explain
+    ? {
+        label: explain.label,
+        className: "bg-muted text-muted-foreground border-border",
+        Icon: CircleDashed,
+      }
+    : baseStyle;
   const Icon = style.Icon;
   const isBuy = row.side === "buy";
   const lastEventAt = row.fills.at(-1)?.filledAt ?? row.updatedAt;
