@@ -100,7 +100,7 @@ export function HoldingEquityChangeChart({ portfolioId }: { portfolioId: string 
                     strokeWidth={2.5}
                     strokeDasharray={LINE_DASHES[index % LINE_DASHES.length]}
                     dot={false}
-                    connectNulls={false}
+                    connectNulls
                     isAnimationActive={false}
                   />
                 ))}
