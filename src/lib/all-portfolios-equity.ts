@@ -20,9 +20,7 @@ export type AllPortfoliosEquity = {
   series: Array<Record<string, string | number>>;
   perPortfolioSeries: Record<string, PortfolioEquityPoint[]>;
   currency: string;
-  /** True when >1 distinct portfolio currency is present. Series totals
-   *  (`total_sim`, `total_real`) are only meaningful when every portfolio
-   *  reports the same currency; the UI must show a warning otherwise. */
+  /** True when >1 distinct source portfolio currency is present. */
   mixedCurrency: boolean;
   /** Distinct currencies observed across the portfolio list. */
   currencies: string[];
@@ -47,22 +45,29 @@ export function buildAllPortfoliosEquity({
   portfolios,
   snapshots,
   today,
+  displayCurrency = "GBP",
+  fxRates = {},
 }: {
   portfolios: PortfolioEquityInput[];
   snapshots: EquitySnapshotInput[];
   today: string;
+  /** Currency used by every returned monetary series. */
+  displayCurrency?: string;
+  /** Multipliers keyed by source currency: source amount × rate = display amount. */
+  fxRates?: Record<string, number>;
 }): AllPortfoliosEquity {
   const list = portfolios;
   const distinctCurrencies = Array.from(
     new Set(list.map((p) => (p.currency || "GBP").toUpperCase())),
   ).sort();
   const mixedCurrency = distinctCurrencies.length > 1;
+  const outputCurrency = displayCurrency.toUpperCase();
   if (list.length === 0) {
     return {
       portfolios: [],
       series: [],
       perPortfolioSeries: {},
-      currency: "GBP",
+      currency: outputCurrency,
       mixedCurrency: false,
       currencies: [],
     };
@@ -84,11 +89,15 @@ export function buildAllPortfoliosEquity({
   const perPortfolio = list.map((portfolio) => ({
     id: portfolio.id,
     name: portfolio.name,
-    currency: portfolio.currency,
+    currency: outputCurrency,
+    sourceCurrency: (portfolio.currency || "GBP").toUpperCase(),
     mode: portfolio.mode ?? "paper",
     starting_cash: toNumber(portfolio.starting_cash),
     current_cash: toNumber(portfolio.current_cash),
-    series: byPortfolio.get(portfolio.id) ?? [],
+    series: (byPortfolio.get(portfolio.id) ?? []).map((point) => ({
+      ...point,
+      value: point.value * (fxRates[(portfolio.currency || "GBP").toUpperCase()] ?? 1),
+    })),
   }));
 
   const dates = new Set<string>();
@@ -110,7 +119,7 @@ export function buildAllPortfoliosEquity({
     for (const portfolio of perPortfolio) {
       const value = portfolio.series.length === 0
         ? date === today
-          ? portfolio.current_cash
+          ? portfolio.current_cash * (fxRates[portfolio.sourceCurrency] ?? 1)
           : undefined
         : latestValueOnOrBefore(portfolio.series, date);
 
@@ -140,7 +149,10 @@ export function buildAllPortfoliosEquity({
       portfolio.series.length > 0
         ? portfolio.series
         : Number.isFinite(portfolio.current_cash)
-          ? [{ date: today, value: portfolio.current_cash }]
+          ? [{
+              date: today,
+              value: portfolio.current_cash * (fxRates[portfolio.sourceCurrency] ?? 1),
+            }]
           : [];
   }
 
@@ -153,7 +165,7 @@ export function buildAllPortfoliosEquity({
     })),
     series,
     perPortfolioSeries,
-    currency: perPortfolio[0]?.currency ?? "GBP",
+    currency: outputCurrency,
     mixedCurrency,
     currencies: distinctCurrencies,
   };

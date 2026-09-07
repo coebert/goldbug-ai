@@ -1,7 +1,7 @@
 // Time-series chart of per-currency wallet balances plus total base cash
 // over the sim run. Data is populated once per tick by trading-engine.server.
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { LineChart as LineIcon } from "lucide-react";
@@ -19,7 +19,6 @@ import {
 
 import { getWalletHistory } from "@/lib/wallet-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   AXIS_LINE,
   AXIS_TICK,
@@ -67,7 +66,6 @@ const fmt = (n: number, ccy: string) =>
 
 export function WalletHistoryCard({ portfolioId, active = true }: Props) {
   const fetchFn = useServerFn(getWalletHistory);
-  const [mode, setMode] = useState<"native" | "base">("native");
 
   const q = useQuery({
     queryKey: ["wallet-history", portfolioId],
@@ -81,23 +79,11 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
     const { rows, currencies, baseCcy } = q.data;
     return rows.map((r) => {
       const row: Record<string, number | string> = { date: r.snapshot_date };
-      if (mode === "native") {
-        for (const c of currencies) row[c] = r.cash_by_ccy[c] ?? 0;
-      } else {
-        // Approximate: base_total already reflects the full wallet valued in base.
-        // For per-currency base-valued areas, scale each currency's native amount
-        // by the implied rate = base_total / native_total for that day (falls back
-        // to native units when baseCcy equals the currency).
-        for (const c of currencies) {
-          const native = r.cash_by_ccy[c] ?? 0;
-          if (c === (baseCcy ?? r.base_ccy)) row[c] = native;
-          else row[c] = native; // native shown; the base line captures the total.
-        }
-      }
+      for (const c of currencies) row[c] = r.cash_by_ccy[c] ?? 0;
       row.__baseTotal = r.base_total;
       return row;
     });
-  }, [q.data, mode]);
+  }, [q.data]);
 
   const currencies = q.data?.currencies ?? [];
   const baseCcy = q.data?.baseCcy ?? "GBP";
@@ -108,24 +94,6 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
         <CardTitle className="flex items-center gap-2 text-base">
           <LineIcon className="h-4 w-4" /> Wallet balances over time
         </CardTitle>
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant={mode === "native" ? "default" : "outline"}
-            className="h-7 px-2 text-xs"
-            onClick={() => setMode("native")}
-          >
-            Native
-          </Button>
-          <Button
-            size="sm"
-            variant={mode === "base" ? "default" : "outline"}
-            className="h-7 px-2 text-xs"
-            onClick={() => setMode("base")}
-          >
-            Base
-          </Button>
-        </div>
       </CardHeader>
       <CardContent>
         {q.isLoading ? (

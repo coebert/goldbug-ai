@@ -26,7 +26,14 @@ const RANGES: Array<{ value: Range; label: string; days: number | null }> = [
 function compactMoney(value: number, currency: string) {
   const abs = Math.abs(value);
   const amount = abs >= 1_000 ? `${(value / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k` : value.toFixed(0);
-  return `${currency} ${amount}`;
+  const symbol = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  })
+    .formatToParts(0)
+    .find((part) => part.type === "currency")?.value ?? currency;
+  return `${symbol}${amount}`;
 }
 
 function money(value: number, currency: string) {

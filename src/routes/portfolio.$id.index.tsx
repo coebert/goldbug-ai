@@ -974,6 +974,7 @@ function PortfolioPage() {
               deposits={depositEvents}
               inceptionDate={q.data?.inceptionDate ?? null}
               seriesStartDate={q.data?.seriesStartDate ?? null}
+              currency={p.currency}
               trades={trades as unknown as import("@/lib/chart-trade-markers").MarkerTrade[]}
             />
 

@@ -137,11 +137,31 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       ),
     );
 
+    const displayCurrency = "GBP";
+    const sourceCurrencies = Array.from(
+      new Set(list.map((portfolio) => String(portfolio.currency || displayCurrency).toUpperCase())),
+    );
+    const fxRates: Record<string, number> = { [displayCurrency]: 1 };
+    const { getFxRate } = await import("./fx.server");
+    await Promise.all(
+      sourceCurrencies
+        .filter((currency) => currency !== displayCurrency)
+        .map(async (currency) => {
+          const fx = await getFxRate(currency, displayCurrency);
+          if (fx.stale || fx.source.startsWith("fallback:")) {
+            throw new Error(`A reliable ${currency} to GBP rate is temporarily unavailable.`);
+          }
+          fxRates[currency] = fx.rate;
+        }),
+    );
+
     const today = new Date().toISOString().slice(0, 10);
     const built = buildAllPortfoliosEquity({
       portfolios: list,
       snapshots: clippedEq,
       today,
+      displayCurrency,
+      fxRates,
     });
 
     // Include live_sim portfolios: they are funded via sim_fund_events
@@ -161,7 +181,10 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         .in("portfolio_id", simIds);
       for (const e of simEvents ?? []) {
         if (!e.portfolio_id || !e.created_at) continue;
-        const amt = Number(e.amount);
+        const sourceCurrency = String(
+          list.find((portfolio) => portfolio.id === e.portfolio_id)?.currency || displayCurrency,
+        ).toUpperCase();
+        const amt = Number(e.amount) * (fxRates[sourceCurrency] ?? 1);
         if (!Number.isFinite(amt)) continue;
         deposits.push({
           portfolio_id: e.portfolio_id,
@@ -206,7 +229,10 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         ) {
           continue;
         }
-        const amt = Number(resp.delta);
+        const sourceCurrency = String(
+          list.find((portfolio) => portfolio.id === row.portfolio_id)?.currency || displayCurrency,
+        ).toUpperCase();
+        const amt = Number(resp.delta) * (fxRates[sourceCurrency] ?? 1);
         if (!Number.isFinite(amt) || amt === 0) continue;
         const raw = {
           date: String(row.created_at).slice(0, 10),
