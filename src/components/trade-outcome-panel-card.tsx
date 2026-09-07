@@ -481,7 +481,21 @@ function OutcomeRow({
         </div>
       )}
 
-      {row.rejectReason && (
+      {explain && (
+        <div className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">
+            No trade happened — this is not an error.{" "}
+          </span>
+          {explain.plain}
+          {row.rejectReason && (
+            <span className="mt-1 block break-all font-mono text-[10px] opacity-70">
+              {truncateReason(row.rejectReason, 160)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {!explain && row.rejectReason && (
         <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
           <span className="font-semibold">Reason: </span>
           <span className="break-all font-mono text-[11px]">
