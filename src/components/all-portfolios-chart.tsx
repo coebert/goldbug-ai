@@ -84,7 +84,7 @@ export function AllPortfoliosChart() {
   });
 
   const portfolios: PortfolioMeta[] = q.data?.portfolios ?? [];
-  const currency = q.data?.currency ?? "GBP";
+  const currency = "GBP";
   const simPortfolios = portfolios.filter((p) => p.mode !== "live_prod");
   const realPortfolios = portfolios.filter((p) => p.mode === "live_prod");
 
@@ -253,7 +253,14 @@ function ModeChart({
   // never masquerades as profit.
   const pnl = adjustedNow - startingTotal;
   const pnlPct = startingTotal > 0 ? (pnl / startingTotal) * 100 : 0;
-  const fmt = (v: number) => `${currency}${v.toFixed(0)}`;
+  const money = (v: number, digits = 2) =>
+    new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(v);
+  const fmt = (v: number) => money(v, 0);
 
   return (
     <SectionCard>
@@ -292,18 +299,18 @@ function ModeChart({
           <>
             <div className="mb-3">
               <div className="text-lg font-semibold leading-tight tracking-tight tabular-nums sm:text-2xl">
-                {currency} {totalNow.toFixed(2)}
+                {money(totalNow)}
               </div>
               <div
                 className={`mt-0.5 text-[11px] leading-snug sm:text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}
               >
                 {pnl >= 0 ? "+" : ""}
-                {currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}
+                {money(pnl)} ({pnl >= 0 ? "+" : ""}
                 {pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
                 {Math.abs(netDeposits) > 0.005 && (
                   <span
                     className="ml-1 text-muted-foreground"
-                    title={`Excludes ${currency}${netDeposits.toFixed(2)} of ${netDeposits >= 0 ? "deposits" : "withdrawals"} in this window`}
+                    title={`Excludes ${money(netDeposits)} of ${netDeposits >= 0 ? "deposits" : "withdrawals"} in this window`}
                   >
                     · trading only
                   </span>
@@ -338,7 +345,7 @@ function ModeChart({
                     width={isMobile ? 52 : 60}
                     tickCount={4}
                     tickFormatter={(v) =>
-                      isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v))
+                      isMobile ? `£${compactNum(Number(v))}` : fmt(Number(v))
                     }
                     domain={yDomain}
                     allowDataOverflow
@@ -363,7 +370,7 @@ function ModeChart({
                           <div className="mb-1 flex justify-between gap-3 tabular-nums">
                             <span className="text-muted-foreground">{badgeLabel} total</span>
                             <span className="font-medium">
-                              {currency} {Number(row[totalKey]).toFixed(2)}
+                               {money(Number(row[totalKey]))}
                             </span>
                           </div>
                           {portfolios.map((p, i) => (
@@ -376,7 +383,7 @@ function ModeChart({
                               </span>
                               <span className="shrink-0">
                                 {Number.isFinite(Number(row[p.id]))
-                                  ? `${currency} ${Number(row[p.id]).toFixed(2)}`
+                                   ? money(Number(row[p.id]))
                                   : "—"}
                               </span>
                             </div>

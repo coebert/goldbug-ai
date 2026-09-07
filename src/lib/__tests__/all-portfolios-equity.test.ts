@@ -46,4 +46,32 @@ describe("buildAllPortfoliosEquity", () => {
       { date: "2026-07-24", [SIM]: 1010, [REAL]: 300, total_sim: 1010, total_real: 300 },
     ]);
   });
+
+  it("converts every monetary series to GBP before summing mixed-currency equity", () => {
+    const result = buildAllPortfoliosEquity({
+      today: "2026-07-24",
+      displayCurrency: "GBP",
+      fxRates: { GBP: 1, EUR: 0.85 },
+      portfolios: [
+        { id: SIM, name: "Euro sim", currency: "EUR", mode: "paper", starting_cash: 1000, current_cash: 1100 },
+        { id: REAL, name: "Real", currency: "GBP", mode: "live_prod", starting_cash: 300, current_cash: 300 },
+      ],
+      snapshots: [
+        { portfolio_id: SIM, snapshot_date: "2026-07-24", total_value: 1100 },
+        { portfolio_id: REAL, snapshot_date: "2026-07-24", total_value: 300 },
+      ],
+    });
+
+    expect(result.currency).toBe("GBP");
+    expect(result.mixedCurrency).toBe(true);
+    expect(result.portfolios[0].currency).toBe("GBP");
+    expect(result.series[0]).toEqual({
+      date: "2026-07-24",
+      [SIM]: 935,
+      [REAL]: 300,
+      total_sim: 935,
+      total_real: 300,
+    });
+    expect(result.perPortfolioSeries[SIM]).toEqual([{ date: "2026-07-24", value: 935 }]);
+  });
 });
