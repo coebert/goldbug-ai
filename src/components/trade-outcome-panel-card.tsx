@@ -27,6 +27,7 @@ import {
   Target,
   AlertTriangle,
 } from "lucide-react";
+import { explainOrderOutcome, isExpectedNonFill } from "@/lib/order-cancel-explain";
 import { formatUkTime } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
 
@@ -229,7 +230,7 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   const summary = useMemo(() => summarizeOutcomes(rows), [rows]);
   const filtered = useMemo(() => {
     if (bucket === "all") return rows;
-    return rows.filter((r) => bucketOf(r.status) === bucket);
+    return rows.filter((r) => bucketOf(r.status, r.rejectReason) === bucket);
   }, [rows, bucket]);
 
   const WINDOWS: { hours: number; label: string }[] = [
