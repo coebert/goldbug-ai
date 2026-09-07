@@ -248,7 +248,7 @@ function PositionsPage() {
                   </TableHeader>
                   <TableBody>
                     {data.rows.map((r) => (
-                      <TableRow key={r.symbol}>
+                      <TableRow key={r.symbol} className="border-b-0">
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{r.symbol}</span>
@@ -301,6 +301,38 @@ function PositionsPage() {
                           )}
                         </TableCell>
                       </TableRow>
+                    )).flatMap((row, index) => {
+                      const r = data.rows[index];
+                      if (!r) return [row];
+                      const chargeLabel = r.brokerFeesBase > 0
+                        ? r.estimatedFeesBase > 0
+                          ? `${money(r.brokerFeesBase, data.currency)} billed · ${money(r.estimatedFeesBase, data.currency)} estimated`
+                          : `${money(r.brokerFeesBase, data.currency)} broker billed`
+                        : r.feesBase > 0
+                          ? `${money(r.feesBase, data.currency)} estimated`
+                          : `${money(0, data.currency)} recorded`;
+                      return [
+                        row,
+                        <TableRow key={`${r.symbol}-money`} className="bg-muted/25 hover:bg-muted/25">
+                          <TableCell colSpan={10} className="px-4 py-2">
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+                              <span className="font-medium text-foreground">Real money</span>
+                              <span className="text-muted-foreground">
+                                Invested <strong className="font-medium text-foreground tabular-nums">{money(r.costBasisBase, data.currency)}</strong>
+                              </span>
+                              <span className="text-muted-foreground">
+                                Worth now <strong className="font-medium text-foreground tabular-nums">{money(r.marketValueBase, data.currency)}</strong>
+                              </span>
+                              <span className="text-muted-foreground">
+                                Charges <strong className="font-medium text-foreground tabular-nums">{chargeLabel}</strong>
+                              </span>
+                              <span className="text-muted-foreground">
+                                All-in P&amp;L <strong className="font-medium"><Pnl value={r.netPnlBase} ccy={data.currency} /></strong>
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>,
+                      ];
                     ))}
                     {data.rows.length === 0 && (
                       <TableRow>

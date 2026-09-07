@@ -31,12 +31,18 @@ export type PositionRow = {
   unrealizedPnl: number | null;
   realizedPnl: number;
   feesPaid: number;
+  brokerFeesPaid: number;
+  estimatedFeesPaid: number;
   /** Same three in the portfolio's base currency. */
   marketValueBase: number | null;
   unrealizedBase: number | null;
   realizedBase: number;
   costBasisBase: number;
   feesBase: number;
+  brokerFeesBase: number;
+  estimatedFeesBase: number;
+  /** All-in P&L: open-position gain/loss plus banked P&L, already net of recorded charges. */
+  netPnlBase: number | null;
   /** Share of the portfolio's latest total value, 0..1. */
   weight: number | null;
   /** This symbol's measured round-trip dealing cost, bps of notional. */
@@ -72,6 +78,7 @@ type FillRow = {
   quantity: number | string | null;
   fill_price: number | string | null;
   fee: number | string | null;
+  fee_source: string | null;
   currency: string | null;
   filled_at: string | null;
 };
@@ -103,7 +110,7 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
           .eq("portfolio_id", data.portfolioId),
         db
           .from("live_fills")
-          .select("symbol, side, quantity, fill_price, fee, currency, filled_at")
+          .select("symbol, side, quantity, fill_price, fee, fee_source, currency, filled_at")
           .eq("portfolio_id", data.portfolioId)
           .order("filled_at", { ascending: true })
           .limit(5000),
@@ -121,7 +128,7 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
     const symbols = [...new Set(holdings.map((h) => String(h.symbol)))];
 
     // --- Replay fills: per-symbol cost basis, realised P&L and charges. ---
-    const book = new Map<string, { qty: number; cost: number; realized: number; fees: number }>();
+    const book = new Map<string, { qty: number; cost: number; realized: number; fees: number; brokerFees: number; estimatedFees: number }>();
     for (const f of (fills ?? []) as FillRow[]) {
       const qty = Math.abs(Number(f.quantity ?? 0));
       const price = Number(f.fill_price ?? 0);
@@ -129,7 +136,7 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
       const key = engineSymbolKey(String(f.symbol ?? ""));
       if (!key) continue;
       const fee = Math.abs(Number(f.fee ?? 0)) || 0;
-      const cur = book.get(key) ?? { qty: 0, cost: 0, realized: 0, fees: 0 };
+      const cur = book.get(key) ?? { qty: 0, cost: 0, realized: 0, fees: 0, brokerFees: 0, estimatedFees: 0 };
       if (String(f.side ?? "buy").toLowerCase() === "sell") {
         const sold = Math.min(qty, cur.qty);
         const avg = cur.qty > 0 ? cur.cost / cur.qty : 0;
@@ -143,6 +150,8 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
         cur.qty += qty;
       }
       cur.fees += fee;
+      if (String(f.fee_source ?? "").toLowerCase() === "broker") cur.brokerFees += fee;
+      else cur.estimatedFees += fee;
       book.set(key, cur);
     }
 
@@ -264,6 +273,8 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
       const b = book.get(key);
       const realizedPnl = b?.realized ?? 0;
       const feesPaid = b?.fees ?? 0;
+      const brokerFeesPaid = b?.brokerFees ?? 0;
+      const estimatedFeesPaid = b?.estimatedFees ?? 0;
       const cost = costByKey.get(key);
 
       return {
@@ -280,11 +291,21 @@ export const getPortfolioPositions = createServerFn({ method: "POST" })
         unrealizedPnl,
         realizedPnl,
         feesPaid,
+        brokerFeesPaid,
+        estimatedFeesPaid,
         marketValueBase: marketValue != null ? toBase(marketValue, ccy) : null,
         unrealizedBase: unrealizedPnl != null ? toBase(unrealizedPnl, ccy) : null,
         realizedBase: toBase(realizedPnl, ccy),
         costBasisBase: toBase(costBasis, ccy),
         feesBase: toBase(feesPaid, ccy),
+        brokerFeesBase: toBase(brokerFeesPaid, ccy),
+        estimatedFeesBase: toBase(estimatedFeesPaid, ccy),
+        netPnlBase:
+          unrealizedPnl != null
+            ? toBase(unrealizedPnl + realizedPnl, ccy)
+            : realizedPnl !== 0
+              ? toBase(realizedPnl, ccy)
+              : null,
         weight: nav != null && nav > 0 && marketValue != null ? toBase(marketValue, ccy) / nav : null,
         roundTripBps: cost?.roundTripBps ?? null,
         costMeasured: cost?.measured ?? false,
