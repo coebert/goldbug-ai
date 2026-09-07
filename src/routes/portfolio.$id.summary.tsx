@@ -12,6 +12,7 @@ import { Metric } from "@/components/portfolio-detail/metric";
 import { FxCashAtRiskCard } from "@/components/fx-cash-at-risk-card";
 import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
 import { FxRiskAlertCard } from "@/components/fx-risk-alert-card";
+import { CashReserveHistoryChart } from "@/components/cash-reserve-history-chart";
 
 import { FxLegRowsCard } from "@/components/fx-leg-rows-card";
 import { FxLeverageLadderCard } from "@/components/fx-leverage-ladder-card";
@@ -188,6 +189,8 @@ function SummaryPage() {
             tone={pnl >= 0 ? "up" : "down"}
           />
         </div>
+
+        {p?.mode === "live_prod" && <CashReserveHistoryChart portfolioId={id} />}
 
         <Card>
           <CardHeader className="pb-3">

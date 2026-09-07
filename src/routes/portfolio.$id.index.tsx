@@ -195,6 +195,11 @@ const EquityCompositionCard = lazy(() =>
     default: m.EquityCompositionCard,
   })),
 );
+const CashReserveHistoryChart = lazy(() =>
+  import("@/components/cash-reserve-history-chart").then((m) => ({
+    default: m.CashReserveHistoryChart,
+  })),
+);
 
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
@@ -971,6 +976,12 @@ function PortfolioPage() {
               seriesStartDate={q.data?.seriesStartDate ?? null}
               trades={trades as unknown as import("@/lib/chart-trade-markers").MarkerTrade[]}
             />
+
+            {p.mode === "live_prod" && (
+              <Suspense fallback={<div className="mb-4 h-[320px] animate-pulse rounded-md bg-muted/40" />}>
+                <CashReserveHistoryChart portfolioId={id} className="mb-4" />
+              </Suspense>
+            )}
 
             <Suspense fallback={<div className="mb-4 h-64 animate-pulse rounded-md bg-muted/40" />}>
               <div id="composition" className="mb-4 scroll-below-sticky">
