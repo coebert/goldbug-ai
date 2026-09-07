@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useChartPreset } from "@/lib/chart-axis";
 import { LineChart, RefreshCw } from "lucide-react";
-import { CHART_ROLE, CHART_SEQUENCE, LEGEND_PROPS, OKABE_ITO } from "@/lib/chart-palette";
+import { CHART_ROLE, LEGEND_PROPS, OKABE_ITO } from "@/lib/chart-palette";
 import {
   SAXO_AXIS,
   SAXO_GRID,
@@ -48,7 +48,16 @@ function shortDate(s: string) {
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 }
 
-const LINE_COLORS = CHART_SEQUENCE;
+// Start the constituent curves away from the blue used by the SIM total.
+// This prevents the first portfolio from visually merging into the total line.
+const LINE_COLORS = [
+  OKABE_ITO.orange,
+  OKABE_ITO.bluishGreen,
+  OKABE_ITO.reddishPurple,
+  OKABE_ITO.yellow,
+  OKABE_ITO.blue,
+] as const;
+const LINE_DASHES = [undefined, "7 4", "2 3", "10 3 2 3"] as const;
 const SIM_COLOR = OKABE_ITO.skyBlue;
 const REAL_COLOR = CHART_ROLE.positive;
 const AXIS_COLOR = "oklch(0.96 0.01 90)";
@@ -182,8 +191,8 @@ function ModeChart({
   const [range, setRange] = useState<Range>("all");
   const { isMobile, margin: chartMargin } = useChartPreset();
 
-  const { series, totalNow, startingTotal, adjustedNow, netDeposits, yDomain } = useMemo(() => {
-    const opt = RANGE_OPTS.find((r) => r.value === range)!;
+  const { series, totalNow, startingTotal, adjustedNow, netDeposits, yDomain, portfolioYDomain } = useMemo(() => {
+    const opt = RANGE_OPTS.find((r) => r.value === range) ?? RANGE_OPTS[4];
     let s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey])));
     if (opt.days && s.length > 0) {
       const cutoff = Date.now() - opt.days * 86_400_000;
@@ -194,6 +203,11 @@ function ModeChart({
     const start = s[0] ? Number(s[0][totalKey]) : 0;
     const last = s[s.length - 1] ? Number(s[s.length - 1][totalKey]) : 0;
     const totals = s.map((r) => Number(r[totalKey])).filter((n) => Number.isFinite(n));
+    const portfolioValues = s.flatMap((row) =>
+      portfolios
+        .map((portfolio) => Number(row[portfolio.id]))
+        .filter((value) => Number.isFinite(value)),
+    );
     let lo = Math.min(...totals);
     let hi = Math.max(...totals);
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
@@ -201,6 +215,13 @@ function ModeChart({
       hi = 1;
     }
     const pad = Math.max((hi - lo) * 0.1, hi * 0.005, 1);
+    const portfolioLo = portfolioValues.length > 0 ? Math.min(...portfolioValues) : 0;
+    const portfolioHi = portfolioValues.length > 0 ? Math.max(...portfolioValues) : 1;
+    const portfolioPad = Math.max(
+      (portfolioHi - portfolioLo) * 0.1,
+      Math.abs(portfolioHi) * 0.005,
+      1,
+    );
 
     // Deposit-adjusted trailing % for this window. Only deposits dated
     // strictly after the first visible point are netted out (matches
@@ -221,8 +242,12 @@ function ModeChart({
       adjustedNow: adjLast,
       netDeposits: netDep,
       yDomain: [Math.max(0, lo - pad), hi + pad] as [number, number],
+      portfolioYDomain: [
+        Math.max(0, portfolioLo - portfolioPad),
+        portfolioHi + portfolioPad,
+      ] as [number, number],
     };
-  }, [allSeries, totalKey, range, deposits]);
+  }, [allSeries, totalKey, range, deposits, portfolios]);
 
   // Trading-only PnL and % — deposits are excluded so a cash top-up
   // never masquerades as profit.
@@ -308,6 +333,7 @@ function ModeChart({
                     padding={{ left: 2, right: 2 }}
                   />
                   <YAxis
+                    yAxisId="total"
                     {...SAXO_AXIS}
                     width={isMobile ? 52 : 60}
                     tickCount={4}
@@ -315,6 +341,13 @@ function ModeChart({
                       isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v))
                     }
                     domain={yDomain}
+                    allowDataOverflow
+                  />
+                  <YAxis
+                    yAxisId="portfolio"
+                    orientation="right"
+                    hide
+                    domain={portfolioYDomain}
                     allowDataOverflow
                   />
                   <Tooltip
@@ -360,6 +393,7 @@ function ModeChart({
                   />
 
                   <Area
+                    yAxisId="total"
                     type="linear"
                     dataKey={totalKey}
                     name={`${badgeLabel} total`}
@@ -374,12 +408,13 @@ function ModeChart({
                   {portfolios.map((p, i) => (
                     <Line
                       key={p.id}
+                      yAxisId="portfolio"
                       type="monotone"
                       dataKey={p.id}
                       name={p.name}
                       stroke={LINE_COLORS[i % LINE_COLORS.length]}
-                      strokeWidth={1.75}
-                      strokeDasharray="4 3"
+                      strokeWidth={2.5}
+                      strokeDasharray={LINE_DASHES[i % LINE_DASHES.length]}
                       dot={false}
                       isAnimationActive={false}
                     />
