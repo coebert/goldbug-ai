@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildSymbolCashFlow, type SymbolCashFlowFill } from "./symbol-cash-flow";
+import { normalizeMarketPriceForTrading } from "./market-price-units";
 
 export const getSymbolCashFlow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -49,7 +50,10 @@ export const getSymbolCashFlow = createServerFn({ method: "POST" })
     const fills: SymbolCashFlowFill[] = [];
     for (const row of fillsResult.data ?? []) {
       const quantity = Number(row.quantity ?? 0);
-      const fillPrice = Number(row.fill_price ?? 0);
+      const fillPrice = normalizeMarketPriceForTrading(
+        String(row.symbol ?? ""),
+        Number(row.fill_price ?? 0),
+      );
       if (!(quantity > 0) || !(fillPrice > 0)) continue;
       const fillCurrency = String(row.currency ?? currency).toUpperCase();
       const notionalBase = await toBase(quantity * fillPrice, fillCurrency);
