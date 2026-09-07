@@ -226,7 +226,6 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   }, [active, portfolioId, qc]);
 
   const rows = query.data?.rows ?? [];
-  const counts = query.data?.counts ?? {};
   const summary = useMemo(() => summarizeOutcomes(rows), [rows]);
   const bucketCounts = useMemo(() => {
     const acc = { working: 0, filled: 0, unfilled: 0, failed: 0 };
