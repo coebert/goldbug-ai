@@ -566,19 +566,26 @@ function maybeToastTransition(args: {
   toastedRef.current.add(key);
 
   const sideLabel = side ? side.toUpperCase() : "";
+  const expected = explainOrderOutcome(next, rejectReason);
   const title = nowSuccess
     ? `${sideLabel} ${symbol} ${next === "partially_filled" ? "partially filled" : "filled"}`
-    : `${sideLabel} ${symbol} ${next === "cancelled" ? "cancelled" : "failed"}`;
+    : expected
+      ? `${sideLabel} ${symbol} — ${expected.label.toLowerCase()}`
+      : `${sideLabel} ${symbol} failed`;
 
   const brokerLine = brokerOrderId
     ? `Broker order: ${brokerOrderId}`
     : "Broker order: (none assigned)";
-  const description = rejectReason
-    ? `${brokerLine} · ${truncateReason(rejectReason, 140)}`
-    : brokerLine;
+  const description = expected
+    ? `${expected.plain} ${brokerLine}`
+    : rejectReason
+      ? `${brokerLine} · ${truncateReason(rejectReason, 140)}`
+      : brokerLine;
 
   if (nowSuccess) {
     toast.success(title, { description, duration: 6000 });
+  } else if (expected) {
+    toast.info(title, { description, duration: 7000 });
   } else {
     toast.error(title, { description, duration: 8000 });
   }
