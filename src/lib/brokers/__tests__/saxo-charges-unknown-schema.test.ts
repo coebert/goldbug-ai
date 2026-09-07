@@ -38,6 +38,38 @@ describe("saxo charge mapping — unfamiliar report schemas", () => {
     expect(charge?.total).toBe(0);
   });
 
+  it("derives a US trade's billed cost from its all-in account settlement", () => {
+    const buy = mapSaxoChargeRow({
+      TradeId: "6852880685",
+      InstrumentSymbol: "TSLA:xnas",
+      TradeEventType: "Bought",
+      Amount: 2,
+      Price: 379.89,
+      TradedValue: -759.78,
+      BookedAmountUSD: -765.16,
+      BookedAmountAccountCurrency: -565.76,
+      AccountCurrency: "GBP",
+    });
+    const sell = mapSaxoChargeRow({
+      TradeId: "6854799886",
+      InstrumentSymbol: "TSLA:xnas",
+      TradeEventType: "Sold",
+      Amount: -2,
+      Price: 355.06,
+      TradedValue: 710.12,
+      BookedAmountUSD: 705.46,
+      BookedAmountAccountCurrency: 521.9,
+      AccountCurrency: "GBP",
+    });
+
+    expect(buy?.currency).toBe("USD");
+    expect(buy?.other).toBeCloseTo(5.38, 3);
+    expect(buy?.total).toBeCloseTo(5.38, 3);
+    expect(sell?.currency).toBe("USD");
+    expect(sell?.other).toBeCloseTo(4.66, 3);
+    expect(sell?.total).toBeCloseTo(4.66, 3);
+  });
+
   it("harvests nested cost blocks and charge arrays", () => {
     const charge = mapSaxoChargeRow({
       TransactionId: "abc-1",

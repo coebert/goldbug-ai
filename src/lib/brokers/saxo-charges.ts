@@ -156,7 +156,7 @@ const TOTAL_KEYS = [
 ] as const;
 
 function parseSide(row: Record<string, unknown>): "buy" | "sell" | undefined {
-  const raw = (text(row, ["BuySell", "TradedSide", "Direction", "TradeType", "Side"]) ?? "").toLowerCase();
+  const raw = (text(row, ["BuySell", "TradedSide", "Direction", "TradeEventType", "TradeType", "Side"]) ?? "").toLowerCase();
   if (!raw) {
     // Some rows only signal direction through a signed quantity.
     const q = num(row, ["Amount", "TradedAmount", "FilledAmount", "Quantity"]);
@@ -183,6 +183,31 @@ function parseTradedAt(row: Record<string, unknown>): string | undefined {
   if (!raw) return undefined;
   const t = Date.parse(raw.length === 10 ? `${raw}T00:00:00Z` : raw);
   return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
+}
+
+/**
+ * Some Saxo trade reports omit every explicit commission field but do expose
+ * the all-in booked settlement. For US-listed instruments `TradedValue` and
+ * `BookedAmountUSD` are directly comparable: their adverse difference is the
+ * money Saxo actually retained. Translate that difference into account
+ * currency using the settlement row's own effective rate, not today's FX.
+ */
+function bookedSettlementCost(row: Record<string, unknown>): number {
+  const symbol = text(row, ["InstrumentSymbol", "UnderlyingInstrumentSymbol", "Symbol"]) ?? "";
+  const venue = text(row, ["Venue", "ExchangeDescription"]) ?? "";
+  const isUsListed = /:(xnas|xnys|arcx|bats)$/i.test(symbol) || /nasdaq|new york|nyse|arca/i.test(venue);
+  if (!isUsListed) return 0;
+
+  const traded = Math.abs(num(row, ["TradedValue"]));
+  const bookedUsd = Math.abs(num(row, ["BookedAmountUSD"]));
+  const bookedAccount = Math.abs(num(row, ["BookedAmountAccountCurrency"]));
+  if (!(traded > 0) || !(bookedUsd > 0) || !(bookedAccount > 0)) return 0;
+
+  const side = parseSide(row);
+  const costUsd = side === "sell" ? traded - bookedUsd : bookedUsd - traded;
+  if (!(costUsd > 0)) return 0;
+
+  return costUsd;
 }
 
 /**
@@ -228,6 +253,13 @@ export function mapSaxoChargeRow(
     for (const amount of groups.values()) other += amount;
   }
 
+  // The live trades report used by this account carries no fee-like columns.
+  // Its all-in settlement still proves the billed amount, including the FX
+  // conversion charge, so use that only when no explicit charge was found.
+  if (!(commission + exchangeFee + tax + other > 0)) {
+    other = bookedSettlementCost(row);
+  }
+
   const total = commission + exchangeFee + tax + other;
 
   const quantityRaw = num(row, ["Amount", "TradedAmount", "FilledAmount", "Quantity"]);
@@ -249,8 +281,10 @@ export function mapSaxoChargeRow(
     ...(price > 0 ? { price } : {}),
     ...(parseTradedAt(row) !== undefined ? { tradedAt: parseTradedAt(row)! } : {}),
     currency: preserveUnitCase(
-      text(row, ["BookingCurrency", "TradeCurrency", "Currency", "AccountCurrency", "AmountCurrency"]) ??
-        fallbackCurrency,
+      bookedSettlementCost(row) > 0
+        ? "USD"
+        : text(row, ["BookingCurrency", "TradeCurrency", "Currency", "AccountCurrency", "AmountCurrency"]) ??
+            fallbackCurrency,
     ),
 
     commission,
