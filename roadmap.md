@@ -52,4 +52,4 @@
 - Shadow replay: US names (JNJ/SPY/MSFT) bought with GBP cash at USD prices but valued after FX -> false ~21% loss. Fix currency conversion on shadow fills before trusting the gap chart.
 - [x] Cost dashboard page: per-symbol avg fill cost, slippage, cost floor + adjustable hurdle slider (persisted, wired into net-edge gate)
 
-- [ ] Run and reconcile the Monday 2026-09-07 live decision cycle (opened, filled, closed orders)
+- [x] Reconcile the Monday 2026-09-07 live decision cycles (opened, filled, closed orders)
