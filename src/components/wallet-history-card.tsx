@@ -19,7 +19,6 @@ import {
 
 import { getWalletHistory } from "@/lib/wallet-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   AXIS_LINE,
   AXIS_TICK,
