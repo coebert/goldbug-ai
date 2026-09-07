@@ -189,6 +189,7 @@ import { CostScenarioBacktestCard } from "@/components/cost-scenario-backtest-ca
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
+import { HoldingEquityChangeChart } from "@/components/holding-equity-change-chart";
 const EquityCompositionCard = lazy(() =>
   import("@/components/equity-composition-card").then((m) => ({
     default: m.EquityCompositionCard,
@@ -1086,6 +1087,11 @@ function PortfolioPage() {
                     portfolioId={id}
                   />
                 </div>
+                {p.mode === "live_prod" && (
+                  <div className="mb-6">
+                    <HoldingEquityChangeChart portfolioId={id} />
+                  </div>
+                )}
                 {p.broker && (
                   <div className="mb-6">
                     <Suspense

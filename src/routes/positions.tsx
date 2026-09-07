@@ -29,6 +29,7 @@ import {
 import { listPortfolios } from "@/lib/portfolios.functions";
 import { getPortfolioPositions, type PositionRow } from "@/lib/portfolio-positions.functions";
 import { RealMoneyCostPanel } from "@/components/real-money-cost-panel";
+import { HoldingEquityChangeChart } from "@/components/holding-equity-change-chart";
 import { formatUkDate, formatUkTime } from "@/lib/uk-time";
 
 export const Route = createFileRoute("/positions")({
@@ -90,7 +91,8 @@ function PositionsPage() {
   const list = useMemo(() => (Array.isArray(portfolios) ? portfolios : []), [portfolios]);
   const portfolioId =
     selectedId ??
-    (list.find((p: any) => p.mode === "live_prod" || p.mode === "live_sim")?.id as string | undefined) ??
+    (list.find((p: any) => p.mode === "live_prod")?.id as string | undefined) ??
+    (list.find((p: any) => p.mode === "live_sim")?.id as string | undefined) ??
     ((list[0] as any)?.id as string | undefined) ??
     null;
 
@@ -225,6 +227,8 @@ function PositionsPage() {
             {data.warnings.length > 0 && (
               <p className="text-xs text-amber-500">{data.warnings.join(" ")}</p>
             )}
+
+            <HoldingEquityChangeChart portfolioId={data.portfolioId} />
 
             <Card>
               <CardHeader>

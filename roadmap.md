@@ -54,3 +54,4 @@
 
 - [x] Reconcile the Monday 2026-09-07 live decision cycles (opened, filled, closed orders)
 - [x] Portfolio page per-symbol real-money row (invested, current value, billed/estimated charges, all-in P&L)
+- [x] Real-cash Portfolio page per-holding percentage performance chart
