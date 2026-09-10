@@ -135,9 +135,10 @@ export const getNextBestTradeHistory = createServerFn({ method: "POST" })
 
     const fills: SuggestionFill[] = [];
     for (const f of fillRes.data ?? []) {
-      const symbol = String(f.symbol ?? "");
+      const raw = String(f.symbol ?? "");
+      const symbol = bySymbolKey.get(engineSymbolKey(raw)) ?? raw;
       const quantity = Number(f.quantity ?? 0);
-      const price = normalizeMarketPriceForTrading(symbol, Number(f.fill_price ?? 0));
+      const price = normalizeMarketPriceForTrading(raw, Number(f.fill_price ?? 0));
       if (!symbol || !(quantity > 0) || !(price > 0)) continue;
       const feeCcy = String(f.currency ?? currency).toUpperCase();
       const fee = Math.abs(Number(f.fee ?? 0)) || 0;
