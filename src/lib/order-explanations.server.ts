@@ -195,7 +195,7 @@ export async function runExplainOrder(
   if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
   const gateway = createLovableAiGatewayProvider(key);
-  const model = "google/gemini-3.6-flash";
+  const model = "google/gemini-3.1-flash-lite" // plain-English narration only, no trading decision — cheapest tier is enough;
 
   const { text } = await generateText({
     model: gateway(model),

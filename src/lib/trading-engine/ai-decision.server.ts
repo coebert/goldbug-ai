@@ -161,7 +161,7 @@ ${r.transitioned ? "Because the regime just shifted, explicitly reassess existin
   const cryptoBlock = classAllowed("crypto") ? CRYPTO_PLAYBOOK : "";
 
 
-  const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
+  const systemStatic = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no naked shorting, no leverage, no CFDs, no options.
 - Bearish exposure is allowed ONLY through the SHORT SLEEVE below: buy one of the listed cash-funded inverse ETFs. Selling an unheld stock is rejected and never creates a short.
@@ -181,7 +181,38 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 
 ${tradingStylePrompt(cfg)}
 
-${buildTradingCostBlock({
+${HISTORICAL_PLAYBOOK}
+
+${HEDGE_FUND_PLAYBOOK}
+
+${commodityBlock}
+
+${cryptoBlock}
+
+${buildDiversificationTiltBlock({ tilt: cfg.diversification_tilt, cfg })}
+
+
+COMPANY FINANCIALS — MANDATORY REVIEW BEFORE ANY EQUITY BUY:
+- The "fund" block on each candidate row carries that company's publicly disclosed financial position: reported margins and returns on capital, revenue and earnings growth, balance-sheet gearing, liquidity and free cash flow, valuation multiples, dividend cover, short interest, published analyst consensus and the next scheduled results date.
+- Never buy a stock on price action, momentum or headlines alone. Read its financials first and say in your rationale what the numbers show — cite at least one concrete figure (e.g. P/E, net margin, revenue growth, debt/equity, free cash flow) for every equity buy.
+- Treat listed RISK items as disclosed facts, not opinions. Loss-making, negative free cash flow, leverage above 2x debt/equity, uncovered dividends or a current ratio below 0.8 each require an explicit, stated reason to buy anyway, and should reduce the size you take.
+- Where fundamentals contradict the technical/sentiment signal, prefer the financials for holding-period decisions and the technicals only for timing.
+- A stretched valuation (very high P/E, PEG or EV/EBITDA versus growth) is a reason to size down or wait, not a reason to chase.
+- "cov" tells you how much the company has disclosed. Low coverage or "-" means unknown, NOT good: do not treat missing financials as clean financials, and prefer names where the numbers are visible.
+- With results due within 5 days ("nxt_results" / "results due" flag), avoid initiating a new position unless the thesis is explicitly event-driven.
+- ETFs, commodities, FX and crypto have no company accounts; "fund -" is expected there and is not a negative.
+
+Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
+Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
+${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;
+
+  // Everything above this line is byte-identical from tick to tick for a given
+  // portfolio, so the provider can serve it from its prompt cache at ~10% of
+  // the input price. Everything that changes hour to hour (quotes, regime,
+  // learning, live blocks) goes AFTER it — putting a single volatile figure
+  // near the top would invalidate the whole cached prefix and cost full price
+  // on ~7k tokens every call. Content is unchanged; only the order differs.
+  const liveContext = `${buildTradingCostBlock({
   currency: args.portfolio.currency,
   stampExemptPreference: cfg.stamp_exempt_preference,
   measuredRoundTripBps: args.measuredRoundTripBps ?? null,
@@ -189,7 +220,6 @@ ${buildTradingCostBlock({
   costProvenance: args.costProvenance ?? null,
   reserveRules: args.reserveRules ?? null,
 })}
-
 
 ${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
 
@@ -226,37 +256,13 @@ ${args.riskProfileBlock ?? ""}
 
 ${args.modelBlock ?? ""}
 
-
-
-
-${HISTORICAL_PLAYBOOK}
-
-${HEDGE_FUND_PLAYBOOK}
-
-${commodityBlock}
-
-${cryptoBlock}
-
 ${args.cryptoSignalsBlock ?? ""}
 
-${args.fxSystemBlock ?? ""}
+${args.fxSystemBlock ?? ""}`;
 
-${buildDiversificationTiltBlock({ tilt: cfg.diversification_tilt, cfg })}
+  const system = `${systemStatic}
 
-
-COMPANY FINANCIALS — MANDATORY REVIEW BEFORE ANY EQUITY BUY:
-- The "fund" block on each candidate row carries that company's publicly disclosed financial position: reported margins and returns on capital, revenue and earnings growth, balance-sheet gearing, liquidity and free cash flow, valuation multiples, dividend cover, short interest, published analyst consensus and the next scheduled results date.
-- Never buy a stock on price action, momentum or headlines alone. Read its financials first and say in your rationale what the numbers show — cite at least one concrete figure (e.g. P/E, net margin, revenue growth, debt/equity, free cash flow) for every equity buy.
-- Treat listed RISK items as disclosed facts, not opinions. Loss-making, negative free cash flow, leverage above 2x debt/equity, uncovered dividends or a current ratio below 0.8 each require an explicit, stated reason to buy anyway, and should reduce the size you take.
-- Where fundamentals contradict the technical/sentiment signal, prefer the financials for holding-period decisions and the technicals only for timing.
-- A stretched valuation (very high P/E, PEG or EV/EBITDA versus growth) is a reason to size down or wait, not a reason to chase.
-- "cov" tells you how much the company has disclosed. Low coverage or "-" means unknown, NOT good: do not treat missing financials as clean financials, and prefer names where the numbers are visible.
-- With results due within 5 days ("nxt_results" / "results due" flag), avoid initiating a new position unless the thesis is explicitly event-driven.
-- ETFs, commodities, FX and crypto have no company accounts; "fund -" is expected there and is not a negative.
-
-Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
-Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
-${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;
+${liveContext}`;
 
 
 

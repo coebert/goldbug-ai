@@ -13,7 +13,7 @@ import {
   type ChartEvent,
 } from "./chart-annotations";
 
-const MODEL = "google/gemini-3.6-flash";
+const MODEL = "google/gemini-3.1-flash-lite" // plain-English narration only, no trading decision — cheapest tier is enough;
 
 export async function explainChartEvents(args: {
   label: string;
