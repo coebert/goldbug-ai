@@ -181,54 +181,6 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 
 ${tradingStylePrompt(cfg)}
 
-${buildTradingCostBlock({
-  currency: args.portfolio.currency,
-  stampExemptPreference: cfg.stamp_exempt_preference,
-  measuredRoundTripBps: args.measuredRoundTripBps ?? null,
-  symbolCosts: args.symbolCosts ?? null,
-  costProvenance: args.costProvenance ?? null,
-  reserveRules: args.reserveRules ?? null,
-})}
-
-
-${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
-
-${regimeBlock}
-
-${args.crossAsset}
-
-${args.optionsBlock}
-
-${args.crossSectional}
-
-${args.marketEvents ?? ""}
-
-${eventsBlock}
-${coolingBlock}
-
-${formatLearningBlock(args.learning)}
-
-${args.attribution ?? ""}
-${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
-${args.calibrationBlock ?? ""}
-${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
-${args.alphaPriors ?? ""}
-${args.algoRegimeBlock ?? ""}
-${args.sectorCycleBlock ?? ""}
-
-${args.cashPolicyBlock ?? ""}
-
-${args.shortSleeveBlock ?? ""}
-
-${args.playbookBlock ?? ""}
-
-${args.riskProfileBlock ?? ""}
-
-${args.modelBlock ?? ""}
-
-
-
-
 ${HISTORICAL_PLAYBOOK}
 
 ${HEDGE_FUND_PLAYBOOK}
@@ -236,10 +188,6 @@ ${HEDGE_FUND_PLAYBOOK}
 ${commodityBlock}
 
 ${cryptoBlock}
-
-${args.cryptoSignalsBlock ?? ""}
-
-${args.fxSystemBlock ?? ""}
 
 ${buildDiversificationTiltBlock({ tilt: cfg.diversification_tilt, cfg })}
 
