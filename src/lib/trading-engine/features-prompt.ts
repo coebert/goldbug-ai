@@ -126,28 +126,29 @@ function fundamentalsCell(f: AnyFeature, full = true): string {
     );
   }
   if (d) {
+    // One ratio per question the buy rules actually ask: what am I paying
+    // (pe, fpe, mcap), does it earn (nm, roe), is it growing (revg, eps+1y),
+    // can it pay its debts (de, cr, fcf), what does the market think (dy,
+    // beta, shrt, rec, tgt) and when do the next numbers land. Derived
+    // duplicates (peg, pb, ev/ebitda, gross and operating margin, roa,
+    // trailing eps growth, next-quarter eps, payout, absolute cash and debt)
+    // were dropped: the model re-derives them from these when it needs them,
+    // and they cost roughly 40% of every fundamentals block.
     parts.push(
-      `pe:${n(d["trailing_pe"], 1)} fpe:${n(d["forward_pe"], 1)} peg:${n(
-        d["peg"],
-        2,
-      )} pb:${n(d["price_to_book"], 1)} ev/eb:${n(d["ev_ebitda"], 1)} mcap:${compactCount(
+      `pe:${n(d["trailing_pe"], 1)} fpe:${n(d["forward_pe"], 1)} mcap:${compactCount(
         d["market_cap"],
       )}`,
-      `gm:${n(d["gross_margin"], 3)} om:${n(d["operating_margin"], 3)} nm:${n(
-        d["profit_margin"],
-        3,
-      )} roe:${n(d["return_on_equity"], 3)} roa:${n(d["return_on_assets"], 3)}`,
-      `revg:${n(d["revenue_growth"], 3)} epsg:${n(d["earnings_growth"], 3)} eps+1q:${n(
-        d["eps_growth_next_q"],
+      `nm:${n(d["profit_margin"], 3)} roe:${n(d["return_on_equity"], 3)} revg:${n(
+        d["revenue_growth"],
         3,
       )} eps+1y:${n(d["eps_growth_next_y"], 3)}`,
       `de:${n(d["debt_to_equity"], 1)} cr:${n(d["current_ratio"], 2)} fcf:${compactCount(
         d["free_cashflow"],
-      )} cash:${compactCount(d["total_cash"])} debt:${compactCount(d["total_debt"])}`,
-      `dy:${n(d["dividend_yield"], 4)} pay:${n(d["payout_ratio"], 2)} beta:${n(
-        d["beta"],
-        2,
-      )} shrt:${n(d["short_percent_float"], 3)}`,
+      )}`,
+      `dy:${n(d["dividend_yield"], 4)} beta:${n(d["beta"], 2)} shrt:${n(
+        d["short_percent_float"],
+        3,
+      )}`,
       `rec:${n(d["analyst_mean"], 2)}/${Number(d["analyst_count"] ?? 0)} tgt:${n(
         d["target_mean_price"],
         2,
