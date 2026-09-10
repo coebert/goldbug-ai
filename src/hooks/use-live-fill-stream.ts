@@ -1,6 +1,6 @@
 // Streams broker fill/order changes for one portfolio so P&L views can refresh
 // the moment a real trade fills, instead of waiting for the next poll.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type LiveFillStream = {
@@ -24,6 +24,10 @@ export function useLiveFillStream(
   const [events, setEvents] = useState(0);
   const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
   const [connected, setConnected] = useState(false);
+  // Each subscriber gets its own channel name: Supabase rejects extra
+  // postgres_changes bindings on a channel that has already subscribed, so a
+  // shared name breaks whichever panel mounts second.
+  const instanceId = useId();
   const cb = useRef(onChange);
   cb.current = onChange;
 
@@ -41,7 +45,7 @@ export function useLiveFillStream(
     };
 
     const channel = supabase
-      .channel(`pnl-live-${portfolioId}`)
+      .channel(`pnl-live-${portfolioId}-${instanceId}`)
       .on(
         "postgres_changes",
         {
@@ -69,7 +73,7 @@ export function useLiveFillStream(
       setConnected(false);
       supabase.removeChannel(channel);
     };
-  }, [portfolioId, debounceMs]);
+  }, [portfolioId, debounceMs, instanceId]);
 
   return { events, lastEventAt, connected };
 }
