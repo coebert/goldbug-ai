@@ -333,6 +333,12 @@ Follow the OUTPUT CONTRACT in your instructions.`;
 - fx_conversions (LEGACY, discouraged unless no intent kind fits): array of { from_ccy, to_ccy, amount_percent (1..100 of the from-currency balance), reason }. Prefer fx_intents. Omit both if no FX action is warranted.
 If no action is warranted, return an empty orders array.`;
 
+  const system = `${systemStatic}
+
+${outputContract}
+
+${liveContext}`;
+
 
   // No artificial timeout: the gateway routinely needs 30-90s for a decision
   // of this size, and a client-side abort throws away work that still bills.
