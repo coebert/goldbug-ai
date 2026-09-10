@@ -517,7 +517,9 @@ export function planAdmissions(
       decisions.push({
         kind: "skip",
         candidate: c,
-        reason: `daily buy-ticket cap reached (${cfg.maxBuysPerDay}/day, ${cfg.buysAlreadyToday} already routed)`,
+        reason:
+          `daily buy-ticket cap reached (${buyCap.cap}/day, ${cfg.buysAlreadyToday} already routed)` +
+          (buyCap.reason ? ` — already lifted: ${buyCap.reason}` : ""),
       });
       continue;
     }
