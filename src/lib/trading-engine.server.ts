@@ -2955,7 +2955,7 @@ export async function runDailyTick(
           continue;
         }
       }
-      workingCash -= outcome.effectiveSpend;
+      workingCash -= effectiveSpend;
       if (isNewPosition) newPositions += 1;
       const cur = holdingsByS.get(meta.symbol);
       if (cur) {
@@ -2984,25 +2984,25 @@ export async function runDailyTick(
       }
       classExposure.set(
         meta.asset_class,
-        (classExposure.get(meta.asset_class) ?? 0) + outcome.effectiveSpend,
+        (classExposure.get(meta.asset_class) ?? 0) + effectiveSpend,
       );
       if (commodityGroupKey) {
         commodityGroupExposure.set(
           commodityGroupKey,
-          (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
+          (commodityGroupExposure.get(commodityGroupKey) ?? 0) + effectiveSpend,
         );
       }
       if (buyCcy !== portfolioBaseCcy) {
         currencyExposure.set(
           buyCcy,
-          (currencyExposure.get(buyCcy) ?? 0) + outcome.effectiveSpend,
+          (currencyExposure.get(buyCcy) ?? 0) + effectiveSpend,
         );
       }
 
       // Phase 6 — slice plan telemetry (attached to executed row).
       const slicePlan = cfg.execution_slicing_enabled
         ? planOrderSlices({
-            parentNotional: outcome.effectiveSpend,
+            parentNotional: effectiveSpend,
             price: fillPrice,
             adv20d: featExec?.adv_20d ?? null,
             participationCap: cfg.execution_participation_cap,
@@ -3018,7 +3018,7 @@ export async function runDailyTick(
         side: "buy",
         quantity: qty,
         price: fillPrice,
-        value: outcome.effectiveSpend,
+        value: effectiveSpend,
         // Conviction + sector travel with the order so the cost governor can
         // rank scarce friction budget by expected edge, and the sector budget
         // can cap concentration, without re-deriving signals downstream.
