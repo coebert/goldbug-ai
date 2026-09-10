@@ -163,9 +163,11 @@ export const VIOLENT_CADENCE_FLOOR = 0.5;
 /**
  * The window budget can never be smaller than this many typical tickets'
  * friction. On a £10k book 40bps is ~£40 — less than four UK tickets — so a
- * single de-risking sequence exhausts a whole month of buying.
+ * single de-risking sequence exhausts a whole month of buying. Raised to six
+ * after the Sep 2026 review: 127 of 440 skipped decisions were fee-guard
+ * blocks, and a book that cannot enter cannot earn back its costs.
  */
-export const MIN_BUDGET_TICKETS = 3;
+export const MIN_BUDGET_TICKETS = 6;
 
 export type ReserveCap = {
   /** Reserve tickets allowed on this tick after the adaptive cap. */
