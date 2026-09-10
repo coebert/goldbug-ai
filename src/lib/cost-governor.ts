@@ -407,7 +407,10 @@ export function planAdmissions(
   // Single-name concentration. Tracked as we admit so two tickets in the same
   // name inside one tick cannot jointly breach the cap.
   const maxPositionPct = Math.max(0, cfg.maxPositionPctOfNav ?? DEFAULT_MAX_POSITION_PCT_OF_NAV);
-  const positionCap = Math.max(0, cfg.navBase) * maxPositionPct;
+  const maxDiversifiedPct = Math.max(
+    maxPositionPct,
+    cfg.maxDiversifiedPositionPctOfNav ?? DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
+  );
   const exposure = new Map<string, number>();
   for (const [k, v] of Object.entries(cfg.positionExposureBase ?? {})) {
     const n = Number(v);
