@@ -55,3 +55,5 @@
 - [x] Reconcile the Monday 2026-09-07 live decision cycles (opened, filled, closed orders)
 - [x] Portfolio page per-symbol real-money row (invested, current value, billed/estimated charges, all-in P&L)
 - [x] Real-cash Portfolio page per-holding percentage performance chart
+- [ ] Decide on the stale GBPUSD funding leg (-4,990.79 @ 1.3556, opened 21 Aug): close, leave, or auto-close on loss budget
+- [x] Cut hourly AI cost further: fewer ratios in the candidate rows, simpler prompt wording
