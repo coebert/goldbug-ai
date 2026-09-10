@@ -181,7 +181,7 @@ export async function generateRunExplanation(input: RunExplanationInput): Promis
 
   try {
     const gateway = createLovableAiGatewayProvider(key);
-    const model = "google/gemini-3.6-flash";
+    const model = "google/gemini-3.1-flash-lite" // plain-English narration only, no trading decision — cheapest tier is enough;
     const { text } = await generateText({
       model: gateway(model),
       prompt: buildPrompt(input, category, fallback),
