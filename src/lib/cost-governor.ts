@@ -103,6 +103,12 @@ export type GovernorConfig = {
    */
   maxPositionPctOfNav?: number;
   /**
+   * Cap for candidates flagged `diversifiedFund`. Defaults to
+   * `DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV`; never below the
+   * single-name cap.
+   */
+  maxDiversifiedPositionPctOfNav?: number;
+  /**
    * Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
    * single stocks when signal strength is comparable. "off" ranks on the cost
    * model alone; "balanced"/"strong" re-count part of the 50bps stamp charge
