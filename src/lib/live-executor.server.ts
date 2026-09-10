@@ -1793,6 +1793,17 @@ export async function routeOrdersToBroker(params: {
   });
 
 
+  // Per-currency spend ledger for the fee-viable size-up. Starts from the
+  // reconciled wallet (or the account balance for the base currency) and is
+  // debited as each buy is routed, so an uplift can never spend cash twice.
+  const { planViableSizeUp } = await import("./viable-size-up");
+  const spendLedger = new Map<string, number>();
+  for (const [ccy, amt] of Object.entries(cashByCcyAdjusted ?? {})) {
+    spendLedger.set(ccy.toUpperCase(), Math.max(0, Number(amt) || 0));
+  }
+  if (!spendLedger.has(portfolioCurrency) && brokerCashAvailable != null) {
+    spendLedger.set(portfolioCurrency, Math.max(0, brokerCashAvailable));
+  }
 
   for (const order of routable) {
     // Pre-placement affordability trim: buys that don't fit the freshly
