@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
+import { getFxLegHygiene } from "@/lib/fx-leg-hygiene.functions";
 import { closeFxLeg } from "@/lib/fx-leg-close.functions";
 
 
