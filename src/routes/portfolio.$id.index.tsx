@@ -210,6 +210,11 @@ const TradeImpactPanel = lazy(() =>
     default: m.TradeImpactPanel,
   })),
 );
+const TradeCostBreakdownCard = lazy(() =>
+  import("@/components/trade-cost-breakdown-card").then((m) => ({
+    default: m.TradeCostBreakdownCard,
+  })),
+);
 const CostModelGapCard = lazy(() =>
   import("@/components/cost-model-gap-card").then((m) => ({
     default: m.CostModelGapCard,
@@ -1130,6 +1135,13 @@ function PortfolioPage() {
                   <div className="mb-6">
                     <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
                       <TradeImpactPanel portfolioId={id} />
+                    </Suspense>
+                  </div>
+                )}
+                {p.mode === "live_prod" && (
+                  <div className="mb-6">
+                    <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                      <TradeCostBreakdownCard portfolioId={id} />
                     </Suspense>
                   </div>
                 )}
