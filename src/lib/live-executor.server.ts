@@ -1859,6 +1859,7 @@ export async function routeOrdersToBroker(params: {
       price: order.price,
     });
     let sizeUpNote: string | null = null;
+    let sizeUpApplied = false;
     // The idea already passed every merit gate upstream; if the only problem
     // is that the ticket is too small to carry the fee floor, buy enough to
     // make it viable rather than discarding the trade.
@@ -1873,6 +1874,7 @@ export async function routeOrdersToBroker(params: {
       });
       sizeUpNote = plan.note;
       if (plan.applied) {
+        sizeUpApplied = true;
         qty = plan.quantity;
         viability = assessTradeViability({
           symbol: order.symbol,
