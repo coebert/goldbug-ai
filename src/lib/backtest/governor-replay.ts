@@ -429,24 +429,57 @@ export function runGovernorReplay(
         }
       }
       if (qty * px < viableFloor) buysBelowViableFloor += 1;
-      const realNotional = qty * px;
-      const costs = priceTicket(
+      let realNotional = qty * px;
+      let costs = priceTicket(
         { symbol: s, side: "buy", quantity: qty, price: px, foreign: foreign.has(s.toUpperCase()) },
         assumptions,
       );
       const strength = slow > 0 ? Math.min(1, Math.max(0, (fast - slow) / slow) * 20) : 0;
       if (gateOn) {
-        const edge = assessNetEdge({
+        const gateInput = {
           symbol: s,
-          side: "buy",
-          quantity: qty,
+          side: "buy" as const,
           price: px,
           conviction: 0.55 + 0.4 * strength,
           atrPct: atrPct(closes, i),
           horizonDays: maxHold,
           safetyMultiple: safety,
           measuredRoundTripBps: floorBps > 0 ? floorBps : null,
-        });
+        };
+        let edge = assessNetEdge({ ...gateInput, quantity: qty });
+
+        // Same rule the live engine uses: a gate failure that names a minimum
+        // viable notional is a sizing problem, so buy up to it when cash and
+        // the position cap allow, then re-price the round trip.
+        if (!edge.pass && sizing === "revised" && Number.isFinite(edge.minViableNotional)) {
+          const up = planViableSizeUp({
+            quantity: qty,
+            price: px,
+            minViableNotional: edge.minViableNotional,
+            spendable: cash,
+            maxNotional: nav * (diversified ? diversifiedCapPct : singleNameCapPct),
+          });
+          if (up.applied) {
+            const retry = assessNetEdge({ ...gateInput, quantity: up.quantity });
+            if (retry.pass) {
+              qty = up.quantity;
+              buysSizedUp += 1;
+              realNotional = qty * px;
+              costs = priceTicket(
+                {
+                  symbol: s,
+                  side: "buy",
+                  quantity: qty,
+                  price: px,
+                  foreign: foreign.has(s.toUpperCase()),
+                },
+                assumptions,
+              );
+              edge = retry;
+            }
+          }
+        }
+
         if (!edge.pass) {
           buysProposed += 1;
           buysBlocked += 1;
