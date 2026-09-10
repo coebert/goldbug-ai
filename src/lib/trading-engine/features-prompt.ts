@@ -84,10 +84,34 @@ function rankCell(f: AnyFeature): string {
  * compact cell so the model sees the company's finances on the same row as its
  * price action, and never decides on technicals alone.
  */
-function fundamentalsCell(f: AnyFeature): string {
+function fundamentalsCell(f: AnyFeature, full = true): string {
   const d = f["fundamentals"] as AnyFeature | null | undefined;
   const s = f["fundamentals_score"] as AnyFeature | null | undefined;
   if (!d && !s) return "-";
+  const riskFlags = Array.isArray((f["fundamentals_score"] as AnyFeature | undefined)?.["flags"])
+    ? ((f["fundamentals_score"] as AnyFeature)["flags"] as unknown[])
+    : [];
+  // Digest form for names outside today's actionable shortlist: the headline
+  // accounts the buy rules actually test (score, coverage, valuation, margin,
+  // growth, gearing, consensus, results date) plus every disclosed red flag.
+  // Costs ~120 characters instead of ~600 and hides no risk item; a name that
+  // moves into the shortlist gets the full block on the next tick.
+  if (!full) {
+    const short = [
+      s ? `sc:${n(s["score"], 2)} cov:${Number(s["coverage"] ?? 0)}/6` : null,
+      d
+        ? `pe:${n(d["trailing_pe"], 1)} nm:${n(d["profit_margin"], 3)} revg:${n(
+            d["revenue_growth"],
+            3,
+          )} de:${n(d["debt_to_equity"], 1)} rec:${n(d["analyst_mean"], 2)} nxt_results:${
+            d["next_earnings_date"] ?? "-"
+          }`
+        : null,
+      riskFlags.length ? `RISK: ${riskFlags.join("; ")}` : null,
+      "(digest — ask for nothing more; treat unknown as unknown)",
+    ].filter(Boolean);
+    return short.join(" ");
+  }
   const parts: string[] = [];
   if (s) {
     const sub = (s["subscores"] as AnyFeature | undefined) ?? {};
