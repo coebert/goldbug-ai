@@ -1123,7 +1123,7 @@ function PortfolioPage() {
                  </div>
                 <div className="mb-6">
                   <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
-                    <NextBestTradeCard portfolioId={id} />
+                    <NextBestTradeCard portfolioId={id} mode={p.mode} />
                   </Suspense>
                 </div>
                 {p.mode === "live_prod" && (

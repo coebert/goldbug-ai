@@ -1,18 +1,34 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Target } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatMoney, formatMoneySigned } from "@/lib/format-money";
 import { getNextBestTrade } from "@/lib/next-best-trade.functions";
+import { placeManualOrder, type ManualOrderResult } from "@/lib/manual-order.functions";
 
 function priceLabel(price: number, currency: string) {
   return formatMoney(price, currency);
 }
 
-export function NextBestTradeCard({ portfolioId }: { portfolioId: string }) {
+export function NextBestTradeCard({
+  portfolioId,
+  mode,
+}: {
+  portfolioId: string;
+  mode?: string;
+}) {
+  const qc = useQueryClient();
+  const isLive = mode === "live_prod" || mode === "live_sim";
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [placed, setPlaced] = useState<ManualOrderResult | null>(null);
   const fetchNext = useServerFn(getNextBestTrade);
+  const placeFn = useServerFn(placeManualOrder);
   const query = useQuery({
     queryKey: ["next-best-trade", portfolioId],
     queryFn: () => fetchNext({ data: { portfolioId } }),
@@ -23,6 +39,38 @@ export function NextBestTradeCard({ portfolioId }: { portfolioId: string }) {
   const data = query.data;
   const top = data?.rows.find((r) => r.recommended) ?? null;
   const others = (data?.rows ?? []).filter((r) => r !== top).slice(0, 4);
+
+  // The suggestion is only useful if it can become a real order: route it
+  // through exactly the same broker path the AI and the order ticket use, so
+  // the buy lands in the live order book and then on the trades list.
+  const place = useMutation({
+    mutationFn: () => {
+      if (!top) throw new Error("No suggestion to place.");
+      return placeFn({
+        data: {
+          portfolioId,
+          symbol: top.symbol,
+          side: "buy" as const,
+          quantity: top.quantity,
+        },
+      });
+    },
+    onSuccess: (r) => {
+      setPlaced(r);
+      if (r.ok) {
+        toast.success(
+          `Buy ${r.quantity} ${r.symbol} sent to the broker${
+            r.brokerOrderId ? ` (order ${r.brokerOrderId})` : ""
+          }`,
+        );
+      } else {
+        toast.error(`Order not placed: ${r.reason ?? r.status}`);
+      }
+      void qc.invalidateQueries();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
 
   return (
     <Card data-testid="next-best-trade-card">
@@ -113,8 +161,42 @@ export function NextBestTradeCard({ portfolioId }: { portfolioId: string }) {
               Expected move {top.expectedMoveBps.toFixed(0)}bps against {top.roundTripBps.toFixed(0)}bps
               of buying and selling costs.
             </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                data-testid="next-best-trade-place"
+                disabled={!isLive || place.isPending}
+                onClick={() => setConfirmOpen(true)}
+              >
+                {place.isPending
+                  ? "Placing…"
+                  : `Buy ${top.quantity} ${top.symbol.split(":")[0]}`}
+              </Button>
+              {!isLive && (
+                <span className="text-xs text-muted-foreground">
+                  This account is not connected to the broker, so the buy cannot be placed here.
+                </span>
+              )}
+            </div>
+
+            {placed && (
+              <div className="mt-3 rounded-md border p-3 text-xs">
+                <p className="font-medium">
+                  Buy {placed.quantity} {placed.symbol} — {placed.status}
+                </p>
+                <p className="text-muted-foreground">
+                  Broker order {placed.brokerOrderId ?? "—"} at{" "}
+                  {formatMoney(placed.price, placed.instrumentCcy)}
+                  {placed.reason ? ` · ${placed.reason}` : ""}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  It appears on your trades list as soon as the broker fills it.
+                </p>
+              </div>
+            )}
           </div>
         )}
+
 
         {data && others.length > 0 && (
           <div className="mt-4 space-y-2">
@@ -147,6 +229,21 @@ export function NextBestTradeCard({ portfolioId }: { portfolioId: string }) {
           </div>
         )}
       </CardContent>
+
+      {top && data && (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title="Place this buy with the broker?"
+          description={`Buy ${top.quantity} ${top.symbol} at about ${priceLabel(top.price, top.currency)} — around ${formatMoney(top.ticketBase, data.currency)} of your cash plus ${formatMoney(top.costBase, data.currency)} of charges. This spends real money.`}
+          confirmLabel="Place buy"
+          onConfirm={() => {
+            setConfirmOpen(false);
+            place.mutate();
+          }}
+        />
+      )}
     </Card>
+
   );
 }
