@@ -21,6 +21,11 @@
 
 import { planAdmissions, governorForNav, type GovernorCandidate } from "../cost-governor";
 import { assessNetEdge } from "../net-edge-gate";
+import { planViableSizeUp } from "../viable-size-up";
+import {
+  isDiversifiedFund,
+  DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
+} from "../diversified-fund";
 import {
   priceTicket,
   resolveAssumptions,
@@ -97,6 +102,28 @@ export type ReplayOptions = {
   edgeSafetyMultiple?: number;
   /** Set false to bypass the net-edge gate entirely. */
   netEdgeGate?: boolean;
+  /**
+   * Sizing policy.
+   *   "legacy"  — the ticket is whatever weight-sizing produced; a notional
+   *               under the fee-viable floor is simply thrown away by the
+   *               governor's minimum-ticket rule, and every name (including
+   *               broad index trackers) sits under the single-name cap.
+   *   "revised" — an under-sized ticket is raised to the fee-viable floor when
+   *               cash and the position cap allow, and broad diversified index
+   *               funds sit under the wider diversified cap.
+   */
+  sizing?: "legacy" | "revised";
+  /** Fee-viable notional floor in base currency for revised sizing (default 250). */
+  viableFloorBase?: number;
+  /** Cap on a single name as a fraction of NAV (default 0.15). */
+  maxPositionPctOfNav?: number;
+  /** Cap for broad diversified funds under revised sizing (default 0.35). */
+  maxDiversifiedPositionPctOfNav?: number;
+  /**
+   * Symbols to treat as broad diversified index funds. Absent = classify with
+   * the shared `isDiversifiedFund` rule on the symbol alone.
+   */
+  diversifiedSymbols?: string[];
 };
 
 export type ReplayTrade = {
@@ -126,6 +153,12 @@ export type ArmOutcome = {
   buysProposed: number;
   buysAdmitted: number;
   buysBlocked: number;
+  /** Sizing policy this arm ran under. */
+  sizing: "legacy" | "revised";
+  /** Tickets raised to the fee-viable floor (revised sizing only). */
+  buysSizedUp: number;
+  /** Tickets skipped because their notional never reached the viable floor. */
+  buysBelowViableFloor: number;
   /** Blocked buys whose forward move would have covered their friction. */
   profitableBlocked: number;
   profitableBlockedPnl: number;
@@ -241,6 +274,20 @@ export function runGovernorReplay(
   const gateOn = opts.netEdgeGate !== false;
   const floorBps = Math.max(0, opts.netEdgeFloorBps ?? 0);
   const safety = opts.edgeSafetyMultiple ?? 1.5;
+  const sizing = opts.sizing ?? "legacy";
+  const viableFloor = Math.max(0, opts.viableFloorBase ?? 250);
+  const singleNameCapPct = opts.maxPositionPctOfNav ?? 0.15;
+  const diversifiedCapPct = Math.max(
+    singleNameCapPct,
+    opts.maxDiversifiedPositionPctOfNav ?? DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
+  );
+  const diversifiedList = opts.diversifiedSymbols
+    ? new Set(opts.diversifiedSymbols.map((s) => s.toUpperCase()))
+    : null;
+  const isDiversified = (s: string) =>
+    diversifiedList
+      ? diversifiedList.has(s.toUpperCase())
+      : isDiversifiedFund({ symbol: s });
 
   const symbols = Array.from(
     new Set(bars.flatMap((b) => Object.keys(b.closes))),
@@ -265,6 +312,8 @@ export function runGovernorReplay(
   let buysProposed = 0;
   let buysAdmitted = 0;
   let buysBlocked = 0;
+  let buysSizedUp = 0;
+  let buysBelowViableFloor = 0;
   let fxLegsAttempted = 0;
   let fxLegsRejected = 0;
   let frictionPaid = 0;
@@ -363,8 +412,23 @@ export function runGovernorReplay(
 
       const notional = Math.min(nav * targetWeight, cash);
       if (!(notional > 0)) continue;
-      const qty = Math.floor(notional / px);
+      let qty = Math.floor(notional / px);
       if (qty <= 0) continue;
+      const diversified = isDiversified(s);
+      if (sizing === "revised") {
+        const up = planViableSizeUp({
+          quantity: qty,
+          price: px,
+          minViableNotional: viableFloor,
+          spendable: cash,
+          maxNotional: nav * (diversified ? diversifiedCapPct : singleNameCapPct),
+        });
+        if (up.applied) {
+          qty = up.quantity;
+          buysSizedUp += 1;
+        }
+      }
+      if (qty * px < viableFloor) buysBelowViableFloor += 1;
       const realNotional = qty * px;
       const costs = priceTicket(
         { symbol: s, side: "buy", quantity: qty, price: px, foreign: foreign.has(s.toUpperCase()) },
@@ -406,6 +470,8 @@ export function runGovernorReplay(
         estCostBase: (costs.roundTripBps / 10_000) * realNotional,
         edgeScore: 0.55 + 0.4 * strength,
         expectedMovePct: 0.04,
+        // Only the revised policy widens the cap for broad index trackers.
+        diversifiedFund: sizing === "revised" ? diversified : false,
       });
       meta.set(s, { qty, price: px });
     }
@@ -445,6 +511,8 @@ export function runGovernorReplay(
       lastBuyDaysAgo,
       positionExposureBase,
       ...governorForNav(nav),
+      maxPositionPctOfNav: singleNameCapPct,
+      maxDiversifiedPositionPctOfNav: sizing === "revised" ? diversifiedCapPct : singleNameCapPct,
       highEdgeReserveTickets: arm === "revised" ? 1 : 0,
     });
 
@@ -556,6 +624,9 @@ export function runGovernorReplay(
     buysProposed,
     buysAdmitted,
     buysBlocked,
+    sizing,
+    buysSizedUp,
+    buysBelowViableFloor,
     profitableBlocked: profitable.length,
     profitableBlockedPnl: profitable.reduce((a, b) => a + b.forwardNetPnl, 0),
     fxLegsAttempted,
@@ -612,6 +683,62 @@ export function governorReplayReport(cmp: GovernorReplayComparison): string {
     ].join(" ");
   return [
     "arm         return  maxDD   admitted  blocked  profBlkd  missedPnL  fxRej/att  idle   1stBuy  friction   bps/eq",
+    row(cmp.legacy),
+    row(cmp.revised),
+    `verdict: ${cmp.verdict}`,
+  ].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Sizing comparison (plan stage D).
+//
+// Both arms run the REVISED governor (decaying friction bucket + reserve) and
+// identical signals, cash and fills. The only difference is the sizing policy:
+// whether an under-sized ticket is raised to the fee-viable floor and whether
+// broad index trackers get the wider position cap. That isolates the effect of
+// the sizing changes from the cost-governor changes already proven.
+// ---------------------------------------------------------------------------
+
+export type SizingComparison = {
+  legacy: ArmOutcome;
+  revised: ArmOutcome;
+  verdict: "revised_sizing_better" | "no_material_difference" | "revised_sizing_worse";
+};
+
+export function compareSizingArms(
+  bars: ReplayBar[],
+  opts: ReplayOptions = {},
+): SizingComparison {
+  const legacy = runGovernorReplay(bars, "revised", { ...opts, sizing: "legacy" });
+  const revised = runGovernorReplay(bars, "revised", { ...opts, sizing: "revised" });
+  const delta = revised.totalReturnPct - legacy.totalReturnPct;
+  const ddWorse = revised.maxDrawdownPct > legacy.maxDrawdownPct + 2;
+  const verdict =
+    delta > 0.25 && !ddWorse
+      ? "revised_sizing_better"
+      : delta < -0.25 || ddWorse
+        ? "revised_sizing_worse"
+        : "no_material_difference";
+  return { legacy, revised, verdict };
+}
+
+export function sizingReplayReport(cmp: SizingComparison): string {
+  const row = (o: ArmOutcome) =>
+    [
+      o.sizing.padEnd(8),
+      `${o.totalReturnPct.toFixed(2)}%`.padStart(9),
+      `${o.maxDrawdownPct.toFixed(2)}%`.padStart(9),
+      String(o.buysAdmitted).padStart(8),
+      String(o.buysBlocked).padStart(8),
+      String(o.buysSizedUp).padStart(8),
+      String(o.buysBelowViableFloor).padStart(9),
+      String(o.trades.length).padStart(7),
+      String(o.longestIdleStreakDays).padStart(6),
+      `£${o.frictionPaid.toFixed(0)}`.padStart(9),
+      `${o.frictionBpsOfEquity.toFixed(0)}bps`.padStart(8),
+    ].join(" ");
+  return [
+    "sizing      return  maxDD   admitted  blocked  sizedUp  subFloor  trades  idle   friction   bps/eq",
     row(cmp.legacy),
     row(cmp.revised),
     `verdict: ${cmp.verdict}`,
