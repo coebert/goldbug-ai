@@ -14,6 +14,8 @@ export type HygieneLegInput = {
   quoteCcy: string;
   /** When the leg was opened (ISO). */
   openedAt: string | null;
+  /** Absolute leg size expressed in the currency it bought (quote ccy). */
+  notionalQuote: number;
   /** Absolute leg size expressed in the portfolio base ccy. */
   notionalBase: number;
 };
@@ -74,7 +76,7 @@ export function assessFxLegs(
     const ordered = [...group].sort((a, b) => Math.abs(b.quantity) - Math.abs(a.quantity));
     for (const leg of ordered) {
       // Leg size measured in the currency it bought, so cover is like-for-like.
-      const legSizeQuote = Math.abs(leg.quantity) * impliedRate(leg);
+      const legSizeQuote = Math.abs(leg.notionalQuote);
       const covered = Math.min(remaining, legSizeQuote);
       remaining -= covered;
       const coverRatio = legSizeQuote > 0 ? covered / legSizeQuote : 1;
@@ -101,13 +103,6 @@ export function assessFxLegs(
     }
   }
   return out;
-}
-
-/** Rate implied by the leg's own base/quote sizing (quote per 1 base). */
-function impliedRate(leg: HygieneLegInput): number {
-  // notionalBase is in the portfolio base ccy, which is not necessarily the
-  // pair base, so fall back to 1:1 when we cannot infer a better rate.
-  return 1;
 }
 
 function explain(
