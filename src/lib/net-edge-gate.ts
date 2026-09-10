@@ -103,6 +103,13 @@ export type NetEdgeInput = {
    * figure too.
    */
   measuredRoundTripBps?: number | null;
+  /**
+   * Notional (instrument currency) the measured figure was sampled at. The
+   * measured cost is a ratio dominated by the broker's fixed per-side minimum
+   * on small tickets, so it is re-priced at the size actually being routed
+   * rather than charged flat. Defaults to the viable-ticket floor.
+   */
+  measuredAtNotional?: number | null;
 };
 
 export type NetEdgeAssessment = {
