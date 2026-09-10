@@ -442,14 +442,10 @@ async function loadDailyCandles(
   days: number,
   asOfDate: string,
 ): Promise<Candle[]> {
-  // First try cache
-  const { data: cached } = await supabaseAdmin
-    .from("price_cache")
-    .select("price_date, open, high, low, close, volume")
-    .eq("symbol", symbol)
-    .lte("price_date", asOfDate)
-    .order("price_date", { ascending: false })
-    .limit(days);
+  // First try cache (shared round-trip with every other symbol in this tick)
+  const cached = await readCachedRowsBatched(symbol, days, asOfDate);
+
+
 
 
   const cachedCandles: Candle[] = (cached ?? [])
