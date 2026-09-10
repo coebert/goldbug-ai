@@ -246,6 +246,8 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   type PricedTicket = {
     ticket: Ticket;
     notionalNative: number;
+    /** Notional in major currency units (pence-quoted LSE lines divided by 100). */
+    notionalMajor: number;
     chargeBps: number;
     invoiced: boolean;
     close: number | null;
