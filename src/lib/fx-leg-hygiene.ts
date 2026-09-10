@@ -73,7 +73,9 @@ export function assessFxLegs(
   const out: HygieneAssessment[] = [];
   for (const [ccy, group] of byCcy) {
     let remaining = Math.max(0, Number(exposureByCcy[ccy] ?? 0));
-    const ordered = [...group].sort((a, b) => Math.abs(b.quantity) - Math.abs(a.quantity));
+    const ordered = [...group].sort(
+      (a, b) => Math.abs(b.notionalQuote) - Math.abs(a.notionalQuote),
+    );
     for (const leg of ordered) {
       // Leg size measured in the currency it bought, so cover is like-for-like.
       const legSizeQuote = Math.abs(leg.notionalQuote);
