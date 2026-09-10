@@ -46,6 +46,7 @@ export function FxLegRowsCard({
 }) {
   const quotesFn = useServerFn(getFxLegQuotes);
   const stressFn = useServerFn(getFxStressReport);
+  const hygieneFn = useServerFn(getFxLegHygiene);
   const closeFn = useServerFn(closeFxLeg);
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<FxLegQuote | null>(null);
@@ -60,6 +61,12 @@ export function FxLegRowsCard({
     queryFn: () => stressFn({ data: { portfolioId, years: 20 } }),
     staleTime: 30 * 60_000,
   });
+  const hygiene = useQuery({
+    queryKey: ["fx-leg-hygiene", portfolioId],
+    queryFn: () => hygieneFn({ data: { portfolioId } }),
+    staleTime: 5 * 60_000,
+  });
+  const hygieneBySymbol = new Map((hygiene.data?.legs ?? []).map((l) => [l.symbol, l]));
 
   const closeMutation = useMutation({
     mutationFn: (symbol: string) => closeFn({ data: { portfolioId, symbol } }),
