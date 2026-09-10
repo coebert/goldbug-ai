@@ -307,6 +307,14 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   // trades that cannot pay for themselves.
   const invoicedChargeBps = invoicedNotional > 0 ? invoicedWeighted / invoicedNotional : null;
 
+  // Tickets below the fee-viable floor are ones the app should never have
+  // routed. Letting them set the account's measured cost creates a doom loop:
+  // tiny ticket -> huge measured bps -> higher hurdle -> smaller next ticket.
+  // They stay in the per-symbol figures (that's real money paid) but are kept
+  // out of the account-wide rate whenever viable tickets carry enough weight.
+  let viableNotional = 0;
+  let viableWeighted = 0;
+
   for (const p of priced) {
     const f = p.ticket;
     const key = `${f.symbol}|${f.side}`;
@@ -322,6 +330,10 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
       allCharge.push(chargeBps);
       chargeNotional += p.notionalNative;
       chargeWeighted += chargeBps * p.notionalNative;
+      if (p.notionalMajor >= VIABLE_TICKET_FLOOR_MAJOR) {
+        viableNotional += p.notionalNative;
+        viableWeighted += chargeBps * p.notionalNative;
+      }
     }
 
     if (p.close !== null) {
@@ -340,8 +352,11 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   // Weighted by notional, not per ticket: what this book pays per pound put to
   // work. A handful of £10 test tickets pay enormous rates but move no money,
   // and should not set the hurdle for every future trade.
-  const accountCharge =
-    chargeNotional > 0
+  const useViableOnly =
+    chargeNotional > 0 && viableNotional / chargeNotional >= VIABLE_SAMPLE_MIN_SHARE;
+  const accountCharge = useViableOnly
+    ? viableWeighted / viableNotional
+    : chargeNotional > 0
       ? chargeWeighted / chargeNotional
       : (median(allCharge) ?? DEFAULT_ONE_WAY_COST_BPS);
   // Slippage is two-sided noise around a real average cost; the median keeps a
