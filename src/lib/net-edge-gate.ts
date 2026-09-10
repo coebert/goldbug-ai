@@ -3,6 +3,10 @@ import {
   minViableNotional,
   type TradeCostBreakdown,
 } from "./trade-viability-gate";
+import {
+  minNotionalForMeasuredFloor,
+  scaleMeasuredRoundTripBps,
+} from "./measured-cost-floor";
 
 /**
  * Net-of-cost edge gate.
