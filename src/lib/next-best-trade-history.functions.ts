@@ -86,15 +86,17 @@ export const getNextBestTradeHistory = createServerFn({ method: "POST" })
       }
     }
 
-    const { convertAmount } = await import("./fx.server");
+    const { getFxRate } = await import("./fx.server");
     const fxCache = new Map<string, number>();
     const rateToBase = async (from: string): Promise<number> => {
       const code = from.toUpperCase();
       if (code === currency) return 1;
       const cached = fxCache.get(code);
       if (cached != null) return cached;
-      const converted = await convertAmount(1, code, currency).catch(() => 1);
-      const safe = Number.isFinite(converted) && converted > 0 ? converted : 1;
+      const rate = await getFxRate(code, currency)
+        .then((r) => Number(r.rate))
+        .catch(() => NaN);
+      const safe = Number.isFinite(rate) && rate > 0 ? rate : 1;
       fxCache.set(code, safe);
       return safe;
     };
