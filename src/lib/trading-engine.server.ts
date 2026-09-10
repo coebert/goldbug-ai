@@ -1886,8 +1886,73 @@ export async function runDailyTick(
     currencyExposure.set(ccy, (currencyExposure.get(ccy) ?? 0) + price * Number(h.quantity));
   }
 
-
-
+  // ---- Core allocation -------------------------------------------------
+  // Idle cash is this account's biggest measured profit leak. If the owner has
+  // set a core target in Risk controls, top the core holding up (or trim it)
+  // BEFORE the AI's own orders are sized, so the deterministic baseline gets
+  // first call on cash and then runs through every normal gate below.
+  try {
+    const { loadCoreAllocationSettings } = await import("./trading-controls.server");
+    const coreCfg = await loadCoreAllocationSettings();
+    if (coreCfg.targetPct > 0) {
+      const { planCoreAllocation } = await import("./core-allocation");
+      const { engineSymbolKey } = await import("./price-symbol");
+      const coreKey = engineSymbolKey(coreCfg.symbol);
+      const coreHoldings = (holdings ?? []).filter(
+        (h) => engineSymbolKey(String(h.symbol)) === coreKey,
+      );
+      const coreValue = coreHoldings.reduce(
+        (s, h) => s + holdingLivePrice(priceMap, h) * Number(h.quantity),
+        0,
+      );
+      let corePrice = holdingPriceBySymbol(priceMap, coreCfg.symbol);
+      if (corePrice == null) {
+        const extra = await currentPrices([coreCfg.symbol], asOf).catch(() => new Map<string, number>());
+        for (const [k, v] of extra) if (!priceMap.has(k)) priceMap.set(k, v);
+        corePrice = holdingPriceBySymbol(priceMap, coreCfg.symbol);
+      }
+      // Already-proposed core orders win: never double up on the same symbol.
+      const coreAlreadyOrdered = decision.orders.some(
+        (o) => engineSymbolKey(o.symbol) === coreKey,
+      );
+      if (corePrice != null && !coreAlreadyOrdered) {
+        const plan = planCoreAllocation({
+          nav: totalValue,
+          coreValue,
+          cash,
+          // Keep one full minimum ticket of cash back for the trading sleeve.
+          cashReserve: Math.max(0, totalValue * 0.02) + 250,
+          price: corePrice,
+          targetPct: coreCfg.targetPct,
+          bandPct: coreCfg.bandPct,
+          minTicket: 250,
+        });
+        if (plan.action !== "hold" && plan.quantity > 0) {
+          const symbolForOrder = coreHoldings[0]?.symbol ?? coreCfg.symbol;
+          const coreQty = coreHoldings.reduce((s, h) => s + Number(h.quantity), 0);
+          // Buys are sized as a share of NAV; sells as a share of the holding.
+          const percent = plan.action === "buy"
+            ? (totalValue > 0 ? Math.min(100, (plan.notional / totalValue) * 100) : 0)
+            : (coreQty > 0 ? Math.min(100, (plan.quantity / coreQty) * 100) : 0);
+          if (percent > 0) {
+            decision.orders.push({
+              symbol: symbolForOrder,
+              side: plan.action === "buy" ? "buy" : "sell",
+              percent,
+              conviction: 0.7,
+              reason: plan.reason,
+              signal_weights: {
+                sma_trend: 0, rsi: 0, price_change: 0, news_sentiment: 0, volatility: 0,
+              },
+            });
+            srvLog.info(`[core-allocation] ${plan.action} ${plan.quantity} ${symbolForOrder}: ${plan.reason}`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    srvLog.warn("core allocation skipped", e);
+  }
 
 
   // Build correlation map covering current holdings + candidate buys

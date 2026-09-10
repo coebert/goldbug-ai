@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
+import { getFxLegHygiene } from "@/lib/fx-leg-hygiene.functions";
 import { closeFxLeg } from "@/lib/fx-leg-close.functions";
 
 
@@ -45,6 +46,7 @@ export function FxLegRowsCard({
 }) {
   const quotesFn = useServerFn(getFxLegQuotes);
   const stressFn = useServerFn(getFxStressReport);
+  const hygieneFn = useServerFn(getFxLegHygiene);
   const closeFn = useServerFn(closeFxLeg);
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<FxLegQuote | null>(null);
@@ -59,6 +61,12 @@ export function FxLegRowsCard({
     queryFn: () => stressFn({ data: { portfolioId, years: 20 } }),
     staleTime: 30 * 60_000,
   });
+  const hygiene = useQuery({
+    queryKey: ["fx-leg-hygiene", portfolioId],
+    queryFn: () => hygieneFn({ data: { portfolioId } }),
+    staleTime: 5 * 60_000,
+  });
+  const hygieneBySymbol = new Map((hygiene.data?.legs ?? []).map((l) => [l.symbol, l]));
 
   const closeMutation = useMutation({
     mutationFn: (symbol: string) => closeFn({ data: { portfolioId, symbol } }),
@@ -149,6 +157,16 @@ export function FxLegRowsCard({
                           <Badge variant="outline" className="ml-1 text-[10px]">
                             stale
                           </Badge>
+                        )}
+                        {hygieneBySymbol.get(l.symbol)?.recommendClose && (
+                          <Badge variant="destructive" className="ml-1 text-[10px]">
+                            close suggested
+                          </Badge>
+                        )}
+                        {hygieneBySymbol.get(l.symbol) && (
+                          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                            {hygieneBySymbol.get(l.symbol)!.reason}
+                          </p>
                         )}
                       </td>
                       <td className="py-1.5 pr-2 text-right tabular-nums">{l.avgCost.toFixed(4)}</td>
