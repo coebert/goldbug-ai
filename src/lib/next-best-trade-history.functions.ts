@@ -70,20 +70,28 @@ export const getNextBestTradeHistory = createServerFn({ method: "POST" })
 
     const symbols = Array.from(new Set(suggestionRows.map((r) => String(r.symbol))));
 
+    // Suggestions are keyed broker-native ("NVDA:xnas") while prices and fills
+    // may use the universe form ("NVDA"). Match on the canonical key.
+    const bySymbolKey = new Map<string, string>();
+    for (const s of symbols) bySymbolKey.set(engineSymbolKey(s), s);
+    const lookupSymbols = Array.from(
+      new Set(symbols.flatMap((s) => priceSymbolVariants(s).concat(s.toUpperCase()))),
+    );
+
     // Latest close per suggested name; a handful of rows each covers weekends.
     const priceMap: Record<string, number> = {};
     const { data: priceRows } = await db
       .from("price_cache")
       .select("symbol, close, price_date")
-      .in("symbol", symbols)
+      .in("symbol", lookupSymbols)
       .order("price_date", { ascending: false })
-      .limit(symbols.length * 8);
+      .limit(lookupSymbols.length * 8);
     for (const r of priceRows ?? []) {
-      const sym = String(r.symbol);
-      if (priceMap[sym] == null) {
-        const px = normalizeMarketPriceForTrading(sym, Number(r.close));
-        if (px > 0) priceMap[sym] = px;
-      }
+      const raw = String(r.symbol);
+      const key = bySymbolKey.get(engineSymbolKey(raw));
+      if (!key || priceMap[key] != null) continue;
+      const px = normalizeMarketPriceForTrading(raw, Number(r.close));
+      if (px > 0) priceMap[key] = px;
     }
 
     const { getFxRate } = await import("./fx.server");
