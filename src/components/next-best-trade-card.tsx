@@ -161,8 +161,42 @@ export function NextBestTradeCard({
               Expected move {top.expectedMoveBps.toFixed(0)}bps against {top.roundTripBps.toFixed(0)}bps
               of buying and selling costs.
             </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                data-testid="next-best-trade-place"
+                disabled={!isLive || place.isPending}
+                onClick={() => setConfirmOpen(true)}
+              >
+                {place.isPending
+                  ? "Placing…"
+                  : `Buy ${top.quantity} ${top.symbol.split(":")[0]}`}
+              </Button>
+              {!isLive && (
+                <span className="text-xs text-muted-foreground">
+                  This account is not connected to the broker, so the buy cannot be placed here.
+                </span>
+              )}
+            </div>
+
+            {placed && (
+              <div className="mt-3 rounded-md border p-3 text-xs">
+                <p className="font-medium">
+                  Buy {placed.quantity} {placed.symbol} — {placed.status}
+                </p>
+                <p className="text-muted-foreground">
+                  Broker order {placed.brokerOrderId ?? "—"} at{" "}
+                  {formatMoney(placed.price, placed.instrumentCcy)}
+                  {placed.reason ? ` · ${placed.reason}` : ""}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  It appears on your trades list as soon as the broker fills it.
+                </p>
+              </div>
+            )}
           </div>
         )}
+
 
         {data && others.length > 0 && (
           <div className="mt-4 space-y-2">
