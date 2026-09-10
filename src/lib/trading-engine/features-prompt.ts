@@ -189,10 +189,40 @@ const COLUMNS = [
  * prior context — they cost ~120 tokens once, versus ~40 repeated key names
  * on every one of the 20-plus rows.
  */
+/**
+ * How many candidates carry the full published-accounts block. The rest carry
+ * the digest (see fundamentalsCell): every red flag and headline ratio, none of
+ * the long tail. Full blocks go to the names most likely to be traded this
+ * tick — best cross-sectional rank, plus anything with a dated hard catalyst.
+ */
+export const FULL_FUNDAMENTALS_ROWS = 10;
+
+function fullFundamentalsSymbols(features: readonly AnyFeature[]): Set<string> {
+  const scored = features.map((f, i) => {
+    const r = f["rank_info"] as AnyFeature | null | undefined;
+    const pct = Number(r?.["percentile"]);
+    return {
+      symbol: String(f["symbol"] ?? `#${i}`),
+      // Higher is better; unranked names fall back to their input order.
+      score: Number.isFinite(pct) ? pct : 1 - i / Math.max(1, features.length),
+      hard: (f["event_features"] as AnyFeature | null | undefined)?.["hard_catalyst"] === true,
+    };
+  });
+  const out = new Set<string>();
+  for (const s of scored) if (s.hard) out.add(s.symbol);
+  for (const s of [...scored].sort((a, b) => b.score - a.score)) {
+    if (out.size >= FULL_FUNDAMENTALS_ROWS) break;
+    out.add(s.symbol);
+  }
+  return out;
+}
+
 export function formatCandidateTable(features: readonly unknown[]): string {
   if (!Array.isArray(features) || features.length === 0) {
     return "Candidate assets: none passed today's filters.";
   }
+
+  const fullSet = fullFundamentalsSymbols(features as AnyFeature[]);
 
   const rows = (features as AnyFeature[]).map((f) => {
     const cross =
