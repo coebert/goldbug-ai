@@ -563,6 +563,7 @@ export async function routeOrdersToBroker(params: {
       edgeScore?: number;
       expectedMovePct?: number;
       stampLiable?: boolean;
+      diversifiedFund?: boolean;
     }> = [];
     const notionalBySymbol = new Map<string, number>();
     for (const o of routable) {
