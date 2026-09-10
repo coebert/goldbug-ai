@@ -308,8 +308,13 @@ ${args.execPostLessons && args.execPostLessons.length > 0
   ? args.execPostLessons.map((l) => `- ${l}`).join("\n")
   : "- no study on file yet; treat post scores as a tie-breaker only, never as a standalone entry."}
 
-Return:
-- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}, and cross-asset posture).
+Regime today: ${humanRegime(r.regime)}${r.transitioned ? " (transitioned today)" : ""}.
+Follow the OUTPUT CONTRACT in your instructions.`;
+
+  // The output contract never changes between ticks, so it lives in the cached
+  // static prefix rather than in the per-tick user message.
+  const outputContract = `OUTPUT CONTRACT — return:
+- briefing: 2-3 sentences on market context today (name the regime given in the message and the cross-asset posture).
 - rationale: 2-4 sentences explaining today's actions in light of the regime, cross-asset, and priors.
 - orders: array of trades to place today. Each order has:
     symbol (must be from candidate list),
