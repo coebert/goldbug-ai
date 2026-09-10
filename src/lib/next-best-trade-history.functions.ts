@@ -15,6 +15,7 @@ import {
   type SuggestionRecord,
 } from "./next-best-trade-history";
 import { normalizeMarketPriceForTrading } from "./market-price-units";
+import { engineSymbolKey, priceSymbolVariants } from "./price-symbol";
 import { inferSaxoCurrency } from "./saxo-fees";
 
 export type SuggestionHistoryPanel = SuggestionHistory & { currency: string };
