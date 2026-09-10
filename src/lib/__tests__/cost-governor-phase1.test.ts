@@ -59,9 +59,9 @@ describe("edge per cost ranking", () => {
     const cfg = {
       navBase: 10_000,
       buysAlreadyToday: 0,
-      // 20 already spent against a 30 floor (3 x 10 typical ticket) leaves
+      // 50 already spent against a 60 floor (6 x 10 typical ticket) leaves
       // room for exactly one ticket.
-      trailingCostBase: 20,
+      trailingCostBase: 50,
       lastBuyDaysAgo: {},
       ...governorForNav(10_000),
       costBudgetPctOfNav: 0.0015,

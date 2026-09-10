@@ -30,6 +30,7 @@
 // per-symbol last-buy ages, and passes base-currency notionals.
 
 import { engineSymbolKey } from "./price-symbol";
+import { DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV } from "./diversified-fund";
 import {
   edgesComparable,
   stampPreferenceSurcharge,
@@ -62,6 +63,13 @@ export type GovernorCandidate = {
    * lower break-even, which the ranking can be told to prefer.
    */
   stampLiable?: boolean;
+  /**
+   * True when the instrument is a broad diversified index fund. These are not
+   * single-name risk, so they sit under the wider
+   * `maxDiversifiedPositionPctOfNav` cap instead of the single-name cap — a
+   * 15% cap on a £10k book left the account unable to be invested at all.
+   */
+  diversifiedFund?: boolean;
 };
 
 
@@ -95,6 +103,12 @@ export type GovernorConfig = {
    * decision ever having approved it. Default 0.15.
    */
   maxPositionPctOfNav?: number;
+  /**
+   * Cap for candidates flagged `diversifiedFund`. Defaults to
+   * `DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV`; never below the
+   * single-name cap.
+   */
+  maxDiversifiedPositionPctOfNav?: number;
   /**
    * Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
    * single stocks when signal strength is comparable. "off" ranks on the cost
@@ -394,7 +408,10 @@ export function planAdmissions(
   // Single-name concentration. Tracked as we admit so two tickets in the same
   // name inside one tick cannot jointly breach the cap.
   const maxPositionPct = Math.max(0, cfg.maxPositionPctOfNav ?? DEFAULT_MAX_POSITION_PCT_OF_NAV);
-  const positionCap = Math.max(0, cfg.navBase) * maxPositionPct;
+  const maxDiversifiedPct = Math.max(
+    maxPositionPct,
+    cfg.maxDiversifiedPositionPctOfNav ?? DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
+  );
   const exposure = new Map<string, number>();
   for (const [k, v] of Object.entries(cfg.positionExposureBase ?? {})) {
     const n = Number(v);
@@ -417,14 +434,16 @@ export function planAdmissions(
     }
 
     const held = exposure.get(symKey) ?? 0;
+    const capPct = c.diversifiedFund ? maxDiversifiedPct : maxPositionPct;
+    const positionCap = Math.max(0, cfg.navBase) * capPct;
     if (positionCap > 0 && held + c.notionalBase > positionCap) {
       decisions.push({
         kind: "skip",
         candidate: c,
         reason:
-          `single-name cap: ${c.symbol} would reach ` +
+          `${c.diversifiedFund ? "diversified-fund cap" : "single-name cap"}: ${c.symbol} would reach ` +
           `${(((held + c.notionalBase) / Math.max(1, cfg.navBase)) * 100).toFixed(1)}% of NAV, ` +
-          `above the ${(maxPositionPct * 100).toFixed(0)}% limit`,
+          `above the ${(capPct * 100).toFixed(0)}% limit`,
       });
       continue;
     }

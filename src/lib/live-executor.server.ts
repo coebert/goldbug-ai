@@ -442,6 +442,8 @@ export async function routeOrdersToBroker(params: {
     const { planSectorAdmissions, DEFAULT_SECTOR_BUDGET } = await import("./sector-concentration");
     const { resolveChurnPolicy } = await import("./churn-policy");
     const { estimateTradeCosts, attractsStampDuty } = await import("./trade-viability-gate");
+    const { isDiversifiedFund } = await import("./diversified-fund");
+    const { companyName: symbolDisplayName } = await import("./symbol-names");
     const { convertAmount } = await import("./fx.server");
     const { inferSaxoCurrency } = await import("./saxo-fees");
     const { symbolSector } = await import("./sector-rotation.server");
@@ -563,6 +565,7 @@ export async function routeOrdersToBroker(params: {
       edgeScore?: number;
       expectedMovePct?: number;
       stampLiable?: boolean;
+      diversifiedFund?: boolean;
     }> = [];
     const notionalBySymbol = new Map<string, number>();
     for (const o of routable) {
@@ -595,6 +598,13 @@ export async function routeOrdersToBroker(params: {
             o.symbol,
             (o as { asset_class?: string | null }).asset_class ?? null,
           ),
+        // Broad index funds are not single-name risk, so they sit under the
+        // wider concentration cap.
+        diversifiedFund: isDiversifiedFund({
+          symbol: o.symbol,
+          assetClass: (o as { asset_class?: string | null }).asset_class ?? null,
+          name: (o as { name?: string | null }).name ?? symbolDisplayName(o.symbol),
+        }),
       });
     }
 
