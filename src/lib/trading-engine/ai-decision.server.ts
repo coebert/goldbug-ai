@@ -260,9 +260,6 @@ ${args.cryptoSignalsBlock ?? ""}
 
 ${args.fxSystemBlock ?? ""}`;
 
-  const system = `${systemStatic}
-
-${liveContext}`;
 
 
 
