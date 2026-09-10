@@ -22,6 +22,7 @@ const BROAD_FUND_SYMBOLS = new Set([
   "ISF.L", "IWDA.L", "SWDA.L", "CSP1.L", "EQQQ.L", "AGGU.L",
   "SPY", "VOO", "VTI", "IVV", "QQQ", "VT", "VXUS", "SCHB", "ITOT",
   "1321.T", "1306.T", "STW.AX", "IOZ.AX",
+  "EXSA.DE", "EXS1.DE", "VWCE.DE", "MEUD.PA", "IWDA.AS",
 ]);
 
 /** Words that mean the fund re-concentrates risk — never widened. */

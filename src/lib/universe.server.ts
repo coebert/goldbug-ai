@@ -46,6 +46,35 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VMID.L", name: "Vanguard FTSE 250 ETF", asset_class: "etf" },
   { symbol: "VWRL.L", name: "Vanguard FTSE All-World ETF", asset_class: "etf" },
   { symbol: "VUSA.L", name: "Vanguard S&P 500 ETF (LON)", asset_class: "etf" },
+  // Continental Europe — Xetra (.DE), Euronext Paris/Amsterdam (.PA/.AS),
+  // Borsa Italiana (.MI), BME Madrid (.MC) and SIX Swiss (.SW). Saxo routes
+  // all of these natively from a cash account; settlement FX (GBP → EUR/CHF)
+  // is planned by the FX conversion layer. Venue hours live in market-hours.ts.
+  { symbol: "SAP.DE", name: "SAP (XETRA)", asset_class: "stock" },
+  { symbol: "SIE.DE", name: "Siemens (XETRA)", asset_class: "stock" },
+  { symbol: "ALV.DE", name: "Allianz (XETRA)", asset_class: "stock" },
+  { symbol: "MBG.DE", name: "Mercedes-Benz Group (XETRA)", asset_class: "stock" },
+  { symbol: "BAS.DE", name: "BASF (XETRA)", asset_class: "stock" },
+  { symbol: "DTE.DE", name: "Deutsche Telekom (XETRA)", asset_class: "stock" },
+  { symbol: "MC.PA", name: "LVMH (Paris)", asset_class: "stock" },
+  { symbol: "OR.PA", name: "L'Oreal (Paris)", asset_class: "stock" },
+  { symbol: "AIR.PA", name: "Airbus (Paris)", asset_class: "stock" },
+  { symbol: "TTE.PA", name: "TotalEnergies (Paris)", asset_class: "stock" },
+  { symbol: "SAN.PA", name: "Sanofi (Paris)", asset_class: "stock" },
+  { symbol: "ASML.AS", name: "ASML (Amsterdam)", asset_class: "stock" },
+  { symbol: "INGA.AS", name: "ING Groep (Amsterdam)", asset_class: "stock" },
+  { symbol: "ENI.MI", name: "Eni (Milan)", asset_class: "stock" },
+  { symbol: "ISP.MI", name: "Intesa Sanpaolo (Milan)", asset_class: "stock" },
+  { symbol: "ITX.MC", name: "Inditex (Madrid)", asset_class: "stock" },
+  { symbol: "NESN.SW", name: "Nestle (SIX)", asset_class: "stock" },
+  { symbol: "ROG.SW", name: "Roche (SIX)", asset_class: "stock" },
+  { symbol: "NOVN.SW", name: "Novartis (SIX)", asset_class: "stock" },
+  // European broad-index ETFs so EUR cash can be invested without single-name risk.
+  { symbol: "EXSA.DE", name: "iShares STOXX Europe 600 ETF (XETRA)", asset_class: "etf" },
+  { symbol: "EXS1.DE", name: "iShares Core DAX ETF (XETRA)", asset_class: "etf" },
+  { symbol: "VWCE.DE", name: "Vanguard FTSE All-World Acc ETF (XETRA)", asset_class: "etf" },
+  { symbol: "MEUD.PA", name: "Amundi Stoxx Europe 600 ETF (Paris)", asset_class: "etf" },
+  { symbol: "IWDA.AS", name: "iShares Core MSCI World ETF (Amsterdam)", asset_class: "etf" },
   // Short sleeve — cash-funded inverse (-1x) UCITS ETFs. Buying these is how
   // the AI expresses a bearish view without margin or borrowing; see
   // src/lib/short-sleeve.ts for the gross/sleeve caps that govern them.
@@ -138,6 +167,8 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "AUDUSD=X", name: "AUD/USD", asset_class: "fx" },
   { symbol: "GBPAUD=X", name: "GBP/AUD", asset_class: "fx" },
   { symbol: "EURAUD=X", name: "EUR/AUD", asset_class: "fx" },
+  { symbol: "GBPCHF=X", name: "GBP/CHF", asset_class: "fx" },
+  { symbol: "EURCHF=X", name: "EUR/CHF", asset_class: "fx" },
 ];
 
 export function filterUniverse(classes: AssetClass[]): UniverseSymbol[] {
