@@ -2904,11 +2904,11 @@ export async function runDailyTick(
       // themselves. Sells are never gated here.
       {
         const { assessNetEdge } = await import("./net-edge-gate");
+        const { planViableSizeUp } = await import("./viable-size-up");
         const horizonDays = cfg.max_hold_days > 0 ? Math.min(cfg.max_hold_days, 20) : 10;
-        const netEdge = assessNetEdge({
+        const gateInput = {
           symbol: meta.symbol,
-          side: "buy",
-          quantity: qty,
+          side: "buy" as const,
           price: fillPrice,
           assetClass: meta.asset_class,
           conviction: typeof order.conviction === "number" ? order.conviction : null,
@@ -2918,7 +2918,39 @@ export async function runDailyTick(
             symbolRoundTripFloor(meta.symbol, symbolCosts, measuredRoundTripBps) ??
             measuredRoundTripBps,
           safetyMultiple: costHurdleMultiple ?? undefined,
-        });
+        };
+        let netEdge = assessNetEdge({ ...gateInput, quantity: qty });
+
+        // A ticket can fail this gate for two very different reasons: the idea
+        // is too weak, or the ticket is simply too small to carry its own
+        // fixed costs. The second one is a sizing mistake, not a merit one —
+        // buying MORE makes the same idea viable, because commission floors
+        // and the fee minimum are spread over a bigger notional. So when the
+        // gate names a minimum viable notional, try to reach it out of cash
+        // we actually have and room left under this name's position cap, then
+        // re-price the round trip on the bigger ticket.
+        if (!netEdge.pass && Number.isFinite(netEdge.minViableNotional)) {
+          const capRoom = effMaxPosVal > 0 ? Math.max(0, effMaxPosVal - existingVal) : Infinity;
+          const plan = planViableSizeUp({
+            quantity: qty,
+            price: fillPrice,
+            minViableNotional: netEdge.minViableNotional,
+            spendable: Math.min(workingCash, capRoom),
+          });
+          if (plan.applied) {
+            const retry = assessNetEdge({ ...gateInput, quantity: plan.quantity });
+            if (retry.pass) {
+              const addedQty = plan.quantity - qty;
+              qty = plan.quantity;
+              effectiveSpend += addedQty * fillPrice;
+              netEdge = retry;
+              sizingNotes.push(
+                `sized up to £${(qty * fillPrice).toFixed(0)} to clear the cost floor`,
+              );
+            }
+          }
+        }
+
         if (!netEdge.pass) {
           executed.push({
             symbol: meta.symbol,
