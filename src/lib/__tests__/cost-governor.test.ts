@@ -86,8 +86,8 @@ describe("cost governor", () => {
   });
 
   it("keeps the budget denominated in NAV, so it scales with the account", () => {
-    // 70 spent clears both the 40bps NAV budget and the 3-ticket floor (3x20).
-    const small = planAdmissions([buy("X", 900, 20)], { ...base, trailingCostBase: 70 });
+    // 130 spent clears both the 40bps NAV budget and the 6-ticket floor (6x20).
+    const small = planAdmissions([buy("X", 900, 20)], { ...base, trailingCostBase: 130 });
     expect(small.decisions[0]!.kind).toBe("skip");
     const large = planAdmissions([buy("X", 9_000, 20)], {
       ...base,

@@ -1483,14 +1483,19 @@ export async function routeOrdersToBroker(params: {
       if (fxExecutionMode === "spot" && trim.fxLegs.length > 0 && typeof adapter.placeFxSpot === "function") {
 
         const { survivingBuysAfterFxSpot } = await import("./fx-spot-plan");
+        const { consolidateFxLegs } = await import("./fx-leg-consolidation");
         type SpotOutcome = import("./fx-spot-plan").FxSpotOutcome;
         const outcomes: SpotOutcome[] = [];
-        for (const leg of trim.fxLegs) {
+        // One conversion per currency pair, rounded up to the broker's
+        // minimum ticket when the wallet can cover it. Sub-minimum legs were
+        // the single biggest reason US buys never got funded.
+        const consolidated = consolidateFxLegs(trim.fxLegs, { available: wallet });
+        for (const leg of consolidated) {
           // Saxo caps ExternalReference at 50 chars; a raw uuid + symbol + pair
           // overflows it and the whole order is rejected with InvalidModelState.
           // Hash instead so the key stays deterministic (idempotent retries) and short.
           const clientOrderId = `fx:${createHash("sha256")
-            .update(`${decisionId}:${leg.triggeredBySymbol}:${leg.fromCcy}${leg.toCcy}`)
+            .update(`${decisionId}:${leg.fromCcy}${leg.toCcy}:${leg.triggerSymbols.join(",")}`)
             .digest("hex")
             .slice(0, 24)}`;
           const spot = await adapter.placeFxSpot!({
@@ -1500,6 +1505,7 @@ export async function routeOrdersToBroker(params: {
             clientOrderId,
           });
           const ok = spot.status === "submitted" || spot.status === "filled";
+          const reason = spot.reason ?? leg.shortfallReason ?? "fx spot rejected";
           await supabaseAdmin.from("live_broker_log").insert({
             portfolio_id: portfolio.id,
             user_id: userId,
@@ -1508,7 +1514,16 @@ export async function routeOrdersToBroker(params: {
             method: ok ? "FX_SPOT_PLACED" : "FX_SPOT_FAILED",
             path: `/fx-spot/${leg.fromCcy}->${leg.toCcy}`,
             status: ok ? 200 : 400,
-            request: asJson({ asOf, decisionId, clientOrderId, amountFrom: leg.amountFrom, plannedRate: leg.rate }),
+            request: asJson({
+              asOf,
+              decisionId,
+              clientOrderId,
+              amountFrom: leg.amountFrom,
+              requiredFrom: leg.requiredFrom,
+              toppedUp: leg.toppedUp,
+              triggerSymbols: leg.triggerSymbols,
+              plannedRate: leg.rate,
+            }),
             response: asJson({
               brokerOrderId: spot.brokerOrderId,
               pairSymbol: spot.pairSymbol,
@@ -1517,18 +1532,18 @@ export async function routeOrdersToBroker(params: {
               status: spot.status,
               reason: spot.reason,
             }),
-            error: ok ? null : (spot.reason ?? "fx spot failed"),
+            error: ok ? null : reason,
           });
-          outcomes.push(
-            ok
-              ? { kind: "ok", triggerSymbol: leg.triggeredBySymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
-              : { kind: "failed", triggerSymbol: leg.triggeredBySymbol, reason: spot.reason ?? "fx spot rejected" },
-          );
-          reconFxOutcomes.push(
-            ok
-              ? { triggerSymbol: leg.triggeredBySymbol, kind: "ok" }
-              : { triggerSymbol: leg.triggeredBySymbol, kind: "failed", reason: spot.reason ?? "fx spot rejected" },
-          );
+          for (const triggerSymbol of leg.triggerSymbols) {
+            outcomes.push(
+              ok
+                ? { kind: "ok", triggerSymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
+                : { kind: "failed", triggerSymbol, reason },
+            );
+            reconFxOutcomes.push(
+              ok ? { triggerSymbol, kind: "ok" } : { triggerSymbol, kind: "failed", reason },
+            );
+          }
         }
         const { survivors, droppedSymbols } = survivingBuysAfterFxSpot(buyOrders, trim, outcomes);
         if (droppedSymbols.size > 0) {
@@ -1778,6 +1793,17 @@ export async function routeOrdersToBroker(params: {
   });
 
 
+  // Per-currency spend ledger for the fee-viable size-up. Starts from the
+  // reconciled wallet (or the account balance for the base currency) and is
+  // debited as each buy is routed, so an uplift can never spend cash twice.
+  const { planViableSizeUp } = await import("./viable-size-up");
+  const spendLedger = new Map<string, number>();
+  for (const [ccy, amt] of Object.entries(cashByCcyAdjusted ?? {})) {
+    spendLedger.set(ccy.toUpperCase(), Math.max(0, Number(amt) || 0));
+  }
+  if (!spendLedger.has(portfolioCurrency) && brokerCashAvailable != null) {
+    spendLedger.set(portfolioCurrency, Math.max(0, brokerCashAvailable));
+  }
 
   for (const order of routable) {
     // Pre-placement affordability trim: buys that don't fit the freshly
@@ -1807,7 +1833,7 @@ export async function routeOrdersToBroker(params: {
 
     // Round quantity to a whole share (Saxo Stock/Etf orders reject fractional
     // Amount). Skip if this rounds to zero.
-    const qty = Math.floor(order.quantity);
+    let qty = Math.floor(order.quantity);
     if (qty <= 0) {
       results.push({
         symbol: order.symbol,
@@ -1826,12 +1852,38 @@ export async function routeOrdersToBroker(params: {
     // quantity — and skip BUYs whose round-trip friction (commission floor +
     // UK stamp duty + PTM levy + half-spread) exceeds the budget. Sells are
     // never blocked: exits must always be able to execute.
-    const viability = assessTradeViability({
+    let viability = assessTradeViability({
       symbol: order.symbol,
       side: order.side,
       quantity: qty,
       price: order.price,
     });
+    let sizeUpNote: string | null = null;
+    let sizeUpApplied = false;
+    // The idea already passed every merit gate upstream; if the only problem
+    // is that the ticket is too small to carry the fee floor, buy enough to
+    // make it viable rather than discarding the trade.
+    if (!viability.viable && order.side === "buy") {
+      const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
+      const spendable = spendLedger.get(orderCcy) ?? 0;
+      const plan = planViableSizeUp({
+        quantity: qty,
+        price: order.price,
+        minViableNotional: viability.minViableNotional,
+        spendable,
+      });
+      sizeUpNote = plan.note;
+      if (plan.applied) {
+        sizeUpApplied = true;
+        qty = plan.quantity;
+        viability = assessTradeViability({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: qty,
+          price: order.price,
+        });
+      }
+    }
     if (!viability.viable) {
       results.push({
         symbol: order.symbol,
@@ -1856,10 +1908,31 @@ export async function routeOrdersToBroker(params: {
           costs: viability.costs,
           budgetBps: viability.budgetBps,
           minViableNotional: viability.minViableNotional,
+          sizeUp: sizeUpNote,
         }),
         error: viability.reason ?? null,
       });
       continue;
+    }
+    // Every routed buy consumes cash, whether or not it was sized up, so the
+    // ledger must be debited for all of them — otherwise a later uplift would
+    // spend money an earlier ticket has already committed.
+    if (order.side === "buy") {
+      const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
+      spendLedger.set(orderCcy, Math.max(0, (spendLedger.get(orderCcy) ?? 0) - qty * order.price));
+    }
+    if (sizeUpApplied) {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: adapter.env,
+        method: "TRADE_SIZED_UP",
+        path: "live_orders",
+        status: 200,
+        request: asJson({ symbol: order.symbol, quantity: qty, price: order.price }),
+        response: asJson({ note: sizeUpNote }),
+      });
     }
 
 

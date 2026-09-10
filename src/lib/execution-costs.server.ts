@@ -76,6 +76,16 @@ export type CostModel = {
 const COST_SHRINK_FILLS = 4;
 const MAX_ONE_WAY_BPS = 400;
 
+/**
+ * Smallest ticket (major currency units) whose cost rate is representative of
+ * how this account should be dealing. Matches the governor's absolute minimum
+ * ticket, so the measured hurdle reflects trades we would actually place.
+ */
+export const VIABLE_TICKET_FLOOR_MAJOR = 250;
+
+/** Viable tickets must carry at least this share of dealt notional to be used alone. */
+export const VIABLE_SAMPLE_MIN_SHARE = 0.25;
+
 function median(xs: number[]): number | null {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -246,6 +256,8 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   type PricedTicket = {
     ticket: Ticket;
     notionalNative: number;
+    /** Notional in major currency units (pence-quoted LSE lines divided by 100). */
+    notionalMajor: number;
     chargeBps: number;
     invoiced: boolean;
     close: number | null;
@@ -270,6 +282,11 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     // every ticket with — applied to the real fill size, so a small ticket
     // carries the fixed floor it genuinely pays.
     const notionalNative = f.quantity * f.price;
+    // Commission floors are set in major currency units; LSE prices are in
+    // pence, so convert before pricing the ticket or the floor disappears.
+    const pence = isPenceQuoted(f.symbol, f.price, rawClose ?? null, close);
+    const priceMajor = pence ? f.price / 100 : f.price;
+    const notionalMajor = f.quantity * priceMajor;
     let chargeBps: number;
     const invoiced = f.invoicedCharge !== null;
     if (invoiced) {
@@ -280,10 +297,6 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
         invoicedWeighted += chargeBps * notionalNative;
       }
     } else {
-      // Commission floors are set in major currency units; LSE prices are in
-      // pence, so convert before pricing the ticket or the floor disappears.
-      const pence = isPenceQuoted(f.symbol, f.price, rawClose ?? null, close);
-      const priceMajor = pence ? f.price / 100 : f.price;
       const modelled = estimateTradeCosts({
         symbol: f.symbol,
         side: f.side,
@@ -294,7 +307,7 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
       chargeBps = Number.isFinite(modelled.oneWayBps) ? modelled.oneWayBps : DEFAULT_ONE_WAY_COST_BPS;
       if (Number.isFinite(chargeBps) && chargeBps >= 0) modelledNotional += notionalNative;
     }
-    priced.push({ ticket: f, notionalNative, chargeBps, invoiced, close });
+    priced.push({ ticket: f, notionalNative, notionalMajor, chargeBps, invoiced, close });
   }
 
   // The rate the broker really charged, per pound dealt. Whenever the invoices
@@ -303,6 +316,14 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   // this account is billed, and a gate priced on the tariff lets through
   // trades that cannot pay for themselves.
   const invoicedChargeBps = invoicedNotional > 0 ? invoicedWeighted / invoicedNotional : null;
+
+  // Tickets below the fee-viable floor are ones the app should never have
+  // routed. Letting them set the account's measured cost creates a doom loop:
+  // tiny ticket -> huge measured bps -> higher hurdle -> smaller next ticket.
+  // They stay in the per-symbol figures (that's real money paid) but are kept
+  // out of the account-wide rate whenever viable tickets carry enough weight.
+  let viableNotional = 0;
+  let viableWeighted = 0;
 
   for (const p of priced) {
     const f = p.ticket;
@@ -319,6 +340,10 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
       allCharge.push(chargeBps);
       chargeNotional += p.notionalNative;
       chargeWeighted += chargeBps * p.notionalNative;
+      if (p.notionalMajor >= VIABLE_TICKET_FLOOR_MAJOR) {
+        viableNotional += p.notionalNative;
+        viableWeighted += chargeBps * p.notionalNative;
+      }
     }
 
     if (p.close !== null) {
@@ -337,8 +362,11 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
   // Weighted by notional, not per ticket: what this book pays per pound put to
   // work. A handful of £10 test tickets pay enormous rates but move no money,
   // and should not set the hurdle for every future trade.
-  const accountCharge =
-    chargeNotional > 0
+  const useViableOnly =
+    chargeNotional > 0 && viableNotional / chargeNotional >= VIABLE_SAMPLE_MIN_SHARE;
+  const accountCharge = useViableOnly
+    ? viableWeighted / viableNotional
+    : chargeNotional > 0
       ? chargeWeighted / chargeNotional
       : (median(allCharge) ?? DEFAULT_ONE_WAY_COST_BPS);
   // Slippage is two-sided noise around a real average cost; the median keeps a
