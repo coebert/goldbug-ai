@@ -62,6 +62,13 @@ export type GovernorCandidate = {
    * lower break-even, which the ranking can be told to prefer.
    */
   stampLiable?: boolean;
+  /**
+   * True when the instrument is a broad diversified index fund. These are not
+   * single-name risk, so they sit under the wider
+   * `maxDiversifiedPositionPctOfNav` cap instead of the single-name cap — a
+   * 15% cap on a £10k book left the account unable to be invested at all.
+   */
+  diversifiedFund?: boolean;
 };
 
 
