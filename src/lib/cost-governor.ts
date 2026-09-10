@@ -191,6 +191,49 @@ export const VIOLENT_CADENCE_FLOOR = 0.5;
  */
 export const MIN_BUDGET_TICKETS = 6;
 
+/** Invested share of NAV a fully deployed book is aiming at. */
+export const DEFAULT_TARGET_INVESTED = 0.9;
+/** Deployment shortfall (in NAV share) that buys one extra ticket a day. */
+export const DEPLOY_SHORTFALL_STEP = 0.15;
+/** Extra daily tickets a badly under-deployed book may draw. */
+export const MAX_DEPLOY_BONUS_TICKETS = 2;
+
+/**
+ * Daily BUY-ticket cap, lifted while the book is under-deployed.
+ *
+ * The cap exists to stop a churn spiral, but on a cash-heavy book it does the
+ * opposite damage: ideas that pass every cost test are simply dropped because
+ * three others came first that morning, and the cash sits idle for another
+ * day. The friction budget already prices over-trading, so the count only has
+ * to be tight once the money is actually at work.
+ */
+export function deploymentAdjustedBuyCap(cfg: {
+  maxBuysPerDay: number;
+  investedFraction?: number;
+  targetInvestedFraction?: number;
+}): { cap: number; bonus: number; reason: string | null } {
+  const base = Math.max(0, cfg.maxBuysPerDay);
+  const invested = Number(cfg.investedFraction);
+  if (!Number.isFinite(invested) || invested < 0) return { cap: base, bonus: 0, reason: null };
+  const target = Number.isFinite(cfg.targetInvestedFraction)
+    ? Math.max(0, Math.min(1, Number(cfg.targetInvestedFraction)))
+    : DEFAULT_TARGET_INVESTED;
+  const shortfall = target - Math.min(1, invested);
+  if (!(shortfall > 0)) return { cap: base, bonus: 0, reason: null };
+  const bonus = Math.min(
+    MAX_DEPLOY_BONUS_TICKETS,
+    Math.floor(shortfall / DEPLOY_SHORTFALL_STEP),
+  );
+  if (bonus <= 0) return { cap: base, bonus: 0, reason: null };
+  return {
+    cap: base + bonus,
+    bonus,
+    reason:
+      `${(invested * 100).toFixed(0)}% invested against a ${(target * 100).toFixed(0)}% target — ` +
+      `daily buy cap ${base}→${base + bonus}`,
+  };
+}
+
 export type ReserveCap = {
   /** Reserve tickets allowed on this tick after the adaptive cap. */
   tickets: number;
