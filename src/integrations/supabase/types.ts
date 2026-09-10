@@ -2410,6 +2410,86 @@ export type Database = {
         }
         Relationships: []
       }
+      next_best_trade_suggestions: {
+        Row: {
+          blocked_reason: string | null
+          conviction: number
+          cost_base: number
+          created_at: string
+          currency: string
+          expected_move_bps: number
+          expected_profit_base: number
+          id: string
+          name: string | null
+          net_edge_bps: number
+          portfolio_id: string
+          price: number
+          quantity: number
+          rank: number
+          recommended: boolean
+          round_trip_bps: number
+          suggested_at: string
+          suggested_on: string
+          symbol: string
+          ticket_base: number
+          updated_at: string
+        }
+        Insert: {
+          blocked_reason?: string | null
+          conviction?: number
+          cost_base?: number
+          created_at?: string
+          currency?: string
+          expected_move_bps?: number
+          expected_profit_base?: number
+          id?: string
+          name?: string | null
+          net_edge_bps?: number
+          portfolio_id: string
+          price?: number
+          quantity?: number
+          rank?: number
+          recommended?: boolean
+          round_trip_bps?: number
+          suggested_at?: string
+          suggested_on?: string
+          symbol: string
+          ticket_base?: number
+          updated_at?: string
+        }
+        Update: {
+          blocked_reason?: string | null
+          conviction?: number
+          cost_base?: number
+          created_at?: string
+          currency?: string
+          expected_move_bps?: number
+          expected_profit_base?: number
+          id?: string
+          name?: string | null
+          net_edge_bps?: number
+          portfolio_id?: string
+          price?: number
+          quantity?: number
+          rank?: number
+          recommended?: boolean
+          round_trip_bps?: number
+          suggested_at?: string
+          suggested_on?: string
+          symbol?: string
+          ticket_base?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "next_best_trade_suggestions_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null
