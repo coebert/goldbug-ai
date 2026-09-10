@@ -537,10 +537,15 @@ export function runGovernorReplay(
       positionExposureBase[pos.symbol] = pos.qty * (Number.isFinite(px) ? px : pos.entryPrice);
     }
 
+    const investedBase = Object.values(positionExposureBase).reduce((s, v) => s + v, 0);
+
     const plan = planAdmissions(candidates, {
       navBase: nav,
       trailingCostBase: trailingCost,
       buysAlreadyToday: 0,
+      // Only the revised arm lifts the daily cap while the book is idle, so
+      // the replay measures that change rather than assuming it.
+      investedFraction: sizing === "revised" && nav > 0 ? investedBase / nav : undefined,
       lastBuyDaysAgo,
       positionExposureBase,
       ...governorForNav(nav),

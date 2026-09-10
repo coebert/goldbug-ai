@@ -84,6 +84,14 @@ export type GovernorConfig = {
   maxBuysPerDay: number;
   /** BUY tickets already routed today. */
   buysAlreadyToday: number;
+  /**
+   * Share of NAV currently invested (0-1). A book sitting 80% in cash is not
+   * at risk of over-trading — it is failing to deploy — so the daily ticket
+   * cap lifts while the friction budget (the real cost control) still binds.
+   */
+  investedFraction?: number;
+  /** Invested share the book is aiming at. Default `DEFAULT_TARGET_INVESTED`. */
+  targetInvestedFraction?: number;
   /** Rolling friction budget as a fraction of NAV over the trailing window. */
   costBudgetPctOfNav: number;
   /** Estimated friction already spent over the trailing window, base ccy. */
@@ -182,6 +190,49 @@ export const VIOLENT_CADENCE_FLOOR = 0.5;
  * blocks, and a book that cannot enter cannot earn back its costs.
  */
 export const MIN_BUDGET_TICKETS = 6;
+
+/** Invested share of NAV a fully deployed book is aiming at. */
+export const DEFAULT_TARGET_INVESTED = 0.9;
+/** Deployment shortfall (in NAV share) that buys one extra ticket a day. */
+export const DEPLOY_SHORTFALL_STEP = 0.15;
+/** Extra daily tickets a badly under-deployed book may draw. */
+export const MAX_DEPLOY_BONUS_TICKETS = 2;
+
+/**
+ * Daily BUY-ticket cap, lifted while the book is under-deployed.
+ *
+ * The cap exists to stop a churn spiral, but on a cash-heavy book it does the
+ * opposite damage: ideas that pass every cost test are simply dropped because
+ * three others came first that morning, and the cash sits idle for another
+ * day. The friction budget already prices over-trading, so the count only has
+ * to be tight once the money is actually at work.
+ */
+export function deploymentAdjustedBuyCap(cfg: {
+  maxBuysPerDay: number;
+  investedFraction?: number;
+  targetInvestedFraction?: number;
+}): { cap: number; bonus: number; reason: string | null } {
+  const base = Math.max(0, cfg.maxBuysPerDay);
+  const invested = Number(cfg.investedFraction);
+  if (!Number.isFinite(invested) || invested < 0) return { cap: base, bonus: 0, reason: null };
+  const target = Number.isFinite(cfg.targetInvestedFraction)
+    ? Math.max(0, Math.min(1, Number(cfg.targetInvestedFraction)))
+    : DEFAULT_TARGET_INVESTED;
+  const shortfall = target - Math.min(1, invested);
+  if (!(shortfall > 0)) return { cap: base, bonus: 0, reason: null };
+  const bonus = Math.min(
+    MAX_DEPLOY_BONUS_TICKETS,
+    Math.floor(shortfall / DEPLOY_SHORTFALL_STEP),
+  );
+  if (bonus <= 0) return { cap: base, bonus: 0, reason: null };
+  return {
+    cap: base + bonus,
+    bonus,
+    reason:
+      `${(invested * 100).toFixed(0)}% invested against a ${(target * 100).toFixed(0)}% target — ` +
+      `daily buy cap ${base}→${base + bonus}`,
+  };
+}
 
 export type ReserveCap = {
   /** Reserve tickets allowed on this tick after the adaptive cap. */
@@ -377,7 +428,8 @@ export function planAdmissions(
 
 
 
-  const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
+  const buyCap = deploymentAdjustedBuyCap(cfg);
+  const roomToday = Math.max(0, buyCap.cap - Math.max(0, cfg.buysAlreadyToday));
 
   const stampPref = cfg.stampExemptPreference ?? "off";
   const decisions: GovernorDecision[] = [];
@@ -465,7 +517,9 @@ export function planAdmissions(
       decisions.push({
         kind: "skip",
         candidate: c,
-        reason: `daily buy-ticket cap reached (${cfg.maxBuysPerDay}/day, ${cfg.buysAlreadyToday} already routed)`,
+        reason:
+          `daily buy-ticket cap reached (${buyCap.cap}/day, ${cfg.buysAlreadyToday} already routed)` +
+          (buyCap.reason ? ` — already lifted: ${buyCap.reason}` : ""),
       });
       continue;
     }

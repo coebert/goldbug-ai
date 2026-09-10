@@ -3,6 +3,10 @@ import {
   minViableNotional,
   type TradeCostBreakdown,
 } from "./trade-viability-gate";
+import {
+  minNotionalForMeasuredFloor,
+  scaleMeasuredRoundTripBps,
+} from "./measured-cost-floor";
 
 /**
  * Net-of-cost edge gate.
@@ -99,6 +103,13 @@ export type NetEdgeInput = {
    * figure too.
    */
   measuredRoundTripBps?: number | null;
+  /**
+   * Notional (instrument currency) the measured figure was sampled at. The
+   * measured cost is a ratio dominated by the broker's fixed per-side minimum
+   * on small tickets, so it is re-priced at the size actually being routed
+   * rather than charged flat. Defaults to the viable-ticket floor.
+   */
+  measuredAtNotional?: number | null;
 };
 
 export type NetEdgeAssessment = {
@@ -137,10 +148,25 @@ export function assessNetEdge(input: NetEdgeInput): NetEdgeAssessment {
     ? Number(input.safetyMultiple)
     : DEFAULT_EDGE_SAFETY_MULTIPLE;
   const modelledRoundTripBps = Number.isFinite(costs.roundTripBps) ? costs.roundTripBps : Infinity;
-  const measuredFloor =
+  const measuredRaw =
     Number.isFinite(input.measuredRoundTripBps) && Number(input.measuredRoundTripBps) > 0
       ? Number(input.measuredRoundTripBps) * MEASURED_FLOOR_HEADROOM
       : 0;
+  const measuredAtNotional =
+    Number.isFinite(input.measuredAtNotional) && Number(input.measuredAtNotional) > 0
+      ? Number(input.measuredAtNotional)
+      : undefined;
+  // Re-price the measured floor at THIS ticket's size: its fixed commission
+  // component is pounds, not bps, so a bigger ticket genuinely pays less.
+  const measuredFloor = measuredRaw
+    ? scaleMeasuredRoundTripBps({
+        symbol: input.symbol,
+        assetClass: input.assetClass,
+        measuredRoundTripBps: measuredRaw,
+        measuredAtNotional,
+        notional: costs.notional,
+      })
+    : 0;
   const roundTripBps = Math.max(modelledRoundTripBps, measuredFloor);
   const netEdgeBps = moveBps - roundTripBps;
   const netEdgeValue = (netEdgeBps / 10_000) * costs.notional;
@@ -148,13 +174,25 @@ export function assessNetEdge(input: NetEdgeInput): NetEdgeAssessment {
   // The break-even budget the ticket must fit: the expected move divided by the
   // safety multiple. A trade sized so its friction eats that is not an edge.
   const budgetBps = moveBps / safety;
-  const floor = minViableNotional({
+  const modelFloor = minViableNotional({
     symbol: input.symbol,
     side: input.side,
     assetClass: input.assetClass,
     spreadBps: input.spreadBps,
     budgetBps,
   });
+  // The size-up target has to clear the measured floor too, or the retry lands
+  // on a ticket the gate rejects for the same reason it rejected the first.
+  const measuredFloorNotional = measuredRaw
+    ? minNotionalForMeasuredFloor({
+        symbol: input.symbol,
+        assetClass: input.assetClass,
+        measuredRoundTripBps: measuredRaw,
+        measuredAtNotional,
+        budgetBps,
+      })
+    : 0;
+  const floor = Math.max(modelFloor, measuredFloorNotional);
 
   const stampNote = costs.stampDuty > 0 ? `, stamp ${costs.stampDutyBps.toFixed(0)}bps` : "";
   const note =

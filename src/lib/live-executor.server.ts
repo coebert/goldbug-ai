@@ -609,9 +609,19 @@ export async function routeOrdersToBroker(params: {
     }
 
 
+    // How much of the book is actually at work. A cash-heavy book is not
+    // over-trading, so the daily ticket cap lifts while the friction budget
+    // keeps pricing the cost of each extra trade.
+    const investedBase = Object.values(inputs.positionExposureBase ?? {}).reduce(
+      (s, v) => s + (Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0),
+      0,
+    );
+    const investedFraction = inputs.navBase > 0 ? investedBase / inputs.navBase : undefined;
+
     const plan = planAdmissions(candidates, {
       navBase: inputs.navBase,
       buysAlreadyToday: inputs.buysAlreadyToday,
+      investedFraction,
       trailingCostBase: inputs.trailingCostBase,
       lastBuyDaysAgo: inputs.lastBuyDaysAgo,
       daysSinceLastBuyFill: inputs.daysSinceLastBuyFill,
