@@ -196,6 +196,39 @@ export const getNextBestTrade = createServerFn({ method: "POST" })
       measuredRoundTripBps: accountRoundTripBps,
     });
 
+    // Log today's shortlist so the history panel can later say what the
+    // suggestion was actually worth. One row per symbol per London day, so
+    // reopening the page re-states the latest read instead of duplicating it.
+    const logged = rows.slice(0, 3);
+    if (logged.length > 0) {
+      const suggestedOn = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+      const { error: logError } = await db.from("next_best_trade_suggestions").upsert(
+        logged.map((r, i) => ({
+          portfolio_id: data.portfolioId,
+          suggested_on: suggestedOn,
+          suggested_at: new Date().toISOString(),
+          symbol: r.symbol,
+          name: r.name,
+          currency: r.currency,
+          rank: i + 1,
+          conviction: r.conviction,
+          price: r.price,
+          quantity: r.quantity,
+          ticket_base: r.ticketBase,
+          cost_base: r.costBase,
+          expected_profit_base: r.expectedProfitBase,
+          expected_move_bps: r.expectedMoveBps,
+          round_trip_bps: r.roundTripBps,
+          net_edge_bps: r.netEdgeBps,
+          recommended: r.recommended,
+          blocked_reason: r.blockedReason,
+        })),
+        { onConflict: "portfolio_id,symbol,suggested_on" },
+      );
+      // A logging failure must never cost the user their suggestion.
+      if (logError) console.warn("next-best-trade log failed:", logError.message);
+    }
+
     return {
       currency,
       navBase,

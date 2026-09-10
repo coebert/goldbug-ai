@@ -226,6 +226,11 @@ const NextBestTradeCard = lazy(() =>
     default: m.NextBestTradeCard,
   })),
 );
+const NextBestTradeHistoryCard = lazy(() =>
+  import("@/components/next-best-trade-history-card").then((m) => ({
+    default: m.NextBestTradeHistoryCard,
+  })),
+);
 
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
@@ -1129,6 +1134,11 @@ function PortfolioPage() {
                 <div className="mb-6">
                   <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
                     <NextBestTradeCard portfolioId={id} mode={p.mode} />
+                  </Suspense>
+                </div>
+                <div className="mb-6">
+                  <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                    <NextBestTradeHistoryCard portfolioId={id} />
                   </Suspense>
                 </div>
                 {p.mode === "live_prod" && (
