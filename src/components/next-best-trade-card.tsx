@@ -229,6 +229,21 @@ export function NextBestTradeCard({
           </div>
         )}
       </CardContent>
+
+      {top && data && (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title="Place this buy with the broker?"
+          description={`Buy ${top.quantity} ${top.symbol} at about ${priceLabel(top.price, top.currency)} — around ${formatMoney(top.ticketBase, data.currency)} of your cash plus ${formatMoney(top.costBase, data.currency)} of charges. This spends real money.`}
+          confirmLabel="Place buy"
+          onConfirm={() => {
+            setConfirmOpen(false);
+            place.mutate();
+          }}
+        />
+      )}
     </Card>
+
   );
 }
