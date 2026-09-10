@@ -126,28 +126,29 @@ function fundamentalsCell(f: AnyFeature, full = true): string {
     );
   }
   if (d) {
+    // One ratio per question the buy rules actually ask: what am I paying
+    // (pe, fpe, mcap), does it earn (nm, roe), is it growing (revg, eps+1y),
+    // can it pay its debts (de, cr, fcf), what does the market think (dy,
+    // beta, shrt, rec, tgt) and when do the next numbers land. Derived
+    // duplicates (peg, pb, ev/ebitda, gross and operating margin, roa,
+    // trailing eps growth, next-quarter eps, payout, absolute cash and debt)
+    // were dropped: the model re-derives them from these when it needs them,
+    // and they cost roughly 40% of every fundamentals block.
     parts.push(
-      `pe:${n(d["trailing_pe"], 1)} fpe:${n(d["forward_pe"], 1)} peg:${n(
-        d["peg"],
-        2,
-      )} pb:${n(d["price_to_book"], 1)} ev/eb:${n(d["ev_ebitda"], 1)} mcap:${compactCount(
+      `pe:${n(d["trailing_pe"], 1)} fpe:${n(d["forward_pe"], 1)} mcap:${compactCount(
         d["market_cap"],
       )}`,
-      `gm:${n(d["gross_margin"], 3)} om:${n(d["operating_margin"], 3)} nm:${n(
-        d["profit_margin"],
-        3,
-      )} roe:${n(d["return_on_equity"], 3)} roa:${n(d["return_on_assets"], 3)}`,
-      `revg:${n(d["revenue_growth"], 3)} epsg:${n(d["earnings_growth"], 3)} eps+1q:${n(
-        d["eps_growth_next_q"],
+      `nm:${n(d["profit_margin"], 3)} roe:${n(d["return_on_equity"], 3)} revg:${n(
+        d["revenue_growth"],
         3,
       )} eps+1y:${n(d["eps_growth_next_y"], 3)}`,
       `de:${n(d["debt_to_equity"], 1)} cr:${n(d["current_ratio"], 2)} fcf:${compactCount(
         d["free_cashflow"],
-      )} cash:${compactCount(d["total_cash"])} debt:${compactCount(d["total_debt"])}`,
-      `dy:${n(d["dividend_yield"], 4)} pay:${n(d["payout_ratio"], 2)} beta:${n(
-        d["beta"],
-        2,
-      )} shrt:${n(d["short_percent_float"], 3)}`,
+      )}`,
+      `dy:${n(d["dividend_yield"], 4)} beta:${n(d["beta"], 2)} shrt:${n(
+        d["short_percent_float"],
+        3,
+      )}`,
       `rec:${n(d["analyst_mean"], 2)}/${Number(d["analyst_count"] ?? 0)} tgt:${n(
         d["target_mean_price"],
         2,
@@ -195,7 +196,7 @@ const COLUMNS = [
  * the long tail. Full blocks go to the names most likely to be traded this
  * tick — best cross-sectional rank, plus anything with a dated hard catalyst.
  */
-export const FULL_FUNDAMENTALS_ROWS = 10;
+export const FULL_FUNDAMENTALS_ROWS = 6;
 
 function fullFundamentalsSymbols(features: readonly AnyFeature[]): Set<string> {
   const scored = features.map((f, i) => {
@@ -261,7 +262,7 @@ Columns: ${COLUMNS.join(" | ")}
   x = MACD cross this bar (B bullish / R bearish / n none); wk_up = weekly trend up (Y/n); cool = loss-cooldown active (Y/n); chg5d/chg30d are fractional returns (0.05 = +5%); adv20 = 20d average daily volume.
   news = <weighted LLM sentiment>/<contributors today> t<today> a3/a7<3d & 7d averages> d3/d7<deltas vs baseline> ac<acceleration> c7<7d contributors>.
   events = s<directional event score -1..1> p<event pressure 0..1> nx<event count> hard<dated hard catalyst Y/n> <top event kinds>.
-  fund = PUBLISHED COMPANY FINANCIALS (reported accounts, derived ratios, consensus analyst estimates, results calendar). sc<overall -1..1> cov<pillars with data>/6 val/prof/grw/bs/div/anl<pillar scores>; pe/fpe/peg/pb/ev-eb<valuation multiples> mcap<market cap>; gm/om/nm<gross, operating, net margin> roe/roa<returns>; revg/epsg<latest reported growth> eps+1q/+1y<consensus estimates>; de<debt/equity %> cr<current ratio> fcf<free cash flow> cash/debt; dy<dividend yield> pay<payout ratio> beta shrt<short % of float>; rec<analyst consensus 1 strong buy..5 strong sell>/<analyst count> tgt<mean price target, in the listing currency> nxt_results<next scheduled results date> ccy<reporting currency of the accounts, may differ from the quote currency>. RISK lists disclosed financial red flags. Rows marked "(digest" carry the same red flags and headline ratios in short form because they rank outside the actionable shortlist — a digest is not a quality signal either way. "-" means the company has not published that figure (or it is not an operating company, e.g. an ETF or commodity).
+  fund = the company's published accounts. sc<overall -1..1> cov<pillars with data>/6 val/prof/grw/bs/div/anl<pillar scores>; pe/fpe<price/earnings, trailing and forward> mcap; nm<net margin> roe; revg<revenue growth> eps+1y<forecast earnings growth>; de<debt/equity %> cr<current ratio> fcf<free cash flow>; dy<dividend yield> beta shrt<short % of float>; rec<analyst view 1 buy..5 sell>/<count> tgt<price target, listing currency> nxt_results<next results date> ccy<currency of the accounts>. RISK = disclosed red flags. "(digest" = short form, used for names outside the top-ranked shortlist; it is not a quality signal. "-" = not published (normal for ETFs, commodities, FX, crypto).
   rank = #<cross-sectional rank>/<universe size> p<percentile> c<composite z> mom/qua/lvol/trd<factor z-scores>.
 ${rows.join("\n")}`;
 }

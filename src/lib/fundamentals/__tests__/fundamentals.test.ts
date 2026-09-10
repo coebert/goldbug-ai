@@ -202,7 +202,7 @@ describe("candidate prompt table", () => {
       row({ fundamentals: healthy, fundamentals_score: scoreFundamentals(healthy, "2026-08-06") }),
     ]);
     expect(table).toContain("fund ");
-    expect(table).toContain("PUBLISHED COMPANY FINANCIALS");
+    expect(table).toContain("published accounts");
     expect(table).toContain("pe:14");
     expect(table).toContain("roe:0.25");
     expect(table).toContain("rec:1.9/20");
