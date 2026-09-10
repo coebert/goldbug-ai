@@ -1136,8 +1136,16 @@ function PortfolioPage() {
                 {p.mode === "live_prod" && (
                   <div className="mb-6">
                     <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                      <CostModelGapCard portfolioId={id} />
+                    </Suspense>
+                  </div>
+                )}
+                {p.mode === "live_prod" && (
+                  <div className="mb-6">
+                    <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
                       <SymbolCashFlowTable portfolioId={id} />
                     </Suspense>
+
                   </div>
                 )}
                 {p.mode === "live_prod" && (
