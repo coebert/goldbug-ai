@@ -84,6 +84,14 @@ export type GovernorConfig = {
   maxBuysPerDay: number;
   /** BUY tickets already routed today. */
   buysAlreadyToday: number;
+  /**
+   * Share of NAV currently invested (0-1). A book sitting 80% in cash is not
+   * at risk of over-trading — it is failing to deploy — so the daily ticket
+   * cap lifts while the friction budget (the real cost control) still binds.
+   */
+  investedFraction?: number;
+  /** Invested share the book is aiming at. Default `DEFAULT_TARGET_INVESTED`. */
+  targetInvestedFraction?: number;
   /** Rolling friction budget as a fraction of NAV over the trailing window. */
   costBudgetPctOfNav: number;
   /** Estimated friction already spent over the trailing window, base ccy. */
