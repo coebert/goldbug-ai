@@ -2891,7 +2891,8 @@ export async function runDailyTick(
         `saxo fee ${saxoFee.tier.currency}${saxoFee.commission.toFixed(2)}`
         + ` (${saxoFee.perSideBps.toFixed(0)}bps${saxoFee.minFloorApplied ? " floor" : ""})`,
       );
-      const qty = outcome.qty;
+      let qty = outcome.qty;
+      let effectiveSpend = outcome.effectiveSpend;
       const fillPrice = outcome.fillPrice;
 
       // Net-of-cost edge gate. The fee guard above only sees commission; this
