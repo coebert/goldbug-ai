@@ -67,6 +67,14 @@ const SESSIONS: Record<MarketVenue, {
   NASDAQ: { openMin: 9 * 60 + 30,     closeMin: 16 * 60,       tz: "America/New_York" },
   TSE_JP: { openMin: 9 * 60,          closeMin: 15 * 60,       tz: "Asia/Tokyo",       breakMin: [11 * 60 + 30, 12 * 60 + 30] },
   ASX:    { openMin: 10 * 60,         closeMin: 16 * 60,       tz: "Australia/Sydney" },
+  // Continental Europe. Continuous-trading windows only (auctions excluded):
+  // Xetra/Frankfurt 09:00–17:30 CET, Euronext (Paris/Amsterdam/Brussels/
+  // Lisbon/Milan/Madrid all share the window) 09:00–17:30 CET, SIX Swiss
+  // 09:00–17:20 CET, Nordic (Stockholm/Copenhagen/Helsinki/Oslo) 09:00–17:25.
+  XETR:     { openMin: 9 * 60, closeMin: 17 * 60 + 30, tz: "Europe/Berlin" },
+  EURONEXT: { openMin: 9 * 60, closeMin: 17 * 60 + 30, tz: "Europe/Paris" },
+  SIX:      { openMin: 9 * 60, closeMin: 17 * 60 + 20, tz: "Europe/Zurich" },
+  NORDIC:   { openMin: 9 * 60, closeMin: 17 * 60 + 25, tz: "Europe/Stockholm" },
   CRYPTO: null, // 24/7
   FX:     null, // Global FX runs ~24/5, but our per-tick decisions treat it as always_open.
   OTHER:  null,
