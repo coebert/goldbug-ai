@@ -272,6 +272,11 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
     // every ticket with — applied to the real fill size, so a small ticket
     // carries the fixed floor it genuinely pays.
     const notionalNative = f.quantity * f.price;
+    // Commission floors are set in major currency units; LSE prices are in
+    // pence, so convert before pricing the ticket or the floor disappears.
+    const pence = isPenceQuoted(f.symbol, f.price, rawClose ?? null, close);
+    const priceMajor = pence ? f.price / 100 : f.price;
+    const notionalMajor = f.quantity * priceMajor;
     let chargeBps: number;
     const invoiced = f.invoicedCharge !== null;
     if (invoiced) {
@@ -282,10 +287,6 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
         invoicedWeighted += chargeBps * notionalNative;
       }
     } else {
-      // Commission floors are set in major currency units; LSE prices are in
-      // pence, so convert before pricing the ticket or the floor disappears.
-      const pence = isPenceQuoted(f.symbol, f.price, rawClose ?? null, close);
-      const priceMajor = pence ? f.price / 100 : f.price;
       const modelled = estimateTradeCosts({
         symbol: f.symbol,
         side: f.side,
@@ -296,7 +297,7 @@ export async function computeExecutionCosts(portfolioIds: string[]): Promise<Cos
       chargeBps = Number.isFinite(modelled.oneWayBps) ? modelled.oneWayBps : DEFAULT_ONE_WAY_COST_BPS;
       if (Number.isFinite(chargeBps) && chargeBps >= 0) modelledNotional += notionalNative;
     }
-    priced.push({ ticket: f, notionalNative, chargeBps, invoiced, close });
+    priced.push({ ticket: f, notionalNative, notionalMajor, chargeBps, invoiced, close });
   }
 
   // The rate the broker really charged, per pound dealt. Whenever the invoices
