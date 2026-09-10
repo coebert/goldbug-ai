@@ -119,3 +119,38 @@ export async function loadTradingGate(): Promise<TradingGate> {
     remaining: Math.max(0, dailyLimit - spentToday),
   };
 }
+
+export interface CoreAllocationSettings {
+  /** Share of NAV to hold in the long-term core holding, 0–1.0 = off. */
+  targetPct: number;
+  /** Ticker of the broad diversified fund used as the core. */
+  symbol: string;
+  /** Drift allowed either side of the target before topping up or trimming. */
+  bandPct: number;
+}
+
+/**
+ * The owner's core-allocation setting (Risk controls). Reads fail SAFE to
+ * "off": an unreadable knob must never start buying on its own.
+ */
+export async function loadCoreAllocationSettings(): Promise<CoreAllocationSettings> {
+  const off: CoreAllocationSettings = { targetPct: 0, symbol: "VWRL.L", bandPct: 0.05 };
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("trading_controls")
+      .select("core_allocation_pct, core_symbol, core_band_pct")
+      .eq("id", true)
+      .maybeSingle();
+    if (!data) return off;
+    const target = Number(data.core_allocation_pct);
+    const band = Number(data.core_band_pct);
+    return {
+      targetPct: Number.isFinite(target) ? Math.min(0.9, Math.max(0, target)) : 0,
+      symbol: String(data.core_symbol || "VWRL.L").toUpperCase(),
+      bandPct: Number.isFinite(band) ? Math.min(0.3, Math.max(0.01, band)) : 0.05,
+    };
+  } catch {
+    return off;
+  }
+}
