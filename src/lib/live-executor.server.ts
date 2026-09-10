@@ -596,6 +596,13 @@ export async function routeOrdersToBroker(params: {
             o.symbol,
             (o as { asset_class?: string | null }).asset_class ?? null,
           ),
+        // Broad index funds are not single-name risk, so they sit under the
+        // wider concentration cap.
+        diversifiedFund: isDiversifiedFund({
+          symbol: o.symbol,
+          assetClass: (o as { asset_class?: string | null }).asset_class ?? null,
+          name: (o as { name?: string | null }).name ?? symbolDisplayName(o.symbol),
+        }),
       });
     }
 
