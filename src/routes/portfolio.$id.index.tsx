@@ -205,6 +205,11 @@ const SymbolCashFlowTable = lazy(() =>
     default: m.SymbolCashFlowTable,
   })),
 );
+const NextBestTradeCard = lazy(() =>
+  import("@/components/next-best-trade-card").then((m) => ({
+    default: m.NextBestTradeCard,
+  })),
+);
 
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
