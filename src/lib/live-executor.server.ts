@@ -1483,14 +1483,19 @@ export async function routeOrdersToBroker(params: {
       if (fxExecutionMode === "spot" && trim.fxLegs.length > 0 && typeof adapter.placeFxSpot === "function") {
 
         const { survivingBuysAfterFxSpot } = await import("./fx-spot-plan");
+        const { consolidateFxLegs } = await import("./fx-leg-consolidation");
         type SpotOutcome = import("./fx-spot-plan").FxSpotOutcome;
         const outcomes: SpotOutcome[] = [];
-        for (const leg of trim.fxLegs) {
+        // One conversion per currency pair, rounded up to the broker's
+        // minimum ticket when the wallet can cover it. Sub-minimum legs were
+        // the single biggest reason US buys never got funded.
+        const consolidated = consolidateFxLegs(trim.fxLegs, { available: wallet });
+        for (const leg of consolidated) {
           // Saxo caps ExternalReference at 50 chars; a raw uuid + symbol + pair
           // overflows it and the whole order is rejected with InvalidModelState.
           // Hash instead so the key stays deterministic (idempotent retries) and short.
           const clientOrderId = `fx:${createHash("sha256")
-            .update(`${decisionId}:${leg.triggeredBySymbol}:${leg.fromCcy}${leg.toCcy}`)
+            .update(`${decisionId}:${leg.fromCcy}${leg.toCcy}:${leg.triggerSymbols.join(",")}`)
             .digest("hex")
             .slice(0, 24)}`;
           const spot = await adapter.placeFxSpot!({
@@ -1500,6 +1505,7 @@ export async function routeOrdersToBroker(params: {
             clientOrderId,
           });
           const ok = spot.status === "submitted" || spot.status === "filled";
+          const reason = spot.reason ?? leg.shortfallReason ?? "fx spot rejected";
           await supabaseAdmin.from("live_broker_log").insert({
             portfolio_id: portfolio.id,
             user_id: userId,
@@ -1508,7 +1514,16 @@ export async function routeOrdersToBroker(params: {
             method: ok ? "FX_SPOT_PLACED" : "FX_SPOT_FAILED",
             path: `/fx-spot/${leg.fromCcy}->${leg.toCcy}`,
             status: ok ? 200 : 400,
-            request: asJson({ asOf, decisionId, clientOrderId, amountFrom: leg.amountFrom, plannedRate: leg.rate }),
+            request: asJson({
+              asOf,
+              decisionId,
+              clientOrderId,
+              amountFrom: leg.amountFrom,
+              requiredFrom: leg.requiredFrom,
+              toppedUp: leg.toppedUp,
+              triggerSymbols: leg.triggerSymbols,
+              plannedRate: leg.rate,
+            }),
             response: asJson({
               brokerOrderId: spot.brokerOrderId,
               pairSymbol: spot.pairSymbol,
@@ -1517,18 +1532,18 @@ export async function routeOrdersToBroker(params: {
               status: spot.status,
               reason: spot.reason,
             }),
-            error: ok ? null : (spot.reason ?? "fx spot failed"),
+            error: ok ? null : reason,
           });
-          outcomes.push(
-            ok
-              ? { kind: "ok", triggerSymbol: leg.triggeredBySymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
-              : { kind: "failed", triggerSymbol: leg.triggeredBySymbol, reason: spot.reason ?? "fx spot rejected" },
-          );
-          reconFxOutcomes.push(
-            ok
-              ? { triggerSymbol: leg.triggeredBySymbol, kind: "ok" }
-              : { triggerSymbol: leg.triggeredBySymbol, kind: "failed", reason: spot.reason ?? "fx spot rejected" },
-          );
+          for (const triggerSymbol of leg.triggerSymbols) {
+            outcomes.push(
+              ok
+                ? { kind: "ok", triggerSymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
+                : { kind: "failed", triggerSymbol, reason },
+            );
+            reconFxOutcomes.push(
+              ok ? { triggerSymbol, kind: "ok" } : { triggerSymbol, kind: "failed", reason },
+            );
+          }
         }
         const { survivors, droppedSymbols } = survivingBuysAfterFxSpot(buyOrders, trim, outcomes);
         if (droppedSymbols.size > 0) {
