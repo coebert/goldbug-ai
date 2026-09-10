@@ -76,6 +76,16 @@ export type CostModel = {
 const COST_SHRINK_FILLS = 4;
 const MAX_ONE_WAY_BPS = 400;
 
+/**
+ * Smallest ticket (major currency units) whose cost rate is representative of
+ * how this account should be dealing. Matches the governor's absolute minimum
+ * ticket, so the measured hurdle reflects trades we would actually place.
+ */
+export const VIABLE_TICKET_FLOOR_MAJOR = 250;
+
+/** Viable tickets must carry at least this share of dealt notional to be used alone. */
+export const VIABLE_SAMPLE_MIN_SHARE = 0.25;
+
 function median(xs: number[]): number | null {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
