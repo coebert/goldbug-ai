@@ -326,7 +326,7 @@ Follow the OUTPUT CONTRACT in your instructions.`;
       sma_trend       — MA trend AND MACD histogram / crosses (grouped)
       rsi             — daily RSI-14 AND weekly RSI alignment
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
-      news_sentiment  — weighted LLM sentiment for this symbol, its typed event_features (catalysts from the MARKET-EVENT FEED), INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL, a SHORT-SLEEVE proxy buy when the view is on that index, or skip.
+      news_sentiment  — this symbol's news score, its events, and the 3d/7d trend in that score. Improving news supports a buy; worsening news supports a sell, a short-sleeve proxy buy, or no trade.
       volatility      — 20d vol, ATR%, Bollinger width
   To take a permitted short position, return side="buy" on XUKS.L (bearish FTSE 100) or XSPS.L (bearish S&P 500). There is no "short" side: SELL only reduces an existing holding and is rejected when nothing is held.
 - fx_intents (PREFERRED when the FX WALLET & EXPOSURE block is present): array of typed intents (kind = "pre_fund" | "hedge" | "sweep_idle" | "carry_tilt" | "close_hedge") — see the FX STRATEGY playbook for the required fields per kind. Guardrails (per-tick turnover, min notional, tilt-exposure cap) are applied server-side; oversized intents are trimmed rather than rejected. Reason MUST cite the numbered rule and its numeric trigger.
