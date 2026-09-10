@@ -210,6 +210,12 @@ const TradeImpactPanel = lazy(() =>
     default: m.TradeImpactPanel,
   })),
 );
+const CostModelGapCard = lazy(() =>
+  import("@/components/cost-model-gap-card").then((m) => ({
+    default: m.CostModelGapCard,
+  })),
+);
+
 const NextBestTradeCard = lazy(() =>
   import("@/components/next-best-trade-card").then((m) => ({
     default: m.NextBestTradeCard,
