@@ -2891,7 +2891,8 @@ export async function runDailyTick(
         `saxo fee ${saxoFee.tier.currency}${saxoFee.commission.toFixed(2)}`
         + ` (${saxoFee.perSideBps.toFixed(0)}bps${saxoFee.minFloorApplied ? " floor" : ""})`,
       );
-      const qty = outcome.qty;
+      let qty = outcome.qty;
+      let effectiveSpend = outcome.effectiveSpend;
       const fillPrice = outcome.fillPrice;
 
       // Net-of-cost edge gate. The fee guard above only sees commission; this
@@ -2903,11 +2904,11 @@ export async function runDailyTick(
       // themselves. Sells are never gated here.
       {
         const { assessNetEdge } = await import("./net-edge-gate");
+        const { planViableSizeUp } = await import("./viable-size-up");
         const horizonDays = cfg.max_hold_days > 0 ? Math.min(cfg.max_hold_days, 20) : 10;
-        const netEdge = assessNetEdge({
+        const gateInput = {
           symbol: meta.symbol,
-          side: "buy",
-          quantity: qty,
+          side: "buy" as const,
           price: fillPrice,
           assetClass: meta.asset_class,
           conviction: typeof order.conviction === "number" ? order.conviction : null,
@@ -2917,7 +2918,39 @@ export async function runDailyTick(
             symbolRoundTripFloor(meta.symbol, symbolCosts, measuredRoundTripBps) ??
             measuredRoundTripBps,
           safetyMultiple: costHurdleMultiple ?? undefined,
-        });
+        };
+        let netEdge = assessNetEdge({ ...gateInput, quantity: qty });
+
+        // A ticket can fail this gate for two very different reasons: the idea
+        // is too weak, or the ticket is simply too small to carry its own
+        // fixed costs. The second one is a sizing mistake, not a merit one —
+        // buying MORE makes the same idea viable, because commission floors
+        // and the fee minimum are spread over a bigger notional. So when the
+        // gate names a minimum viable notional, try to reach it out of cash
+        // we actually have and room left under this name's position cap, then
+        // re-price the round trip on the bigger ticket.
+        if (!netEdge.pass && Number.isFinite(netEdge.minViableNotional)) {
+          const capRoom = effMaxPosVal > 0 ? Math.max(0, effMaxPosVal - existingVal) : Infinity;
+          const plan = planViableSizeUp({
+            quantity: qty,
+            price: fillPrice,
+            minViableNotional: netEdge.minViableNotional,
+            spendable: Math.min(workingCash, capRoom),
+          });
+          if (plan.applied) {
+            const retry = assessNetEdge({ ...gateInput, quantity: plan.quantity });
+            if (retry.pass) {
+              const addedQty = plan.quantity - qty;
+              qty = plan.quantity;
+              effectiveSpend += addedQty * fillPrice;
+              netEdge = retry;
+              sizingNotes.push(
+                `sized up to £${(qty * fillPrice).toFixed(0)} to clear the cost floor`,
+              );
+            }
+          }
+        }
+
         if (!netEdge.pass) {
           executed.push({
             symbol: meta.symbol,
@@ -2955,7 +2988,7 @@ export async function runDailyTick(
           continue;
         }
       }
-      workingCash -= outcome.effectiveSpend;
+      workingCash -= effectiveSpend;
       if (isNewPosition) newPositions += 1;
       const cur = holdingsByS.get(meta.symbol);
       if (cur) {
@@ -2984,25 +3017,25 @@ export async function runDailyTick(
       }
       classExposure.set(
         meta.asset_class,
-        (classExposure.get(meta.asset_class) ?? 0) + outcome.effectiveSpend,
+        (classExposure.get(meta.asset_class) ?? 0) + effectiveSpend,
       );
       if (commodityGroupKey) {
         commodityGroupExposure.set(
           commodityGroupKey,
-          (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
+          (commodityGroupExposure.get(commodityGroupKey) ?? 0) + effectiveSpend,
         );
       }
       if (buyCcy !== portfolioBaseCcy) {
         currencyExposure.set(
           buyCcy,
-          (currencyExposure.get(buyCcy) ?? 0) + outcome.effectiveSpend,
+          (currencyExposure.get(buyCcy) ?? 0) + effectiveSpend,
         );
       }
 
       // Phase 6 — slice plan telemetry (attached to executed row).
       const slicePlan = cfg.execution_slicing_enabled
         ? planOrderSlices({
-            parentNotional: outcome.effectiveSpend,
+            parentNotional: effectiveSpend,
             price: fillPrice,
             adv20d: featExec?.adv_20d ?? null,
             participationCap: cfg.execution_participation_cap,
@@ -3018,7 +3051,7 @@ export async function runDailyTick(
         side: "buy",
         quantity: qty,
         price: fillPrice,
-        value: outcome.effectiveSpend,
+        value: effectiveSpend,
         // Conviction + sector travel with the order so the cost governor can
         // rank scarce friction budget by expected edge, and the sector budget
         // can cap concentration, without re-deriving signals downstream.
