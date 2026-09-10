@@ -167,6 +167,8 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "AUDUSD=X", name: "AUD/USD", asset_class: "fx" },
   { symbol: "GBPAUD=X", name: "GBP/AUD", asset_class: "fx" },
   { symbol: "EURAUD=X", name: "EUR/AUD", asset_class: "fx" },
+  { symbol: "GBPCHF=X", name: "GBP/CHF", asset_class: "fx" },
+  { symbol: "EURCHF=X", name: "EUR/CHF", asset_class: "fx" },
 ];
 
 export function filterUniverse(classes: AssetClass[]): UniverseSymbol[] {
