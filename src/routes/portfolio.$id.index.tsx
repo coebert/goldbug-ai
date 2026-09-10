@@ -226,6 +226,11 @@ const NextBestTradeCard = lazy(() =>
     default: m.NextBestTradeCard,
   })),
 );
+const NextBestTradeHistoryCard = lazy(() =>
+  import("@/components/next-best-trade-history-card").then((m) => ({
+    default: m.NextBestTradeHistoryCard,
+  })),
+);
 
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
