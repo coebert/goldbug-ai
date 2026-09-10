@@ -141,16 +141,22 @@ export function TradeCostBreakdownCard({ portfolioId }: { portfolioId: string })
                       <td className="py-2 text-right tabular-nums">
                         {formatMoney(r.grossBase, ccy)}
                       </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {formatMoney(r.commissionBase, ccy)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">{formatMoney(r.taxBase, ccy)}</td>
-                      <td className="py-2 text-right tabular-nums">
-                        {formatMoney(r.exchangeBase, ccy)}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {formatMoney(r.otherBase, ccy)}
-                      </td>
+                      {itemised && (
+                        <>
+                          <td className="py-2 text-right tabular-nums">
+                            {formatMoney(r.commissionBase, ccy)}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            {formatMoney(r.taxBase, ccy)}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            {formatMoney(r.exchangeBase, ccy)}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            {formatMoney(r.otherBase, ccy)}
+                          </td>
+                        </>
+                      )}
                       <td className="py-2 text-right tabular-nums font-medium">
                         {formatMoney(r.totalCostBase, ccy)}
                         <span className="block text-xs text-muted-foreground">
