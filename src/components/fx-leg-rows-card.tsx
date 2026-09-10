@@ -158,6 +158,16 @@ export function FxLegRowsCard({
                             stale
                           </Badge>
                         )}
+                        {hygieneBySymbol.get(l.symbol)?.recommendClose && (
+                          <Badge variant="destructive" className="ml-1 text-[10px]">
+                            close suggested
+                          </Badge>
+                        )}
+                        {hygieneBySymbol.get(l.symbol) && (
+                          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                            {hygieneBySymbol.get(l.symbol)!.reason}
+                          </p>
+                        )}
                       </td>
                       <td className="py-1.5 pr-2 text-right tabular-nums">{l.avgCost.toFixed(4)}</td>
                       <td className="py-1.5 pr-2 text-right tabular-nums">
