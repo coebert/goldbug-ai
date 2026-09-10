@@ -206,6 +206,64 @@ Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if 
 Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
 ${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;
 
+  // Everything above this line is byte-identical from tick to tick for a given
+  // portfolio, so the provider can serve it from its prompt cache at ~10% of
+  // the input price. Everything that changes hour to hour (quotes, regime,
+  // learning, live blocks) goes AFTER it — putting a single volatile figure
+  // near the top would invalidate the whole cached prefix and cost full price
+  // on ~7k tokens every call. Content is unchanged; only the order differs.
+  const liveContext = `${buildTradingCostBlock({
+  currency: args.portfolio.currency,
+  stampExemptPreference: cfg.stamp_exempt_preference,
+  measuredRoundTripBps: args.measuredRoundTripBps ?? null,
+  symbolCosts: args.symbolCosts ?? null,
+  costProvenance: args.costProvenance ?? null,
+  reserveRules: args.reserveRules ?? null,
+})}
+
+${args.liveQuoteBlock ?? "LIVE MARKET PRICES: no real-time tick available this run — every price below is the last daily close and may be stale."}
+
+${regimeBlock}
+
+${args.crossAsset}
+
+${args.optionsBlock}
+
+${args.crossSectional}
+
+${args.marketEvents ?? ""}
+
+${eventsBlock}
+${coolingBlock}
+
+${formatLearningBlock(args.learning)}
+
+${args.attribution ?? ""}
+${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
+${args.calibrationBlock ?? ""}
+${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
+${args.alphaPriors ?? ""}
+${args.algoRegimeBlock ?? ""}
+${args.sectorCycleBlock ?? ""}
+
+${args.cashPolicyBlock ?? ""}
+
+${args.shortSleeveBlock ?? ""}
+
+${args.playbookBlock ?? ""}
+
+${args.riskProfileBlock ?? ""}
+
+${args.modelBlock ?? ""}
+
+${args.cryptoSignalsBlock ?? ""}
+
+${args.fxSystemBlock ?? ""}`;
+
+  const system = `${systemStatic}
+
+${liveContext}`;
+
 
 
   const budgetBlock = args.perSymbolBudget != null
