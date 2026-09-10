@@ -442,6 +442,8 @@ export async function routeOrdersToBroker(params: {
     const { planSectorAdmissions, DEFAULT_SECTOR_BUDGET } = await import("./sector-concentration");
     const { resolveChurnPolicy } = await import("./churn-policy");
     const { estimateTradeCosts, attractsStampDuty } = await import("./trade-viability-gate");
+    const { isDiversifiedFund } = await import("./diversified-fund");
+    const { companyName: symbolDisplayName } = await import("./symbol-names");
     const { convertAmount } = await import("./fx.server");
     const { inferSaxoCurrency } = await import("./saxo-fees");
     const { symbolSector } = await import("./sector-rotation.server");
