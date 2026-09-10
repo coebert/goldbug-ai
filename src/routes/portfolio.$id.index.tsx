@@ -205,6 +205,11 @@ const SymbolCashFlowTable = lazy(() =>
     default: m.SymbolCashFlowTable,
   })),
 );
+const TradeImpactPanel = lazy(() =>
+  import("@/components/trade-impact-panel").then((m) => ({
+    default: m.TradeImpactPanel,
+  })),
+);
 const NextBestTradeCard = lazy(() =>
   import("@/components/next-best-trade-card").then((m) => ({
     default: m.NextBestTradeCard,
@@ -1115,6 +1120,13 @@ function PortfolioPage() {
                     <NextBestTradeCard portfolioId={id} />
                   </Suspense>
                 </div>
+                {p.mode === "live_prod" && (
+                  <div className="mb-6">
+                    <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                      <TradeImpactPanel portfolioId={id} />
+                    </Suspense>
+                  </div>
+                )}
                 {p.mode === "live_prod" && (
                   <div className="mb-6">
                     <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
