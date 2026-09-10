@@ -250,7 +250,10 @@ export function formatCandidateTable(features: readonly unknown[]): string {
     ];
     return `${cells.join(" | ")} || news ${sentimentCell(f)} || events ${eventCell(
       f,
-    )} || rank ${rankCell(f)} || fund ${fundamentalsCell(f)}`;
+    )} || rank ${rankCell(f)} || fund ${fundamentalsCell(
+      f,
+      fullSet.has(String(f["symbol"] ?? "")),
+    )}`;
   });
 
   return `Candidate assets — one row per symbol, fields separated by " | ", sub-blocks by " || ". Values rounded; "-" = not available.
