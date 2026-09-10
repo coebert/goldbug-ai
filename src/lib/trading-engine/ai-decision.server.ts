@@ -161,7 +161,7 @@ ${r.transitioned ? "Because the regime just shifted, explicitly reassess existin
   const cryptoBlock = classAllowed("crypto") ? CRYPTO_PLAYBOOK : "";
 
 
-  const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
+  const systemStatic = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no naked shorting, no leverage, no CFDs, no options.
 - Bearish exposure is allowed ONLY through the SHORT SLEEVE below: buy one of the listed cash-funded inverse ETFs. Selling an unheld stock is rejected and never creates a short.
