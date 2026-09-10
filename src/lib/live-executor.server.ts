@@ -1833,7 +1833,7 @@ export async function routeOrdersToBroker(params: {
 
     // Round quantity to a whole share (Saxo Stock/Etf orders reject fractional
     // Amount). Skip if this rounds to zero.
-    const qty = Math.floor(order.quantity);
+    let qty = Math.floor(order.quantity);
     if (qty <= 0) {
       results.push({
         symbol: order.symbol,
@@ -1852,12 +1852,36 @@ export async function routeOrdersToBroker(params: {
     // quantity — and skip BUYs whose round-trip friction (commission floor +
     // UK stamp duty + PTM levy + half-spread) exceeds the budget. Sells are
     // never blocked: exits must always be able to execute.
-    const viability = assessTradeViability({
+    let viability = assessTradeViability({
       symbol: order.symbol,
       side: order.side,
       quantity: qty,
       price: order.price,
     });
+    let sizeUpNote: string | null = null;
+    // The idea already passed every merit gate upstream; if the only problem
+    // is that the ticket is too small to carry the fee floor, buy enough to
+    // make it viable rather than discarding the trade.
+    if (!viability.viable && order.side === "buy") {
+      const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
+      const spendable = spendLedger.get(orderCcy) ?? 0;
+      const plan = planViableSizeUp({
+        quantity: qty,
+        price: order.price,
+        minViableNotional: viability.minViableNotional,
+        spendable,
+      });
+      sizeUpNote = plan.note;
+      if (plan.applied) {
+        qty = plan.quantity;
+        viability = assessTradeViability({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: qty,
+          price: order.price,
+        });
+      }
+    }
     if (!viability.viable) {
       results.push({
         symbol: order.symbol,
@@ -1882,10 +1906,26 @@ export async function routeOrdersToBroker(params: {
           costs: viability.costs,
           budgetBps: viability.budgetBps,
           minViableNotional: viability.minViableNotional,
+          sizeUp: sizeUpNote,
         }),
         error: viability.reason ?? null,
       });
       continue;
+    }
+    if (sizeUpNote) {
+      const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
+      spendLedger.set(orderCcy, Math.max(0, (spendLedger.get(orderCcy) ?? 0) - qty * order.price));
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: adapter.env,
+        method: "TRADE_SIZED_UP",
+        path: "live_orders",
+        status: 200,
+        request: asJson({ symbol: order.symbol, quantity: qty, price: order.price }),
+        response: asJson({ note: sizeUpNote }),
+      });
     }
 
 
