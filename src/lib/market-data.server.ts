@@ -234,6 +234,125 @@ type PriceRow = {
   volume: number | null;
 };
 
+// ---------------------------------------------------------------------------
+// Micro-batched cache reads.
+//
+// Even with the memo, a tick still fires one `price_cache` SELECT per symbol
+// because every module asks for a DIFFERENT symbol at the same moment. Those
+// hundreds of tiny reads monopolise the connection pool, and unrelated
+// queries — notably the broker activity log — queue behind them until they
+// time out. Requests raised in the same tick are therefore collected and
+// served by ONE `in (...)` query per (days, asOf) group. Callers keep calling
+// `getDailyCandles` symbol by symbol; only the round-trips collapse.
+// ---------------------------------------------------------------------------
+const BATCH_CHUNK = 60;
+type CacheWaiter = {
+  symbol: string;
+  resolve: (rows: PriceRow[]) => void;
+  reject: (err: unknown) => void;
+};
+const pendingCacheReads = new Map<string, { waiters: CacheWaiter[]; scheduled: boolean }>();
+
+/** One `price_cache` read for a single symbol; the un-batched fallback. */
+async function readCachedRows(
+  symbol: string,
+  days: number,
+  asOfDate: string,
+): Promise<PriceRow[]> {
+  const { data } = await supabaseAdmin
+    .from("price_cache")
+    .select("price_date, open, high, low, close, volume")
+    .eq("symbol", symbol)
+    .lte("price_date", asOfDate)
+    .order("price_date", { ascending: false })
+    .limit(days);
+  return (data ?? []) as PriceRow[];
+}
+
+async function flushCacheBatch(groupKey: string, days: number, asOfDate: string): Promise<void> {
+  const group = pendingCacheReads.get(groupKey);
+  if (!group) return;
+  pendingCacheReads.delete(groupKey);
+
+  // Collapse duplicate symbols within the batch onto one row set.
+  const bySymbolWaiters = new Map<string, CacheWaiter[]>();
+  for (const w of group.waiters) {
+    const list = bySymbolWaiters.get(w.symbol) ?? [];
+    list.push(w);
+    bySymbolWaiters.set(w.symbol, list);
+  }
+  const symbols = [...bySymbolWaiters.keys()];
+
+  for (let i = 0; i < symbols.length; i += BATCH_CHUNK) {
+    const chunk = symbols.slice(i, i + BATCH_CHUNK);
+    const rowBudget = days * chunk.length;
+    let rows: PriceRow[] & { symbol?: string }[] = [];
+    let failed: unknown = null;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("price_cache")
+        .select("symbol, price_date, open, high, low, close, volume")
+        .in("symbol", chunk)
+        .lte("price_date", asOfDate)
+        .order("price_date", { ascending: false })
+        .limit(rowBudget);
+      if (error) throw new Error(error.message);
+      rows = (data ?? []) as never;
+    } catch (err) {
+      failed = err;
+    }
+
+    const grouped = new Map<string, PriceRow[]>();
+    for (const row of rows as unknown as (PriceRow & { symbol: string })[]) {
+      const list = grouped.get(row.symbol) ?? [];
+      if (list.length >= days) continue;
+      list.push(row);
+      grouped.set(row.symbol, list);
+    }
+    // The shared row budget can truncate a symbol whose history is denser than
+    // its peers'. Those few symbols get their own read rather than a short series.
+    const truncated = (rows as unknown[]).length >= rowBudget;
+
+    for (const symbol of chunk) {
+      const waiters = bySymbolWaiters.get(symbol) ?? [];
+      const own = grouped.get(symbol) ?? [];
+      const needsOwnRead = failed !== null || (truncated && own.length < days);
+      const settle = needsOwnRead
+        ? readCachedRows(symbol, days, asOfDate)
+        : Promise.resolve(own);
+      settle.then(
+        (out) => waiters.forEach((w) => w.resolve(out)),
+        (err) => waiters.forEach((w) => w.reject(err)),
+      );
+    }
+  }
+}
+
+/**
+ * Ask for one symbol's cached rows, but share the round-trip with every other
+ * symbol requested in the same tick.
+ */
+function readCachedRowsBatched(
+  symbol: string,
+  days: number,
+  asOfDate: string,
+): Promise<PriceRow[]> {
+  const groupKey = `${days}|${asOfDate}`;
+  const group = pendingCacheReads.get(groupKey) ?? { waiters: [], scheduled: false };
+  pendingCacheReads.set(groupKey, group);
+  const promise = new Promise<PriceRow[]>((resolve, reject) => {
+    group.waiters.push({ symbol, resolve, reject });
+  });
+  if (!group.scheduled) {
+    group.scheduled = true;
+    // Next macrotask: everything the current synchronous burst asks for lands
+    // in this batch, including work queued by already-resolved promises.
+    setTimeout(() => void flushCacheBatch(groupKey, days, asOfDate), 0);
+  }
+  return promise;
+}
+
+
 /** Write candles into `price_cache` (chunked) so later reads are free. */
 async function cacheCandles(symbol: string, candles: Candle[]): Promise<void> {
   if (candles.length === 0) return;
@@ -323,14 +442,10 @@ async function loadDailyCandles(
   days: number,
   asOfDate: string,
 ): Promise<Candle[]> {
-  // First try cache
-  const { data: cached } = await supabaseAdmin
-    .from("price_cache")
-    .select("price_date, open, high, low, close, volume")
-    .eq("symbol", symbol)
-    .lte("price_date", asOfDate)
-    .order("price_date", { ascending: false })
-    .limit(days);
+  // First try cache (shared round-trip with every other symbol in this tick)
+  const cached = await readCachedRowsBatched(symbol, days, asOfDate);
+
+
 
 
   const cachedCandles: Candle[] = (cached ?? [])
