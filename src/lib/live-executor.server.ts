@@ -1914,9 +1914,14 @@ export async function routeOrdersToBroker(params: {
       });
       continue;
     }
-    if (sizeUpNote) {
+    // Every routed buy consumes cash, whether or not it was sized up, so the
+    // ledger must be debited for all of them — otherwise a later uplift would
+    // spend money an earlier ticket has already committed.
+    if (order.side === "buy") {
       const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
       spendLedger.set(orderCcy, Math.max(0, (spendLedger.get(orderCcy) ?? 0) - qty * order.price));
+    }
+    if (sizeUpApplied) {
       await supabaseAdmin.from("live_broker_log").insert({
         portfolio_id: portfolio.id,
         user_id: userId,
