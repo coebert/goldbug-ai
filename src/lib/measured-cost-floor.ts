@@ -66,8 +66,14 @@ export function measuredFloorParts(input: {
   measuredAtNotional?: number;
 }): MeasuredFloorParts {
   const measured = Math.max(0, Number(input.measuredRoundTripBps) || 0);
-  const at = Math.max(1, Number(input.measuredAtNotional) || DEFAULT_MEASURED_TICKET_NOTIONAL);
+  const given = Math.max(1, Number(input.measuredAtNotional) || DEFAULT_MEASURED_TICKET_NOTIONAL);
   const fixedCost = fixedRoundTripCost(input.symbol, input.assetClass);
+  // Guard against attributing more of the measured ratio to fixed commission
+  // than it can possibly contain: if the assumed sample ticket were that
+  // small, the commission minimum alone would exceed the whole measured cost.
+  // In that case the real sample was larger, so infer the implied size.
+  const impliedAt = measured > 0 ? (fixedCost * 10_000) / (MAX_FIXED_SHARE * measured) : given;
+  const at = Math.max(given, impliedAt);
   const fixedBpsAtMeasure = (fixedCost * 10_000) / at;
   return {
     variableBps: Math.max(0, measured - fixedBpsAtMeasure),
