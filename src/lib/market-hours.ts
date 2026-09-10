@@ -94,6 +94,13 @@ export function inferVenue(symbol: string): MarketVenue {
   if (s.endsWith(".AX") || s.endsWith(":XASX")) return "ASX";
   // LSE — either Yahoo `.L` or Saxo `SYMBOL:XLON` form.
   if (s.endsWith(".L") || s.endsWith(":XLON")) return "LSE";
+  // Continental Europe — Yahoo suffixes or Saxo `SYMBOL:MIC` forms.
+  if (/\.(DE|F)$/.test(s) || /:(XETR|XFRA)$/.test(s)) return "XETR";
+  if (/\.(PA|AS|BR|LS|MI|MC)$/.test(s) || /:(XPAR|XAMS|XBRU|XLIS|XMIL|XMAD|XDUB|XMSM)$/.test(s)) {
+    return "EURONEXT";
+  }
+  if (/\.SW$/.test(s) || /:(XSWX|XVTX)$/.test(s)) return "SIX";
+  if (/\.(ST|CO|HE|OL)$/.test(s) || /:(XSTO|XCSE|XHEL|XOSL)$/.test(s)) return "NORDIC";
   // Anything else that looks like a 1-5 letter equity ticker → US listed.
   // We can't cheaply distinguish NYSE from NASDAQ; both share the same window
   // so we just pick NYSE as the label — the session windows are identical.
