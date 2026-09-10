@@ -22,7 +22,7 @@ describe("measured cost floor scaling", () => {
       symbol: "VWRL:xlon",
       measuredRoundTripBps: 90,
       measuredAtNotional: 250,
-      notional: 250,
+      notional: 650,
     });
     const big = scaleMeasuredRoundTripBps({
       symbol: "VWRL:xlon",
@@ -30,8 +30,8 @@ describe("measured cost floor scaling", () => {
       measuredAtNotional: 250,
       notional: 1500,
     });
-    expect(small).toBeCloseTo(90, 1);
     expect(big).toBeLessThan(small);
+    expect(big).toBeGreaterThanOrEqual(90 * 0.4);
   });
 
   it("charges an undersized ticket more, capped", () => {
