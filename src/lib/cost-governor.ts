@@ -428,7 +428,8 @@ export function planAdmissions(
 
 
 
-  const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
+  const buyCap = deploymentAdjustedBuyCap(cfg);
+  const roomToday = Math.max(0, buyCap.cap - Math.max(0, cfg.buysAlreadyToday));
 
   const stampPref = cfg.stampExemptPreference ?? "off";
   const decisions: GovernorDecision[] = [];
