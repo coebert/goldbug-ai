@@ -30,6 +30,7 @@
 // per-symbol last-buy ages, and passes base-currency notionals.
 
 import { engineSymbolKey } from "./price-symbol";
+import { DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV } from "./diversified-fund";
 import {
   edgesComparable,
   stampPreferenceSurcharge,
