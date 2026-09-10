@@ -1929,13 +1929,24 @@ export async function runDailyTick(
         });
         if (plan.action !== "hold" && plan.quantity > 0) {
           const symbolForOrder = coreHoldings[0]?.symbol ?? coreCfg.symbol;
-          decision.orders.push({
-            symbol: symbolForOrder,
-            side: plan.action === "buy" ? "buy" : "sell",
-            quantity: plan.quantity,
-            reason: plan.reason,
-          } as (typeof decision.orders)[number]);
-          srvLog.info(`[core-allocation] ${plan.action} ${plan.quantity} ${symbolForOrder}: ${plan.reason}`);
+          const coreQty = coreHoldings.reduce((s, h) => s + Number(h.quantity), 0);
+          // Buys are sized as a share of NAV; sells as a share of the holding.
+          const percent = plan.action === "buy"
+            ? (totalValue > 0 ? Math.min(100, (plan.notional / totalValue) * 100) : 0)
+            : (coreQty > 0 ? Math.min(100, (plan.quantity / coreQty) * 100) : 0);
+          if (percent > 0) {
+            decision.orders.push({
+              symbol: symbolForOrder,
+              side: plan.action === "buy" ? "buy" : "sell",
+              percent,
+              conviction: 0.7,
+              reason: plan.reason,
+              signal_weights: {
+                sma_trend: 0, rsi: 0, price_change: 0, news_sentiment: 0, volatility: 0,
+              },
+            });
+            srvLog.info(`[core-allocation] ${plan.action} ${plan.quantity} ${symbolForOrder}: ${plan.reason}`);
+          }
         }
       }
     }
