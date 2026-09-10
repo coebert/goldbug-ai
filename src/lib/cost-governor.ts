@@ -434,14 +434,16 @@ export function planAdmissions(
     }
 
     const held = exposure.get(symKey) ?? 0;
+    const capPct = c.diversifiedFund ? maxDiversifiedPct : maxPositionPct;
+    const positionCap = Math.max(0, cfg.navBase) * capPct;
     if (positionCap > 0 && held + c.notionalBase > positionCap) {
       decisions.push({
         kind: "skip",
         candidate: c,
         reason:
-          `single-name cap: ${c.symbol} would reach ` +
+          `${c.diversifiedFund ? "diversified-fund cap" : "single-name cap"}: ${c.symbol} would reach ` +
           `${(((held + c.notionalBase) / Math.max(1, cfg.navBase)) * 100).toFixed(1)}% of NAV, ` +
-          `above the ${(maxPositionPct * 100).toFixed(0)}% limit`,
+          `above the ${(capPct * 100).toFixed(0)}% limit`,
       });
       continue;
     }
