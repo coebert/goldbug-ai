@@ -205,6 +205,11 @@ const SymbolCashFlowTable = lazy(() =>
     default: m.SymbolCashFlowTable,
   })),
 );
+const TradeImpactPanel = lazy(() =>
+  import("@/components/trade-impact-panel").then((m) => ({
+    default: m.TradeImpactPanel,
+  })),
+);
 const NextBestTradeCard = lazy(() =>
   import("@/components/next-best-trade-card").then((m) => ({
     default: m.NextBestTradeCard,
