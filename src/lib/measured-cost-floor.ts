@@ -29,6 +29,13 @@ export const DEFAULT_MEASURED_TICKET_NOTIONAL = 250;
 /** Never re-price the measured floor beyond this multiple of itself. */
 const MAX_SCALE = 3;
 
+/**
+ * Most of the measured ratio that may be attributed to the fixed commission
+ * minimum. Keeps a floor of real, size-invariant spread/slippage cost that no
+ * amount of sizing up can dilute away.
+ */
+const MAX_FIXED_SHARE = 0.6;
+
 export type MeasuredFloorInput = {
   symbol: string;
   assetClass?: string | null;
