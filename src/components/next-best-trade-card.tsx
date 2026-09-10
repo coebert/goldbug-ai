@@ -1,18 +1,34 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Target } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatMoney, formatMoneySigned } from "@/lib/format-money";
 import { getNextBestTrade } from "@/lib/next-best-trade.functions";
+import { placeManualOrder, type ManualOrderResult } from "@/lib/manual-order.functions";
 
 function priceLabel(price: number, currency: string) {
   return formatMoney(price, currency);
 }
 
-export function NextBestTradeCard({ portfolioId }: { portfolioId: string }) {
+export function NextBestTradeCard({
+  portfolioId,
+  mode,
+}: {
+  portfolioId: string;
+  mode?: string;
+}) {
+  const qc = useQueryClient();
+  const isLive = mode === "live_prod" || mode === "live_sim";
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [placed, setPlaced] = useState<ManualOrderResult | null>(null);
   const fetchNext = useServerFn(getNextBestTrade);
+  const placeFn = useServerFn(placeManualOrder);
   const query = useQuery({
     queryKey: ["next-best-trade", portfolioId],
     queryFn: () => fetchNext({ data: { portfolioId } }),
@@ -23,6 +39,38 @@ export function NextBestTradeCard({ portfolioId }: { portfolioId: string }) {
   const data = query.data;
   const top = data?.rows.find((r) => r.recommended) ?? null;
   const others = (data?.rows ?? []).filter((r) => r !== top).slice(0, 4);
+
+  // The suggestion is only useful if it can become a real order: route it
+  // through exactly the same broker path the AI and the order ticket use, so
+  // the buy lands in the live order book and then on the trades list.
+  const place = useMutation({
+    mutationFn: () => {
+      if (!top) throw new Error("No suggestion to place.");
+      return placeFn({
+        data: {
+          portfolioId,
+          symbol: top.symbol,
+          side: "buy" as const,
+          quantity: top.quantity,
+        },
+      });
+    },
+    onSuccess: (r) => {
+      setPlaced(r);
+      if (r.ok) {
+        toast.success(
+          `Buy ${r.quantity} ${r.symbol} sent to the broker${
+            r.brokerOrderId ? ` (order ${r.brokerOrderId})` : ""
+          }`,
+        );
+      } else {
+        toast.error(`Order not placed: ${r.reason ?? r.status}`);
+      }
+      void qc.invalidateQueries();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
 
   return (
     <Card data-testid="next-best-trade-card">
