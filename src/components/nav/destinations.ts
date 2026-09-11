@@ -233,6 +233,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     area: "trades",
     keywords: "core allocation target progress build cash needed date vwrl tracker",
   },
+  {
+    to: "/core-performance",
+    label: "Core performance",
+    tabLabel: "Performance",
+    hint: "VWRL returns, drawdown and the 50% target compared with global peers.",
+    icon: LineChart,
+    area: "markets",
+    keywords: "core performance vwrl history returns peers allocation global funds",
+  },
 
 
   // --- System -----------------------------------------------------
@@ -307,7 +316,7 @@ export function searchDestinations(query: string): Destination[] {
 /** Which area a pathname belongs to, for active highlighting. */
 export function areaForPath(pathname: string): AreaId {
   if (pathname === "/") return "home";
-  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/signals-by-market") || pathname.startsWith("/global-coverage") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
+  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/signals-by-market") || pathname.startsWith("/global-coverage") || pathname.startsWith("/core-performance") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
     return "markets";
   }
   if (

@@ -1,13 +1,14 @@
 // Core Progress: how much of the owner-set core allocation is actually built,
 // what it still costs to finish, and when it gets there at the recent pace.
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Target } from "lucide-react";
+import { ChartNoAxesCombined, Target } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Table,
@@ -58,6 +59,7 @@ function CoreProgressPage() {
       <PageShell
         title="Core progress"
         purpose="Your long-term core holding, how far it is from its target share of the account, and what it still costs to finish."
+        actions={<Button variant="outline" size="sm" asChild><Link to="/core-performance"><ChartNoAxesCombined className="h-4 w-4" /> Performance</Link></Button>}
       >
         <div className="space-y-4">
           {query.isLoading ? (

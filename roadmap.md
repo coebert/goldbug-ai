@@ -63,3 +63,4 @@
 - [x] Global strong-signal coverage: full-universe hourly gate/cache, venue-balanced AI window, and European execution-session safeguards
 - [x] Signals by Market page: current signals, confidence, expected edge, market status, and explicit coverage gaps
 - [x] Global coverage page: per-market fill rates and missed signals with causes and paper outcomes
+- [x] Core Performance page: VWRL price history, GBP returns, drawdown, closest global peers, and 50% target comparison
