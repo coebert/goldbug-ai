@@ -1986,8 +1986,15 @@ export async function runDailyTick(
   // working buffer is short, so it can never be the reason a trade fails.
   try {
     const { loadCashSleeveSettings } = await import("./trading-controls.server");
-    const sleeveCfg = await loadCashSleeveSettings();
-    if (sleeveCfg.enabled) {
+    const loaded = await loadCashSleeveSettings();
+    // Park cash in the book's OWN currency: holding a GBP fund inside a EUR
+    // account turns a cash balance into an FX bet, which is the opposite of
+    // what a cash sleeve is for. Books in a currency with no listed sleeve
+    // keep their cash as cash.
+    const sleeveByCcy: Record<string, string> = { GBP: loaded.symbol, EUR: "XEON.DE" };
+    const sleeveSymbol = sleeveByCcy[portfolioBaseCcy.toUpperCase()];
+    const sleeveCfg = { ...loaded, symbol: sleeveSymbol ?? loaded.symbol };
+    if (loaded.enabled && sleeveSymbol) {
       const { planCashSleeve } = await import("./cash-sleeve");
       const sleeveKey = engineSymbolKey(sleeveCfg.symbol);
       cashSleeveSizing = { key: sleeveKey, capPct: 0.95 };
