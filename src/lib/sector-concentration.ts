@@ -110,7 +110,7 @@ export function planSectorAdmissions(
         reason:
           `sector budget: ${key === UNKNOWN ? "unclassified" : key} exposure would reach ` +
           `${after.toFixed(0)} of a ${cap.toFixed(0)} cap ` +
-          `(${((key === UNKNOWN ? cfg.maxUnknownPctOfNav : cfg.maxSectorPctOfNav) * 100).toFixed(0)}% of NAV ${nav.toFixed(0)}); ` +
+          `(${(effPct * 100).toFixed(0)}% of NAV ${nav.toFixed(0)}${override ? ", already stretched for a very strong signal" : ""}); ` +
           `already holding ${current.toFixed(0)}`,
       });
       continue;
