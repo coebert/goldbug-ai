@@ -214,10 +214,13 @@ export function scoreFundamentals(
   // Hard risks bite: each one shaves the score, capped so flags alone cannot
   // drive a healthy company to maximally negative.
   const penalty = Math.min(0.5, flags.filter((x) => !x.startsWith("results due")).length * 0.12);
+  // Size tilt: bigger, deeper names are cheaper to trade and have carried this
+  // account's winners. Bounded to +/-0.08 so it only ever breaks ties.
+  const size = scaleBonus(f.market_cap);
 
   return {
     symbol: f.symbol,
-    score: Number(clamp1(base - penalty).toFixed(3)),
+    score: Number(clamp1(base - penalty + size).toFixed(3)),
     subscores,
     coverage,
     flags,
