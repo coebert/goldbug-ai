@@ -106,6 +106,7 @@ import { unifiedScore } from "./alpha/unified-score";
 import { combineHaircuts } from "./sizing-haircuts";
 import { combineBoosts } from "./sizing/multiplier-ceiling";
 import { earningsGate } from "./events/earnings-gate";
+import { earningsThresholdsFor } from "./events/region-thresholds";
 import { loadMeasuredEdge } from "./measured-edge.server";
 import { computeAndPersistCalibration, getLatestCalibration, formatCalibrationBlock } from "./calibration.server";
 import {
