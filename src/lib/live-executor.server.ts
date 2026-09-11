@@ -618,8 +618,25 @@ export async function routeOrdersToBroker(params: {
     );
     const investedFraction = inputs.navBase > 0 ? investedBase / inputs.navBase : undefined;
 
+    // The owner-set core holding is a deliberate baseline, not a single-name
+    // bet, so it sits under its own cap (target + drift band).
+    const coreCaps = await (async () => {
+      try {
+        const { loadCoreAllocationSettings } = await import("./trading-controls.server");
+        const c = await loadCoreAllocationSettings();
+        if (!(c.targetPct > 0)) return {};
+        return {
+          coreSymbolKey: c.symbol,
+          coreCapPctOfNav: Math.min(0.95, c.targetPct + Math.max(0, c.bandPct)),
+        };
+      } catch {
+        return {};
+      }
+    })();
+
     const plan = planAdmissions(candidates, {
       navBase: inputs.navBase,
+      ...coreCaps,
       buysAlreadyToday: inputs.buysAlreadyToday,
       investedFraction,
       trailingCostBase: inputs.trailingCostBase,
