@@ -1,4 +1,5 @@
 import {
+  Target,
   Home,
   LineChart,
   FlaskConical,
