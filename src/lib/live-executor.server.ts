@@ -1962,7 +1962,10 @@ export async function routeOrdersToBroker(params: {
         });
       } else {
         const reason =
-          order.side === "buy" && onePrice > 0
+          order.side === "buy" && onePrice > 0 && extraOne > headroomOne
+            ? `ticket trimmed below one share and rounding up to one ${order.symbol} share ` +
+              `would exceed today's remaining trading limit — nothing was bought`
+            : order.side === "buy" && onePrice > 0
             ? `ticket trimmed below one share: one ${order.symbol} share costs ` +
               `${onePrice.toFixed(2)} ${orderCcy} and only ${spendable.toFixed(2)} ${orderCcy} ` +
               `is spendable this run — nothing was bought and no money was spent`
