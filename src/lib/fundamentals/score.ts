@@ -236,7 +236,7 @@ export function scoreFundamentals(
   const penalty = Math.min(0.5, flags.filter((x) => !x.startsWith("results due")).length * 0.12);
   // Size tilt: bigger, deeper names are cheaper to trade and have carried this
   // account's winners. Bounded to +/-0.08 so it only ever breaks ties.
-  const size = scaleBonus(f.market_cap);
+  const size = scaleBonus(f.market_cap, reportingCurrency(f));
 
   return {
     symbol: f.symbol,
