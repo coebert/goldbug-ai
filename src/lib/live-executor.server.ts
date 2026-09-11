@@ -1919,14 +1919,54 @@ export async function routeOrdersToBroker(params: {
     // Amount). Skip if this rounds to zero.
     let qty = Math.floor(order.quantity);
     if (qty <= 0) {
-      results.push({
-        symbol: order.symbol,
-        side: order.side,
-        quantity: order.quantity,
-        status: "skipped",
-        skipped: "quantity < 1 whole share",
-      });
-      continue;
+      // A buy trimmed to a fraction of a share is not an error — the idea
+      // survived every merit gate and then lost the rounding. Buy one whole
+      // share when the cash is genuinely there, otherwise say plainly why
+      // nothing was bought instead of emitting a bare "quantity < 1".
+      const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
+      const spendable = spendLedger.get(orderCcy) ?? 0;
+      const onePrice = Number(order.price) || 0;
+      if (order.side === "buy" && onePrice > 0 && spendable >= onePrice) {
+        qty = 1;
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "TRADE_ROUNDED_UP_TO_ONE_SHARE",
+          path: "live_orders",
+          status: 200,
+          request: asJson({ symbol: order.symbol, requested: order.quantity, price: onePrice }),
+          response: asJson({ quantity: 1, spendable }),
+        });
+      } else {
+        const reason =
+          order.side === "buy" && onePrice > 0
+            ? `ticket trimmed below one share: one ${order.symbol} share costs ` +
+              `${onePrice.toFixed(2)} ${orderCcy} and only ${spendable.toFixed(2)} ${orderCcy} ` +
+              `is spendable this run — nothing was bought and no money was spent`
+            : "quantity < 1 whole share";
+        results.push({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: order.quantity,
+          status: "skipped",
+          skipped: reason,
+        });
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "TRADE_SUB_SHARE_SKIPPED",
+          path: "live_orders",
+          status: 412,
+          request: asJson({ symbol: order.symbol, side: order.side, requested: order.quantity, price: onePrice }),
+          response: asJson({ spendable, currency: orderCcy }),
+          error: reason,
+        });
+        continue;
+      }
     }
 
     // Trade-viability gate. Sizing upstream works on a *notional* budget, but
