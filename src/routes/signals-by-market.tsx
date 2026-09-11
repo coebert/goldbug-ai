@@ -19,9 +19,9 @@ export const Route = createFileRoute("/signals-by-market")({
   component: SignalsByMarketPage,
   head: () => ({
     meta: [
-      { title: "Signals by market | Goldbug" },
+      { title: "Signals by market | Aegis" },
       { name: "description", content: DESCRIPTION },
-      { property: "og:title", content: "Signals by market | Goldbug" },
+      { property: "og:title", content: "Signals by market | Aegis" },
       { property: "og:description", content: DESCRIPTION },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

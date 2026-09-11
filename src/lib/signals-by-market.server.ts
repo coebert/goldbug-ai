@@ -81,7 +81,7 @@ export async function buildSignalsByMarket(args: {
       direction: signalDirection(latest?.modelScore ?? null),
       signalScore: latest?.modelScore ?? null,
       confidence: suggestion?.confidence ?? deskRow.strength,
-      expectedEdgeBps: suggestion?.edge ?? deskRow.meanNetBps,
+      expectedEdgeBps: suggestion?.edge ?? null,
       price: deskRow.lastPrice,
       priceDate: deskRow.priceDate,
       decisionAt: suggestion?.at ?? comparison?.decisionAt ?? null,

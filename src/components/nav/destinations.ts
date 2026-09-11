@@ -299,7 +299,7 @@ export function searchDestinations(query: string): Destination[] {
 /** Which area a pathname belongs to, for active highlighting. */
 export function areaForPath(pathname: string): AreaId {
   if (pathname === "/") return "home";
-  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
+  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/signals-by-market") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
     return "markets";
   }
   if (
