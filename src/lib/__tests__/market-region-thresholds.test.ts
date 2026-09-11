@@ -15,6 +15,7 @@ describe("market region", () => {
     expect(marketRegion("SAP.DE")).toBe("europe");
     expect(marketRegion("ASML:XAMS")).toBe("europe");
     expect(marketRegion("7203.T")).toBe("japan");
+    expect(marketRegion("BHP.AX")).toBe("apac");
     expect(marketRegion("VWRL.L")).toBe("uk");
   });
 });
@@ -43,6 +44,7 @@ describe("region-aware event thresholds", () => {
     expect(earningsThresholdsFor("AAPL")).toMatchObject({ vetoDays: 2, haircutDays: 5 });
     expect(earningsThresholdsFor("7203.T")).toMatchObject({ vetoDays: 1, haircutDays: 2 });
     expect(earningsThresholdsFor("SAP.DE")).toMatchObject({ vetoDays: 1, haircutDays: 3 });
+    expect(earningsThresholdsFor("BHP.AX")).toMatchObject({ vetoDays: 1, haircutDays: 3 });
   });
 
   it("lets a Japanese buy through 4 days ahead of a print", () => {

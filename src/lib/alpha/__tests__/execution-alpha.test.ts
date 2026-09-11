@@ -68,11 +68,15 @@ describe("planOrderSlices", () => {
 });
 
 describe("inferVenueFromSymbol", () => {
-  it("classifies LSE, US, and crypto tickers", () => {
+  it("classifies global equity and crypto tickers", () => {
     expect(inferVenueFromSymbol("VOD.L")).toBe("LSE");
     expect(inferVenueFromSymbol("AAPL")).toBe("NYSE");
     expect(inferVenueFromSymbol("BTC-USD")).toBe("CRYPTO");
     expect(inferVenueFromSymbol("SGLN:XLON")).toBe("LSE");
+    expect(inferVenueFromSymbol("SAP.DE")).toBe("XETR");
+    expect(inferVenueFromSymbol("AIR.PA")).toBe("EURONEXT");
+    expect(inferVenueFromSymbol("NESN.SW")).toBe("SIX");
+    expect(inferVenueFromSymbol("VOLV-B.ST")).toBe("NORDIC");
   });
 });
 

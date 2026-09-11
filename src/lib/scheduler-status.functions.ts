@@ -64,9 +64,7 @@ export const getSchedulerStatus = createServerFn({ method: "GET" })
       try {
         const cls = classesFromUniverse(p.universe);
         classes = cls as string[];
-        symbols = filterUniverse(cls)
-          .slice(0, 22)
-          .map((u) => u.symbol);
+        symbols = filterUniverse(cls).map((u) => u.symbol);
       } catch {
         classes = [];
         symbols = [];

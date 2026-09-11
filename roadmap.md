@@ -60,3 +60,4 @@
 - [x] Flag FX funding legs that no longer fund any foreign holding (unused/oversized), with a close recommendation
 - [ ] Profit maximisation drive: evidence-led sweep of sizing, exit and conviction parameters on real prices; apply the best combination live
 - [x] Core allocation: owner-set long-term holding in a broad fund, deterministic top-up/trim in the daily tick (ships off at 0%; Risk page control)
+- [x] Global strong-signal coverage: full-universe hourly gate/cache, venue-balanced AI window, and European execution-session safeguards

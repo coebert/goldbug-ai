@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterUniverseByAffordability,
+  selectVenueBalancedCandidates,
   type UniverseSymbol,
 } from "../universe.server";
 
@@ -179,5 +180,36 @@ describe("filterUniverseByAffordability", () => {
 
     expect(res.candidates).toHaveLength(6);
     expect(res.candidates.map((c) => c.symbol).slice(0, 2)).toEqual(["XUKS.L", "XSPS.L"]);
+  });
+
+  it("balances a bounded window across every configured equity venue", () => {
+    const candidates: UniverseSymbol[] = [
+      ...Array.from({ length: 8 }, (_, i) => ({ symbol: `US${i + 1}`, name: `US ${i + 1}`, asset_class: "stock" as const })),
+      { symbol: "VOD.L", name: "UK", asset_class: "stock" },
+      { symbol: "SAP.DE", name: "Germany", asset_class: "stock" },
+      { symbol: "AIR.PA", name: "France", asset_class: "stock" },
+      { symbol: "NESN.SW", name: "Switzerland", asset_class: "stock" },
+      { symbol: "VOLV-B.ST", name: "Sweden", asset_class: "stock" },
+      { symbol: "7203.T", name: "Japan", asset_class: "stock" },
+      { symbol: "BHP.AX", name: "Australia", asset_class: "stock" },
+    ];
+    expect(selectVenueBalancedCandidates({ candidates, maxCandidates: 9 }).map((c) => c.symbol)).toEqual([
+      "US1", "VOD.L", "SAP.DE", "AIR.PA", "NESN.SW", "VOLV-B.ST", "7203.T", "BHP.AX", "US2",
+    ]);
+  });
+
+  it("reserves held and hedge symbols before venue balancing", () => {
+    const candidates: UniverseSymbol[] = [
+      { symbol: "AAPL", name: "Apple", asset_class: "stock" },
+      { symbol: "MSFT", name: "Microsoft", asset_class: "stock" },
+      { symbol: "SAP.DE", name: "SAP", asset_class: "stock" },
+      { symbol: "7203.T", name: "Toyota", asset_class: "stock" },
+      { symbol: "XUKS.L", name: "Inverse FTSE", asset_class: "etf" },
+    ];
+    expect(selectVenueBalancedCandidates({
+      candidates,
+      maxCandidates: 3,
+      prioritySymbols: ["7203.T", "XUKS.L"],
+    }).map((c) => c.symbol)).toEqual(["7203.T", "XUKS.L", "AAPL"]);
   });
 });

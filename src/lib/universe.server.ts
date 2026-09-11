@@ -2,6 +2,7 @@
 // (e.g. BTC-USD, GC=F, GBPUSD=X, VOD.L) which the price fetcher understands.
 import type { Database } from "@/integrations/supabase/types";
 import { parseTradingStyle, SWING_STYLE_OVERRIDES } from "./trading-style";
+import { inferVenue } from "./market-hours";
 
 export type AssetClass = Database["public"]["Enums"]["asset_class"];
 
@@ -668,6 +669,56 @@ export type AffordabilityResult = {
   fellBackToCheapest: boolean;
 };
 
+/** Keep a bounded decision window representative of every tradeable venue. */
+export function selectVenueBalancedCandidates(args: {
+  candidates: UniverseSymbol[];
+  maxCandidates: number;
+  prioritySymbols?: string[];
+}): UniverseSymbol[] {
+  const limit = Math.max(0, Math.floor(args.maxCandidates));
+  if (limit === 0) return [];
+  if (args.candidates.length <= limit) return [...args.candidates];
+
+  const priority = new Set((args.prioritySymbols ?? []).map((s) => s.toUpperCase()));
+  const selected: UniverseSymbol[] = [];
+  const selectedSymbols = new Set<string>();
+  const add = (candidate: UniverseSymbol) => {
+    const key = candidate.symbol.toUpperCase();
+    if (selected.length >= limit || selectedSymbols.has(key)) return;
+    selected.push(candidate);
+    selectedSymbols.add(key);
+  };
+  for (const candidate of args.candidates) {
+    if (priority.has(candidate.symbol.toUpperCase())) add(candidate);
+  }
+
+  const venueOrder: string[] = [];
+  const byVenue = new Map<string, UniverseSymbol[]>();
+  for (const candidate of args.candidates) {
+    if (selectedSymbols.has(candidate.symbol.toUpperCase())) continue;
+    const venue = inferVenue(candidate.symbol);
+    if (!byVenue.has(venue)) {
+      venueOrder.push(venue);
+      byVenue.set(venue, []);
+    }
+    byVenue.get(venue)?.push(candidate);
+  }
+  let depth = 0;
+  while (selected.length < limit) {
+    let added = false;
+    for (const venue of venueOrder) {
+      const candidate = byVenue.get(venue)?.[depth];
+      if (!candidate) continue;
+      add(candidate);
+      added = true;
+      if (selected.length >= limit) break;
+    }
+    if (!added) break;
+    depth += 1;
+  }
+  return selected;
+}
+
 export function filterUniverseByAffordability(args: {
   fullUniverse: UniverseSymbol[];
   priceMap: Map<string, number>;
@@ -730,16 +781,13 @@ export function filterUniverseByAffordability(args: {
       `No instruments affordable within per-symbol budget ${perSymbolBudget.toFixed(2)} ${currency}; showing 6 cheapest for reference. Add funds or widen the per-symbol cap to enable buys.`,
     );
   } else {
-    // Stable partition: priority symbols keep their original relative order,
-    // then everything else does. Without this the inverse ETFs near the end of
-    // the curated universe silently fall outside the model's 22-name window.
-    const orderedAffordable = priority.size
-      ? [
-          ...affordable.filter((u) => priority.has(u.symbol.toUpperCase())),
-          ...affordable.filter((u) => !priority.has(u.symbol.toUpperCase())),
-        ]
-      : affordable;
-    candidates = orderedAffordable.slice(0, maxCandidates);
+    // Held names and short proxies keep reserved places. Remaining seats are
+    // venue-balanced so declaration order cannot make the AI US/UK-only.
+    candidates = selectVenueBalancedCandidates({
+      candidates: affordable,
+      maxCandidates,
+      prioritySymbols: [...priority, ...heldSymbols],
+    });
     if (dropped.length > 0) {
       notes.push(
         `Cash-aware filter kept ${candidates.length}/${fullUniverse.length} instruments; dropped ${dropped.length} priced above per-symbol budget ${perSymbolBudget.toFixed(2)} ${currency}.`,

@@ -1,3 +1,5 @@
+import { inferVenue, type MarketVenue } from "../market-hours";
+
 /**
  * Phase 6 — Execution Alpha
  * -------------------------
@@ -82,16 +84,10 @@ export function planOrderSlices(args: {
 // Time-of-day filter — treats London trading hours as canonical for LSE names,
 // falls back to US session windows for US-listed symbols.
 
-export type Venue = "LSE" | "NYSE" | "NASDAQ" | "TSE_JP" | "ASX" | "CRYPTO" | "OTHER";
+export type Venue = MarketVenue;
 
 export function inferVenueFromSymbol(symbol: string): Venue {
-  const s = symbol.toUpperCase();
-  if (/-USD$|BTC|ETH|USDT|USDC/.test(s)) return "CRYPTO";
-  if (s.endsWith(".L") || s.endsWith(":XLON")) return "LSE";
-  if (s.endsWith(".T") || s.endsWith(":XTKS")) return "TSE_JP";
-  if (s.endsWith(".AX") || s.endsWith(":XASX")) return "ASX";
-  if (/^[A-Z]{1,5}$/.test(s)) return "NYSE";
-  return "OTHER";
+  return inferVenue(symbol);
 }
 
 // Session windows in minutes-since-midnight, local venue timezone. These are
@@ -105,7 +101,12 @@ const SESSIONS: Record<Venue, { openMin: number; closeMin: number } | null> = {
   NASDAQ: { openMin: 9 * 60 + 30, closeMin: 16 * 60 },
   TSE_JP: { openMin: 9 * 60, closeMin: 15 * 60 },
   ASX: { openMin: 10 * 60, closeMin: 16 * 60 },
+  XETR: { openMin: 9 * 60, closeMin: 17 * 60 + 30 },
+  EURONEXT: { openMin: 9 * 60, closeMin: 17 * 60 + 30 },
+  SIX: { openMin: 9 * 60, closeMin: 17 * 60 + 20 },
+  NORDIC: { openMin: 9 * 60, closeMin: 17 * 60 + 25 },
   CRYPTO: null, // 24/7
+  FX: null,
   OTHER: null,
 };
 
@@ -115,7 +116,12 @@ const VENUE_TZ: Record<Venue, string | null> = {
   NASDAQ: "America/New_York",
   TSE_JP: "Asia/Tokyo",
   ASX: "Australia/Sydney",
+  XETR: "Europe/Berlin",
+  EURONEXT: "Europe/Paris",
+  SIX: "Europe/Zurich",
+  NORDIC: "Europe/Stockholm",
   CRYPTO: null,
+  FX: null,
   OTHER: null,
 };
 
