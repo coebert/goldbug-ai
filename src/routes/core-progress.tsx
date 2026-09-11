@@ -107,10 +107,19 @@ function CoreProgressPage() {
                     <Stat
                       label="Spare cash today"
                       value={formatMoney(d.deployableCashBase, d.currency)}
+                      hint={`of ${formatMoney(d.cashBase, d.currency)} total cash`}
+                    />
+                    <Stat
+                      label="Cash gap"
+                      value={
+                        d.cashShortfallBase > 0
+                          ? formatMoney(d.cashShortfallBase, d.currency)
+                          : "None"
+                      }
                       hint={
                         d.cashShortfallBase > 0
-                          ? `${formatMoney(d.cashShortfallBase, d.currency)} short`
-                          : "enough to finish"
+                          ? "extra cash still needed to finish the core"
+                          : "spare cash covers what is left to buy"
                       }
                     />
                     <Stat

@@ -732,6 +732,15 @@ export async function routeOrdersToBroker(params: {
           }),
         };
       });
+    // The owner-set core holding is a deliberate baseline governed by its own
+    // target + drift cap, so the sector budget must never block it.
+    if (coreCaps.coreSymbolKey) {
+      const { engineSymbolKey: coreKeyOf } = await import("./price-symbol");
+      const coreKey = coreKeyOf(coreCaps.coreSymbolKey);
+      for (const c of sectorCandidates) {
+        if (coreKeyOf(c.symbol) === coreKey) c.diversified = true;
+      }
+    }
     const sectorPlan = planSectorAdmissions(sectorCandidates, inputs.sectorExposureBase, {
       navBase: inputs.navBase,
       ...DEFAULT_SECTOR_BUDGET,
