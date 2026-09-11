@@ -273,7 +273,7 @@ export async function routeOrdersToBroker(params: {
   const coreKeyForOrder = await (async () => {
     try {
       const { loadCoreAllocationSettings } = await import("./trading-controls.server");
-      const { engineSymbolKey } = await import("./symbol-key");
+      const { engineSymbolKey } = await import("./price-symbol");
       const c = await loadCoreAllocationSettings();
       return c.targetPct > 0 ? engineSymbolKey(c.symbol) : null;
     } catch {
@@ -282,7 +282,7 @@ export async function routeOrdersToBroker(params: {
   })();
   const orderedForDailyCap = coreKeyForOrder
     ? await (async () => {
-        const { engineSymbolKey } = await import("./symbol-key");
+        const { engineSymbolKey } = await import("./price-symbol");
         const isCoreOrder = (e: ExecutedOrderLike) =>
           e.side === "buy" && engineSymbolKey(e.symbol) === coreKeyForOrder;
         return [...routable.filter(isCoreOrder), ...routable.filter((e) => !isCoreOrder(e))];
