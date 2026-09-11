@@ -118,6 +118,14 @@ export type GovernorConfig = {
    */
   maxDiversifiedPositionPctOfNav?: number;
   /**
+   * Owner-set core holding (engine symbol key). Its size is decided by the
+   * core-allocation target, not by the AI, so it sits under
+   * `coreCapPctOfNav` instead of the single-name / diversified caps.
+   */
+  coreSymbolKey?: string;
+  /** Cap for the core holding as a fraction of NAV (target + drift band). */
+  coreCapPctOfNav?: number;
+  /**
    * Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
    * single stocks when signal strength is comparable. "off" ranks on the cost
    * model alone; "balanced"/"strong" re-count part of the 50bps stamp charge
