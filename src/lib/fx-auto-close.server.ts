@@ -213,7 +213,7 @@ async function notifyAutoClose(
     await supabase.from("notifications").insert({
       user_id: userId,
       portfolio_id: portfolioId,
-      kind: "fx_auto_close",
+      category: "fx_auto_close",
       severity: "info",
       title: `Closed ${symbol} currency position`,
       body: `It was spare currency losing ${lossPct.toFixed(2)}%, so it was closed at the live rate (${pnl >= 0 ? "+" : "−"}${Math.abs(pnl).toFixed(2)} ${ccy} after charges).`,
