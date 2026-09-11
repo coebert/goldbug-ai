@@ -81,7 +81,7 @@ export function NextBestTradeCard({
           </CardTitle>
           {data && (
             <Badge variant="outline">
-              {formatMoney(data.cashBase, data.currency)} cash free
+              {formatMoney(data.deployableCashBase, data.currency)} spare to spend
             </Badge>
           )}
         </div>
@@ -89,6 +89,13 @@ export function NextBestTradeCard({
           The holding worth adding to next, sized to what your cash and limits allow, after your
           real dealing costs.
         </p>
+        {data && (
+          <p className="text-xs text-muted-foreground">
+            {formatMoney(data.cashBase, data.currency)} cash, of which{" "}
+            {formatMoney(data.cashReserveBase, data.currency)} is kept back. Smallest worthwhile buy{" "}
+            {formatMoney(data.minTicketBase, data.currency)}.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         {query.isLoading && (

@@ -135,7 +135,49 @@ describe("rankNextBuys", () => {
     expect(rankNextBuys({ ...input, candidates: [{ ...base, heldQuantity: 0 }] })).toEqual([]);
   });
 
-  it("suggests nothing when there is no cash", () => {
-    expect(rankNextBuys({ ...input, cashBase: 10 })).toEqual([]);
+  it("recommends nothing when there is no cash, but explains why", () => {
+    const rows = rankNextBuys({ ...input, cashBase: 10 });
+    expect(rows.every((r) => !r.recommended)).toBe(true);
+    for (const r of rows) expect(r.blockedReason).toMatch(/not enough spare cash/);
+  });
+});
+
+describe("cash reserve sizing", () => {
+  const candidate = {
+    symbol: "AAA",
+    price: 100,
+    currency: "GBP",
+    fxToBase: 1,
+    heldQuantity: 10,
+    heldValueBase: 1000,
+    sma20: 90,
+    sma50: 85,
+    sma200: 80,
+    atrPct: 3,
+  };
+
+  it("sizes out of cash above the reserve only", () => {
+    const rows = rankNextBuys({
+      candidates: [candidate as never],
+      navBase: 10_000,
+      cashBase: 3000,
+      cashReserveBase: 450,
+      minTicketBase: 250,
+      maxCashSharePct: 0.6,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.ticketBase).toBeLessThanOrEqual((3000 - 450) * 0.6 + 1);
+  });
+
+  it("blocks when spare cash cannot fund a viable ticket", () => {
+    const rows = rankNextBuys({
+      candidates: [candidate as never],
+      navBase: 10_000,
+      cashBase: 500,
+      cashReserveBase: 450,
+      minTicketBase: 250,
+    });
+    expect(rows[0]!.recommended).toBe(false);
+    expect(rows[0]!.blockedReason).toMatch(/not enough spare cash/);
   });
 });

@@ -70,6 +70,13 @@ export type NextBuyInput = {
   horizonDays?: number;
   /** Share of NAV a fresh add aims at before caps and cash bite. */
   targetWeightPct?: number;
+  /**
+   * Cash the account must keep back (settlement, fees, the executor's safety
+   * buffer). Suggestions are sized out of cash ABOVE this, never through it.
+   */
+  cashReserveBase?: number;
+  /** Most of the spare cash one suggestion may consume (0-1). */
+  maxCashSharePct?: number;
 };
 
 export type NextBuyRow = {
@@ -103,6 +110,17 @@ export type NextBuyRow = {
 
 export const DEFAULT_TARGET_WEIGHT_PCT = 0.12;
 export const DEFAULT_HORIZON_DAYS = 10;
+/** Most of the spare cash a single suggestion may take by default. */
+export const DEFAULT_MAX_CASH_SHARE_PCT = 0.6;
+
+/**
+ * Cash the executor keeps back: 2% of NAV plus a flat settlement buffer.
+ * Same shape as `trading-engine.server.ts` uses when it sizes a core top-up,
+ * so the panel can never suggest money the live path would refuse to spend.
+ */
+export function cashReserveForNav(navBase: number): number {
+  return Math.max(0, navBase * 0.02) + 250;
+}
 
 /**
  * Trend and momentum read for one name, expressed as 0..1 conviction plus the
@@ -155,17 +173,37 @@ function toRow(
     input.maxDiversifiedPositionPctOfNav ?? DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
   );
   const capRoomBase = Math.max(0, input.navBase * capPct - c.heldValueBase);
+
+  // Money this account can actually put to work today: free cash less the
+  // reserve the live path keeps back, and no more than one suggestion's share
+  // of it, so a single idea never drains the book.
+  const reserveBase = input.cashReserveBase ?? cashReserveForNav(input.navBase);
+  const freeCashBase = Math.max(0, input.cashBase - reserveBase);
+  const shareCap = Math.min(1, Math.max(0.1, input.maxCashSharePct ?? DEFAULT_MAX_CASH_SHARE_PCT));
+  // One idea may still take the whole free balance when that is the only way
+  // to reach a fee-viable ticket — the alternative is an over-priced stub.
+  const cashForTicketBase = Math.max(
+    Math.min(freeCashBase, input.minTicketBase),
+    freeCashBase * shareCap,
+  );
+
   const targetBase = Math.max(
     input.minTicketBase,
     input.navBase * (input.targetWeightPct ?? DEFAULT_TARGET_WEIGHT_PCT),
   );
-  const spendableBase = Math.max(0, Math.min(input.cashBase, capRoomBase));
+  const spendableBase = Math.max(0, Math.min(cashForTicketBase, capRoomBase));
   const ticketBase = Math.min(targetBase, spendableBase);
+
+  // Under the minimum viable ticket the dealing costs eat the idea; say so in
+  // money terms instead of quietly suggesting a stub trade.
+  const cashShort = ticketBase < input.minTicketBase - 0.01;
 
   let quantity = Math.floor(ticketBase / priceBase);
   if (quantity < 1) {
-    // Not even one share fits inside cash or the cap — nothing to suggest.
-    if (spendableBase < priceBase) return null;
+    // The position cap leaves no room at all — there is nothing to say.
+    if (capRoomBase < priceBase) return null;
+    // Cash is the binding constraint: keep the idea visible and priced at one
+    // share, so the panel can explain the shortfall in money terms.
     quantity = 1;
   }
 
@@ -209,6 +247,10 @@ function toRow(
 
   const notionalBase = quantity * priceBase;
   const costBase = (edge.roundTripBps / 10_000) * notionalBase;
+  // Spare cash is the binding constraint: either the ticket cannot be paid for
+  // out of free cash, or it is too small to be worth its dealing costs.
+  const cashBlocked =
+    notionalBase > freeCashBase + 0.01 || (cashShort && notionalBase < input.minTicketBase - 0.01);
 
   return {
     symbol: c.symbol,
@@ -225,8 +267,13 @@ function toRow(
     roundTripBps: edge.roundTripBps,
     netEdgeBps: edge.netEdgeBps,
     heldQuantity: c.heldQuantity,
-    recommended: edge.pass,
-    blockedReason: edge.pass ? null : edge.reason ?? "does not clear the cost floor",
+    recommended: edge.pass && !cashBlocked,
+    blockedReason: cashBlocked
+      ? `not enough spare cash: ${Math.round(freeCashBase)} free after the reserve, ` +
+        `smallest worthwhile buy is ${Math.round(input.minTicketBase)}`
+      : edge.pass
+        ? null
+        : edge.reason ?? "does not clear the cost floor",
     sizedUp,
   };
 }

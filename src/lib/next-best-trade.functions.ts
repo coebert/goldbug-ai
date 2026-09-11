@@ -10,7 +10,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { rankNextBuys, type NextBuyCandidate, type NextBuyRow } from "./next-best-trade";
+import {
+  rankNextBuys,
+  cashReserveForNav,
+  type NextBuyCandidate,
+  type NextBuyRow,
+} from "./next-best-trade";
 import { DEFAULT_EDGE_SAFETY_MULTIPLE } from "./net-edge-gate";
 import {
   governorForNav,
@@ -26,6 +31,10 @@ export type NextBestTradePanel = {
   currency: string;
   navBase: number;
   cashBase: number;
+  /** Cash held back for settlement and fees. */
+  cashReserveBase: number;
+  /** Cash actually available to deal with today. */
+  deployableCashBase: number;
   minTicketBase: number;
   hurdleMultiple: number;
   measuredRoundTripBps: number | null;
@@ -100,6 +109,8 @@ export const getNextBestTrade = createServerFn({ method: "POST" })
         currency,
         navBase: navEmpty,
         cashBase,
+        cashReserveBase: cashReserveForNav(navEmpty),
+        deployableCashBase: Math.max(0, cashBase - cashReserveForNav(navEmpty)),
         minTicketBase: minTicketBase({ navBase: navEmpty || 10_000, ...govEmpty }),
         hurdleMultiple,
         measuredRoundTripBps: accountRoundTripBps,
@@ -178,6 +189,7 @@ export const getNextBestTrade = createServerFn({ method: "POST" })
     const navBase =
       Number(snapRes.data?.["total_value"] ?? 0) || cashBase + holdingsValueBase;
     const gov = governorForNav(navBase || 10_000);
+    const cashReserveBase = cashReserveForNav(navBase);
     const capPct = Number(portfolioRes.data.concentration_cap_pct);
 
     const rows = rankNextBuys({
@@ -194,6 +206,7 @@ export const getNextBestTrade = createServerFn({ method: "POST" })
       maxDiversifiedPositionPctOfNav: DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
       safetyMultiple: hurdleMultiple,
       measuredRoundTripBps: accountRoundTripBps,
+      cashReserveBase,
     });
 
     // Log today's shortlist so the history panel can later say what the
@@ -233,6 +246,8 @@ export const getNextBestTrade = createServerFn({ method: "POST" })
       currency,
       navBase,
       cashBase,
+      cashReserveBase,
+      deployableCashBase: Math.max(0, cashBase - cashReserveBase),
       minTicketBase: minTicketBase({ navBase: navBase || 10_000, ...gov }),
       hurdleMultiple,
       measuredRoundTripBps: accountRoundTripBps,
