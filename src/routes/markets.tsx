@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
-import { GitCompare, Network, Radar } from "lucide-react";
+import { GitCompare, Network, Radar, Target } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { PageShell, PageSection } from "@/components/layout/page-shell";
 import { SectionIndex } from "@/components/nav/section-index";
@@ -87,6 +87,12 @@ function MarketsPage() {
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
             >
               <Radar className="h-4 w-4 text-primary" aria-hidden /> Signals by market
+            </Link>
+            <Link
+              to="/global-coverage"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
+            >
+              <Target className="h-4 w-4 text-primary" aria-hidden /> Global coverage
             </Link>
           </>
         }

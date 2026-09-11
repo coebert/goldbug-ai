@@ -6,6 +6,7 @@ import { inferVenue } from "./market-hours";
 import { marketIdentity } from "./signals-by-market";
 import { buildGlobalCoverage, type CoverageFill, type CoverageOrder, type CoverageSuggestion, type GlobalCoverage } from "./global-coverage";
 import { normalizeMarketPriceForTrading } from "./market-price-units";
+import { roundMoney } from "./format-money";
 
 export const getGlobalCoverage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
