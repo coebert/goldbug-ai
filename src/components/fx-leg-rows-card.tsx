@@ -98,6 +98,7 @@ export function FxLegRowsCard({
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-base">Open FX legs</CardTitle>
+          <AutoCloseControl />
           {selectedPair && (
             <Button
               size="sm"
