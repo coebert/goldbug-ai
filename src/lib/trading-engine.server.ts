@@ -1892,6 +1892,11 @@ export async function runDailyTick(
   // set a core target in Risk controls, top the core holding up (or trim it)
   // BEFORE the AI's own orders are sized, so the deterministic baseline gets
   // first call on cash and then runs through every normal gate below.
+  // Sizing exemption for the core holding: it is a deliberate, owner-set
+  // baseline, not a single-name bet, so it must not be squeezed by the
+  // per-name concentration cap, the target-weight nibbler or the net-edge
+  // gate (a broad tracker's expected daily move never clears a trading hurdle).
+  let coreSizing: { key: string; capPct: number } | null = null;
   try {
     const { loadCoreAllocationSettings } = await import("./trading-controls.server");
     const coreCfg = await loadCoreAllocationSettings();
@@ -1899,6 +1904,10 @@ export async function runDailyTick(
       const { planCoreAllocation } = await import("./core-allocation");
       const { engineSymbolKey } = await import("./price-symbol");
       const coreKey = engineSymbolKey(coreCfg.symbol);
+      coreSizing = {
+        key: coreKey,
+        capPct: Math.min(0.95, coreCfg.targetPct + Math.max(0, coreCfg.bandPct)),
+      };
       const coreHoldings = (holdings ?? []).filter(
         (h) => engineSymbolKey(String(h.symbol)) === coreKey,
       );
@@ -2651,10 +2660,19 @@ export async function runDailyTick(
       // When the AI model is unavailable the rule-set fallback is driving.
       // Hard-cap any single name at FALLBACK_MAX_NAME_WEIGHT_PCT of account
       // value so an offline tick can never build a concentrated bet.
-      const effMaxPosVal = aiUnavailable
-        ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
-        : maxPosVal;
-      if (aiUnavailable && effMaxPosVal < maxPosVal) {
+      const isCoreOrder =
+        order.side === "buy" &&
+        coreSizing != null &&
+        engineSymbolKey(meta.symbol) === coreSizing.key;
+      const effMaxPosVal = isCoreOrder
+        ? Math.max(maxPosVal, totalValue * coreSizing!.capPct)
+        : aiUnavailable
+          ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
+          : maxPosVal;
+      if (isCoreOrder) {
+        sizingNotes.push(`core holding ≤${(coreSizing!.capPct * 100).toFixed(0)}% NAV`);
+      }
+      if (!isCoreOrder && aiUnavailable && effMaxPosVal < maxPosVal) {
         sizingNotes.push(`AI offline · single name ≤${FALLBACK_MAX_NAME_WEIGHT_PCT}% NAV`);
       }
       const roomInPosition = Math.max(0, effMaxPosVal - existingVal);
@@ -2664,8 +2682,10 @@ export async function runDailyTick(
       // name until it bumps the concentration cap, decide the weight we
       // actually want and buy only the gap to it. Sub-scale gaps are skipped
       // outright, so a position can never be walked into the cap inch by inch.
+      // The core holding is exempt: its size is already decided by the core
+      // target, so re-deciding a weight here would shrink every top-up.
       let targetWeightRejected: string | null = null;
-      if (totalValue > 0 && effMaxPosVal > 0) {
+      if (!isCoreOrder && totalValue > 0 && effMaxPosVal > 0) {
         const maxWeight = effMaxPosVal / totalValue;
         const tw = desiredWeight({
           baseWeight: maxWeight * 0.5,
@@ -2967,8 +2987,13 @@ export async function runDailyTick(
       // move the signal actually supports clears that friction with a margin
       // of safety. This is what stops the book bleeding out through tickets
       // that were never big enough, or never convinced enough, to pay for
-      // themselves. Sells are never gated here.
-      {
+      // themselves. Sells are never gated here, and neither is the core
+      // holding: it is a long-term baseline, not a short-horizon trade, so a
+      // broad tracker's modest daily range must not block it being funded.
+      if (isCoreOrder) {
+        sizingNotes.push("core holding · long-term baseline, not edge-gated");
+      }
+      if (!isCoreOrder) {
         const { assessNetEdge } = await import("./net-edge-gate");
         const { planViableSizeUp } = await import("./viable-size-up");
         const horizonDays = cfg.max_hold_days > 0 ? Math.min(cfg.max_hold_days, 20) : 10;

@@ -118,6 +118,14 @@ export type GovernorConfig = {
    */
   maxDiversifiedPositionPctOfNav?: number;
   /**
+   * Owner-set core holding (engine symbol key). Its size is decided by the
+   * core-allocation target, not by the AI, so it sits under
+   * `coreCapPctOfNav` instead of the single-name / diversified caps.
+   */
+  coreSymbolKey?: string;
+  /** Cap for the core holding as a fraction of NAV (target + drift band). */
+  coreCapPctOfNav?: number;
+  /**
    * Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
    * single stocks when signal strength is comparable. "off" ranks on the cost
    * model alone; "balanced"/"strong" re-count part of the 50bps stamp charge
@@ -486,14 +494,23 @@ export function planAdmissions(
     }
 
     const held = exposure.get(symKey) ?? 0;
-    const capPct = c.diversifiedFund ? maxDiversifiedPct : maxPositionPct;
+    const isCore =
+      !!cfg.coreSymbolKey && symKey === engineSymbolKey(cfg.coreSymbolKey);
+    const capPct = isCore
+      ? Math.max(
+          maxDiversifiedPct,
+          Math.min(0.95, cfg.coreCapPctOfNav ?? maxDiversifiedPct),
+        )
+      : c.diversifiedFund
+        ? maxDiversifiedPct
+        : maxPositionPct;
     const positionCap = Math.max(0, cfg.navBase) * capPct;
     if (positionCap > 0 && held + c.notionalBase > positionCap) {
       decisions.push({
         kind: "skip",
         candidate: c,
         reason:
-          `${c.diversifiedFund ? "diversified-fund cap" : "single-name cap"}: ${c.symbol} would reach ` +
+          `${isCore ? "core-holding cap" : c.diversifiedFund ? "diversified-fund cap" : "single-name cap"}: ${c.symbol} would reach ` +
           `${(((held + c.notionalBase) / Math.max(1, cfg.navBase)) * 100).toFixed(1)}% of NAV, ` +
           `above the ${(capPct * 100).toFixed(0)}% limit`,
       });
