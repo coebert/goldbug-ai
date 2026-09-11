@@ -87,6 +87,11 @@ const MultiCurrencyExposureCard = lazy(() =>
     default: m.MultiCurrencyExposureCard,
   })),
 );
+const HoldingCurrencyRiskCard = lazy(() =>
+  import("@/components/holding-currency-risk-card").then((m) => ({
+    default: m.HoldingCurrencyRiskCard,
+  })),
+);
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
