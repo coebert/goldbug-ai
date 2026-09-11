@@ -183,7 +183,7 @@ function LiveDashboardPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-surface-1">
       <AppHeader />
-      <PageShell title="Live dashboard" purpose="Watch broker state as it changes: positions, working orders, actual fills, and money P&L in one dedicated desk." width="wide" actions={
+      <PageShell title="Live dashboard" purpose="Watch broker state as it changes: positions, working orders, actual fills, and money P&L in one dedicated desk." width="wide" className="overflow-x-hidden" actions={
         <div className="flex items-center gap-2">
           {portfolioId && <Badge variant="outline" className="uppercase">{portfolio?.mode ?? "loading"}</Badge>}
           <Button variant="outline" size="sm" onClick={() => { void portfoliosQ.refetch(); void portfolioQ.refetch(); void historyQ.refetch(); }} disabled={portfolioQ.isFetching}>
@@ -195,7 +195,7 @@ function LiveDashboardPage() {
           <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No portfolios available.</CardContent></Card>
         ) : (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+            <div className="grid min-w-0 grid-cols-1 gap-3 border-b border-border pb-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="flex items-center gap-2 text-sm font-medium"><Activity className="h-4 w-4 text-primary" /> Live execution desk</div>
               <Select value={portfolioId ?? undefined} onValueChange={setSelectedId}>
                 <SelectTrigger className="w-full sm:w-[280px]"><SelectValue placeholder="Choose portfolio" /></SelectTrigger>
@@ -204,17 +204,17 @@ function LiveDashboardPage() {
             </div>
             {!portfolioId || portfolioQ.isLoading ? <p className="text-sm text-muted-foreground">Loading live portfolio…</p> : portfolioQ.isError ? <p className="text-sm text-destructive">Could not load this portfolio: {(portfolioQ.error as Error).message}</p> : portfolio ? (
               <>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-4">
                   <DeskMetric icon={<Wallet className="h-4 w-4" />} label="Account equity" value={broker ? fmtCcy(broker.totalValue, broker.currency) : fmt(metrics.totalValue)} sub={broker ? "Live from broker" : metrics.source === "snapshot" ? "Latest snapshot" : "Fallback estimate"} />
                   <DeskMetric label="Cash" value={broker ? fmtCcy(broker.cash, broker.currency) : fmt(metrics.cash)} sub={broker?.cashAvailable != null ? `${fmtCcy(broker.cashAvailable, broker.currency)} available` : undefined} />
                   <DeskMetric label="Positions value" value={broker ? fmtCcy(broker.positionsValue, broker.currency) : fmt(metrics.invested)} sub={`${broker?.positionsCount ?? positions.length} open`} />
                   <DeskMetric icon={<BookOpen className="h-4 w-4" />} label="Unrealised P&L" value={broker?.unrealizedPnl != null ? fmtCcy(broker.unrealizedPnl, broker.currency) : "—"} sub={brokerQ.isError ? "Broker unavailable" : brokerEnv ? `Saxo ${brokerEnv}` : "Not broker-linked"} />
                 </div>
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-                  <div className="space-y-4">
+                <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+                  <div className="min-w-0 space-y-4">
                     <LiveHoldingsCard holdings={holdings} currency={currency} cash={metrics.cash} cashByCcy={portfolio.cash_by_ccy ?? null} totalValue={metrics.totalValue} invested={metrics.invested} mode={portfolio.mode ?? "paper"} series={Object.fromEntries(history.map((item) => [item.symbol, item]))} portfolioId={portfolio.id} />
                     <Card>
-                      <CardHeader className="pb-3">
+                      <CardHeader className="px-4 pb-3 pt-4 sm:p-6 sm:pb-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <CardTitle className="text-base">Position details</CardTitle>
                           {streamLive && (
@@ -243,13 +243,13 @@ function LiveDashboardPage() {
                       </CardHeader>
 
 
-                      <CardContent>
-                        {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}{quoteSourceBySymbol.has(p.symbol) ? <span className="ml-1 text-[10px] text-muted-foreground">live</span> : null}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
+                      <CardContent className="px-4 pb-4 sm:p-6 sm:pt-0">
+                        {positions.length === 0 ? <p className="text-sm text-muted-foreground">No open positions.</p> : <div className="max-w-full overflow-x-auto"><table className="min-w-[34rem] text-sm"><thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="pb-2">Symbol</th><th className="pb-2 text-right">Qty</th><th className="pb-2 text-right">Price</th><th className="pb-2 text-right">Value</th><th className="pb-2 text-right">P&amp;L</th></tr></thead><tbody>{positions.map((p) => <tr key={p.id} className="border-b border-border/60"><td className="py-2 font-medium">{p.symbol}</td><td className="py-2 text-right tabular-nums">{p.quantity}</td><td className="py-2 text-right tabular-nums">{p.price == null ? "—" : p.price.toFixed(2)}{quoteSourceBySymbol.has(p.symbol) ? <span className="ml-1 text-[10px] text-muted-foreground">live</span> : null}</td><td className="py-2 text-right tabular-nums">{fmt(p.value)}</td><td className={`py-2 text-right tabular-nums ${p.pnl != null && p.pnl < 0 ? "text-destructive" : "text-emerald-500"}`}>{p.pnl == null ? "—" : fmt(p.pnl)}</td></tr>)}</tbody></table></div>}
                       </CardContent>
                     </Card>
                   </div>
-                  <div className="space-y-4">
-                    <Card><CardHeader className="pb-3"><CardTitle className="text-base">Live order book &amp; fills</CardTitle></CardHeader><CardContent><OrderFillsCard portfolioId={portfolio.id} /></CardContent></Card>
+                  <div className="min-w-0 space-y-4">
+                    <Card><CardHeader className="px-4 pb-3 pt-4 sm:p-6 sm:pb-3"><CardTitle className="text-base">Live order book &amp; fills</CardTitle></CardHeader><CardContent className="px-4 pb-4 sm:p-6 sm:pt-0"><OrderFillsCard portfolioId={portfolio.id} /></CardContent></Card>
                     <Suspense fallback={<Card><CardContent className="py-8 text-sm text-muted-foreground">Loading backtest comparison…</CardContent></Card>}>
                       <BacktestVsRealCard portfolioId={portfolio.id} currency={currency} />
                     </Suspense>
@@ -267,9 +267,9 @@ function LiveDashboardPage() {
 
 function DeskMetric({ icon, label, value, sub }: { icon?: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
+    <div className="min-w-0 rounded-lg border border-border bg-card p-3">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-      <div className="mt-1 text-base font-semibold tabular-nums">{value}</div>
+      <div className="mt-1 break-words text-base font-semibold tabular-nums">{value}</div>
       {sub ? <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div> : null}
     </div>
   );

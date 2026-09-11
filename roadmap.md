@@ -66,3 +66,4 @@
 - [x] Core Performance page: VWRL price history, GBP returns, drawdown, closest global peers, and 50% target comparison
 - [x] Raise per-name target weight to 15% of NAV with the hard position cap at 20%
 - [x] Put idle cash to work: spare cash above a £1,500 buffer is held in ERNS.L (short-dated GBP bonds) and sold back on demand
+- [x] Make the Live dashboard fit portrait mobile screens without horizontal clipping

@@ -162,11 +162,11 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
 
   return (
     <Card ref={cardRef}>
-      <CardHeader>
+      <CardHeader className="px-4 pt-4 sm:p-6">
 
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <CardTitle className="flex items-center gap-2">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+          <div className="min-w-0">
+            <CardTitle className="flex flex-wrap items-center gap-2">
               <Radio className="h-4 w-4" /> Live trading (Saxo)
               <Badge variant={isLive ? (mode === "live_prod" ? "destructive" : "default") : "outline"}>
                 {mode}
@@ -177,7 +177,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
               Cash-only, no leverage. AI trades are mirrored to your Saxo account after guardrail checks.
             </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             {isLive && paused && (
               <Button variant="outline" size="sm" onClick={() => mResumeAll.mutate(promptReason("Resume all"))} disabled={mResumeAll.isPending}>
                 <PlayCircle className="h-4 w-4 mr-1" /> Resume all
@@ -189,7 +189,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-w-0 space-y-4 px-4 pb-4 sm:p-6 sm:pt-0">
         <SaxoOAuthPanel />
 
         <CashSyncIndicator lastSync={s?.lastCashSync ?? null} pending={mSync.isPending} />
@@ -224,7 +224,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         {!isLive ? (
           <div className="space-y-3 rounded-md border border-border p-3">
             <div className="text-sm font-medium">Activate live trading</div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 size="sm" variant={targetEnv === "sim" ? "default" : "outline"}
                 onClick={() => setTargetEnv("sim")}
