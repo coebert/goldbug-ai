@@ -200,8 +200,10 @@ function toRow(
 
   let quantity = Math.floor(ticketBase / priceBase);
   if (quantity < 1) {
-    // Not even one share fits inside spare cash or the cap.
-    if (spendableBase < priceBase) return null;
+    // The position cap leaves no room at all — there is nothing to say.
+    if (capRoomBase < priceBase) return null;
+    // Cash is the binding constraint: keep the idea visible and priced at one
+    // share, so the panel can explain the shortfall in money terms.
     quantity = 1;
   }
 
