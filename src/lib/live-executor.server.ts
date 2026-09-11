@@ -1286,7 +1286,13 @@ export async function routeOrdersToBroker(params: {
         brokerCashAvailable = cap.aggregateCap;
       }
 
-      if (willAdjustAggregate || perOrderSkips.length > 0 || cap.samples.total > 0) {
+      if (
+        willAdjustAggregate ||
+        perOrderSkips.length > 0 ||
+        perOrderTrims.length > 0 ||
+        cap.samples.total > 0
+      ) {
+
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: portfolio.id,
           user_id: userId,
