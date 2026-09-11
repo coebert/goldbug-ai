@@ -216,13 +216,14 @@ export function scoreFundamentals(
 ): FundamentalsScore {
   if (!f) return EMPTY_FUNDAMENTALS_SCORE(symbol ?? "?");
 
+  const region: MarketRegion = marketRegion(symbol ?? f.symbol);
   const subscores: FundamentalsSubscores = {
     valuation: scoreValuation(f),
     profitability: scoreProfitability(f),
     growth: scoreGrowth(f),
     balance_sheet: scoreBalanceSheet(f),
-    shareholder: scoreShareholder(f),
-    analysts: scoreAnalysts(f),
+    shareholder: scoreShareholder(f, region),
+    analysts: scoreAnalysts(f, region),
   };
 
   const pillars = Object.values(subscores);
