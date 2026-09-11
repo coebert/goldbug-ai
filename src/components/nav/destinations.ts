@@ -125,6 +125,14 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     keywords: "global coverage edge confidence venue gaps",
   },
   {
+    to: "/global-coverage",
+    label: "Global coverage",
+    hint: "Fill rates and missed signals across every market group.",
+    icon: Target,
+    area: "markets",
+    keywords: "global fills missed execution gaps markets",
+  },
+  {
     to: "/spillover",
     label: "Spillover",
     hint: "How moves in one market spread into the others.",
@@ -299,7 +307,7 @@ export function searchDestinations(query: string): Destination[] {
 /** Which area a pathname belongs to, for active highlighting. */
 export function areaForPath(pathname: string): AreaId {
   if (pathname === "/") return "home";
-  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/signals-by-market") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
+  if (pathname.startsWith("/markets") || pathname.startsWith("/market/") || pathname.startsWith("/signals-by-market") || pathname.startsWith("/global-coverage") || pathname.startsWith("/symbols") || pathname.startsWith("/compare") || pathname.startsWith("/spillover")) {
     return "markets";
   }
   if (

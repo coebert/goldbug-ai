@@ -62,3 +62,4 @@
 - [x] Core allocation: owner-set long-term holding in a broad fund, deterministic top-up/trim in the daily tick (ships off at 0%; Risk page control)
 - [x] Global strong-signal coverage: full-universe hourly gate/cache, venue-balanced AI window, and European execution-session safeguards
 - [x] Signals by Market page: current signals, confidence, expected edge, market status, and explicit coverage gaps
+- [x] Global coverage page: per-market fill rates and missed signals with causes and paper outcomes

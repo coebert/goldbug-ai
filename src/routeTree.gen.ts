@@ -23,6 +23,7 @@ import { Route as MarketsRouteImport } from './routes/markets'
 import { Route as LiveDashboardRouteImport } from './routes/live-dashboard'
 import { Route as LearnRouteImport } from './routes/learn'
 import { Route as HedgeFallbacksRouteImport } from './routes/hedge-fallbacks'
+import { Route as GlobalCoverageRouteImport } from './routes/global-coverage'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as DecisionModelRouteImport } from './routes/decision-model'
 import { Route as DailyReportRouteImport } from './routes/daily-report'
@@ -146,6 +147,11 @@ const LearnRoute = LearnRouteImport.update({
 const HedgeFallbacksRoute = HedgeFallbacksRouteImport.update({
   id: '/hedge-fallbacks',
   path: '/hedge-fallbacks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GlobalCoverageRoute = GlobalCoverageRouteImport.update({
+  id: '/global-coverage',
+  path: '/global-coverage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GetStartedRoute = GetStartedRouteImport.update({
@@ -451,6 +457,7 @@ export interface FileRoutesByFullPath {
   '/daily-report': typeof DailyReportRoute
   '/decision-model': typeof DecisionModelRoute
   '/get-started': typeof GetStartedRoute
+  '/global-coverage': typeof GlobalCoverageRoute
   '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/live-dashboard': typeof LiveDashboardRoute
@@ -521,6 +528,7 @@ export interface FileRoutesByTo {
   '/daily-report': typeof DailyReportRoute
   '/decision-model': typeof DecisionModelRoute
   '/get-started': typeof GetStartedRoute
+  '/global-coverage': typeof GlobalCoverageRoute
   '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/live-dashboard': typeof LiveDashboardRoute
@@ -592,6 +600,7 @@ export interface FileRoutesById {
   '/daily-report': typeof DailyReportRoute
   '/decision-model': typeof DecisionModelRoute
   '/get-started': typeof GetStartedRoute
+  '/global-coverage': typeof GlobalCoverageRoute
   '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/live-dashboard': typeof LiveDashboardRoute
@@ -664,6 +673,7 @@ export interface FileRouteTypes {
     | '/daily-report'
     | '/decision-model'
     | '/get-started'
+    | '/global-coverage'
     | '/hedge-fallbacks'
     | '/learn'
     | '/live-dashboard'
@@ -734,6 +744,7 @@ export interface FileRouteTypes {
     | '/daily-report'
     | '/decision-model'
     | '/get-started'
+    | '/global-coverage'
     | '/hedge-fallbacks'
     | '/learn'
     | '/live-dashboard'
@@ -804,6 +815,7 @@ export interface FileRouteTypes {
     | '/daily-report'
     | '/decision-model'
     | '/get-started'
+    | '/global-coverage'
     | '/hedge-fallbacks'
     | '/learn'
     | '/live-dashboard'
@@ -875,6 +887,7 @@ export interface RootRouteChildren {
   DailyReportRoute: typeof DailyReportRoute
   DecisionModelRoute: typeof DecisionModelRoute
   GetStartedRoute: typeof GetStartedRoute
+  GlobalCoverageRoute: typeof GlobalCoverageRoute
   HedgeFallbacksRoute: typeof HedgeFallbacksRoute
   LearnRoute: typeof LearnRoute
   LiveDashboardRoute: typeof LiveDashboardRoute
@@ -1033,6 +1046,13 @@ declare module '@tanstack/react-router' {
       path: '/hedge-fallbacks'
       fullPath: '/hedge-fallbacks'
       preLoaderRoute: typeof HedgeFallbacksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/global-coverage': {
+      id: '/global-coverage'
+      path: '/global-coverage'
+      fullPath: '/global-coverage'
+      preLoaderRoute: typeof GlobalCoverageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/get-started': {
@@ -1427,6 +1447,7 @@ const rootRouteChildren: RootRouteChildren = {
   DailyReportRoute: DailyReportRoute,
   DecisionModelRoute: DecisionModelRoute,
   GetStartedRoute: GetStartedRoute,
+  GlobalCoverageRoute: GlobalCoverageRoute,
   HedgeFallbacksRoute: HedgeFallbacksRoute,
   LearnRoute: LearnRoute,
   LiveDashboardRoute: LiveDashboardRoute,
