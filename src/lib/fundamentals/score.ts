@@ -18,6 +18,12 @@
 import type { Fundamentals, FundamentalsScore, FundamentalsSubscores } from "./types";
 import { EMPTY_FUNDAMENTALS_SCORE } from "./types";
 import { qualityTolerance, scaleBonus, scaleTier } from "../quality-scale";
+import { isNonUsDeveloped, marketRegion, type MarketRegion } from "../market-region";
+
+/** Currency the accounts (and therefore the market cap) are reported in. */
+function reportingCurrency(f: Fundamentals): string | null {
+  return f.financial_currency ?? f.currency ?? null;
+}
 
 const clamp1 = (x: number): number =>
   Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
