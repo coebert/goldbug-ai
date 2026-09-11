@@ -1547,6 +1547,34 @@ export async function routeOrdersToBroker(params: {
         // the single biggest reason US buys never got funded.
         const consolidated = consolidateFxLegs(trim.fxLegs, { available: wallet });
         for (const leg of consolidated) {
+          // A leg the wallet cannot lift to the pair minimum is a certain
+          // broker reject. Don't spend an order slot proving it — record the
+          // real reason so the dependent buys read "not enough spare GBP to
+          // reach the 1,000 minimum conversion", not "fx spot rejected".
+          if (leg.shortfallReason) {
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolio.id,
+              user_id: userId,
+              broker: "saxo",
+              env: portfolio.mode === "live_prod" ? "live" : "sim",
+              method: "FX_SPOT_BELOW_MINIMUM",
+              path: `/fx-spot/${leg.fromCcy}->${leg.toCcy}`,
+              status: 412,
+              request: asJson({
+                asOf,
+                decisionId,
+                requiredFrom: leg.requiredFrom,
+                triggerSymbols: leg.triggerSymbols,
+              }),
+              response: asJson({ skippedBeforeBroker: true }),
+              error: leg.shortfallReason,
+            });
+            for (const triggerSymbol of leg.triggerSymbols) {
+              outcomes.push({ kind: "failed", triggerSymbol, reason: leg.shortfallReason });
+              reconFxOutcomes.push({ triggerSymbol, kind: "failed", reason: leg.shortfallReason });
+            }
+            continue;
+          }
           // Saxo caps ExternalReference at 50 chars; a raw uuid + symbol + pair
           // overflows it and the whole order is rejected with InvalidModelState.
           // Hash instead so the key stays deterministic (idempotent retries) and short.
