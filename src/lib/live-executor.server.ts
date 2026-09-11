@@ -733,6 +733,11 @@ export async function routeOrdersToBroker(params: {
           symbol: c.symbol,
           sector: held?.sector ?? symbolSector(c.symbol),
           notionalBase: c.notionalBase,
+          // Lets an exceptionally strong, cost-clearing idea stretch the
+          // sector cap instead of being turned away.
+          edgeScore: c.edgeScore,
+          expectedMovePct: c.expectedMovePct,
+          estCostBase: c.estCostBase,
           // Broad global/market trackers span every sector; the per-name
           // position cap governs them, not the sector budget.
           diversified: isDiversifiedFund({
