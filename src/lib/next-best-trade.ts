@@ -247,6 +247,10 @@ function toRow(
 
   const notionalBase = quantity * priceBase;
   const costBase = (edge.roundTripBps / 10_000) * notionalBase;
+  // Spare cash is the binding constraint: either the ticket cannot be paid for
+  // out of free cash, or it is too small to be worth its dealing costs.
+  const cashBlocked =
+    notionalBase > freeCashBase + 0.01 || (cashShort && notionalBase < input.minTicketBase - 0.01);
 
   return {
     symbol: c.symbol,
