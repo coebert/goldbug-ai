@@ -47,6 +47,15 @@ describe("high-edge reserve", () => {
     expect(thin.decisions[0]!.kind).toBe("skip");
   });
 
+  it("admits a moderately convicted idea whose edge covers friction 10x", () => {
+    // conviction 0.45 (below the 0.6 bar) but 0.45 * 0.08 * 1500 = £54 vs £3 cost
+    const plan = planAdmissions(
+      [{ ...strong, edgeScore: 0.45, expectedMovePct: 0.08, notionalBase: 1_500, estCostBase: 3 }],
+      base,
+    );
+    expect(plan.decisions[0]!.kind).toBe("admit");
+  });
+
   it("can be turned off entirely", () => {
     const plan = planAdmissions([strong], { ...base, highEdgeReserveTickets: 0 });
     expect(plan.decisions[0]!.kind).toBe("skip");
