@@ -261,8 +261,14 @@ function toRow(
     roundTripBps: edge.roundTripBps,
     netEdgeBps: edge.netEdgeBps,
     heldQuantity: c.heldQuantity,
-    recommended: edge.pass,
-    blockedReason: edge.pass ? null : edge.reason ?? "does not clear the cost floor",
+    recommended: edge.pass && !(cashShort && !sizedUp && notionalBase < input.minTicketBase - 0.01),
+    blockedReason:
+      cashShort && !sizedUp && notionalBase < input.minTicketBase - 0.01
+        ? `not enough spare cash: ${Math.round(freeCashBase)} free after the reserve, ` +
+          `smallest worthwhile buy is ${Math.round(input.minTicketBase)}`
+        : edge.pass
+          ? null
+          : edge.reason ?? "does not clear the cost floor",
     sizedUp,
   };
 }
