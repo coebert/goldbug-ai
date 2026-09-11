@@ -514,6 +514,10 @@ export function planAdmissions(
         ? maxDiversifiedPct
         : maxPositionPct;
     const positionCap = Math.max(0, cfg.navBase) * capPct;
+    // Room left under the cap once this ticket is on the books; the executor
+    // uses it to bound any later fee-viable size-up.
+    const capRoomAfter = (cand: GovernorCandidate) =>
+      positionCap > 0 ? Math.max(0, positionCap - held - cand.notionalBase) : undefined;
     if (positionCap > 0 && held + c.notionalBase > positionCap) {
       decisions.push({
         kind: "skip",
@@ -563,7 +567,7 @@ export function planAdmissions(
         budgetLeft = Math.max(0, budgetLeft - c.estCostBase);
         buysAdmitted += 1;
         exposure.set(symKey, held + c.notionalBase);
-        decisions.push({ kind: "admit", candidate: c });
+        decisions.push({ kind: "admit", candidate: c, capRoomBase: capRoomAfter(c) });
         continue;
       }
       // Reserve: an exceptional idea may still go, so an exhausted window can
@@ -576,7 +580,7 @@ export function planAdmissions(
         reserveLeft -= 1;
         buysAdmitted += 1;
         exposure.set(symKey, held + c.notionalBase);
-        decisions.push({ kind: "admit", candidate: c });
+        decisions.push({ kind: "admit", candidate: c, capRoomBase: capRoomAfter(c) });
         continue;
       }
       decisions.push({
@@ -601,7 +605,7 @@ export function planAdmissions(
     budgetLeft -= c.estCostBase;
     buysAdmitted += 1;
     exposure.set(symKey, held + c.notionalBase);
-    decisions.push({ kind: "admit", candidate: c });
+    decisions.push({ kind: "admit", candidate: c, capRoomBase: capRoomAfter(c) });
 
   }
 
