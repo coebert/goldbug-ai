@@ -609,8 +609,14 @@ export function planAdmissions(
       const conviction = Number.isFinite(c.edgeScore) ? Number(c.edgeScore) : 0;
       const move = Number.isFinite(c.expectedMovePct) ? Number(c.expectedMovePct) : 0.02;
       const grossEdge = conviction * move * Math.max(0, c.notionalBase);
-      const clears = grossEdge >= reserveEdgeMultiple * Math.max(0.01, c.estCostBase);
-      if (reserveLeft > 0 && conviction >= reserveMinConviction && clears) {
+      const costFloor = Math.max(0.01, c.estCostBase);
+      const clears = grossEdge >= reserveEdgeMultiple * costFloor;
+      // …or cover so large that a moderate conviction still leaves the ticket
+      // clearly profitable net of friction.
+      const clearsStrong =
+        conviction >= RESERVE_STRONG_MIN_CONVICTION &&
+        grossEdge >= RESERVE_STRONG_EDGE_MULTIPLE * costFloor;
+      if (reserveLeft > 0 && ((conviction >= reserveMinConviction && clears) || clearsStrong)) {
         reserveLeft -= 1;
         buysAdmitted += 1;
         exposure.set(symKey, held + c.notionalBase);
