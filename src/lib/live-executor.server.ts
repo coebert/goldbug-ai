@@ -1318,6 +1318,8 @@ export async function routeOrdersToBroker(params: {
             appliedAggregateHaircut: willAdjustAggregate,
             brokerCashAvailableAfter: brokerCashAvailable,
             perOrderSkips,
+            perOrderTrims,
+
             notes: cap.notes,
           }),
           error: null,
