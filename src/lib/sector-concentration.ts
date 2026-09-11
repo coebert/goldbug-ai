@@ -22,6 +22,14 @@ export type SectorCandidate = {
   symbol: string;
   sector: string | null;
   notionalBase: number;
+  /**
+   * Broad, physically diversified index funds (VWRL, VUSA, ISF…). They span
+   * every sector by construction, so the sector budget does not apply — the
+   * per-name position cap governs them instead. Without this a global tracker
+   * lands in the "unclassified" bucket and is capped at 15% of NAV, which
+   * silently blocks the core allocation on every run.
+   */
+  diversified?: boolean;
 };
 
 export type SectorDecision =
