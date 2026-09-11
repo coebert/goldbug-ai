@@ -262,6 +262,8 @@ export async function routeOrdersToBroker(params: {
 
   // Daily ceiling: SELLs always route (they reduce risk); BUYs are admitted in
   // order until the remaining daily budget is exhausted.
+  // Unspent daily BUY notional, shared with the placement loop below.
+  let dailyBuyHeadroom = 0;
   let budget = gate.remaining;
   const admitted: ExecutedOrderLike[] = [];
   const capped: { symbol: string; notional: number }[] = [];
@@ -291,6 +293,10 @@ export async function routeOrdersToBroker(params: {
     );
   }
   routable = admitted;
+  // Whatever daily BUY notional survives the admission loop is the only extra
+  // spend later size-ups may use. Without this, a £200 ticket enlarged to £800
+  // would route £600 the daily ceiling never sanctioned.
+  dailyBuyHeadroom = Math.max(0, budget);
   if (routable.length === 0) return results;
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -408,6 +414,9 @@ export async function routeOrdersToBroker(params: {
   // exceeds what the broker actually has available, so we never hand Saxo an
   // order that will come straight back as InsufficientCash.
   const preSkips = new Map<string, string>(); // clientOrderId key by symbol+side
+  // Room left under each name's position cap AFTER its admitted ticket. Any
+  // later enlargement of a ticket (fee-viable size-up) must fit inside it.
+  const capRoomBySymbol = new Map<string, number>();
 
   // ---------- Phase B: algo-regime block-new-buys guardrail.
   // When the caller supplied a snapshot whose multipliers recommend
@@ -676,6 +685,8 @@ export async function routeOrdersToBroker(params: {
       if (d.kind === "skip") {
         preSkips.set(`${d.candidate.symbol}:${d.candidate.side}`, d.reason);
         blocked.push({ symbol: d.candidate.symbol, reason: d.reason });
+      } else if (d.candidate.side === "buy" && Number.isFinite(d.capRoomBase as number)) {
+        capRoomBySymbol.set(d.candidate.symbol.toUpperCase(), Math.max(0, Number(d.capRoomBase)));
       }
     }
 
@@ -1926,8 +1937,18 @@ export async function routeOrdersToBroker(params: {
       const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
       const spendable = spendLedger.get(orderCcy) ?? 0;
       const onePrice = Number(order.price) || 0;
-      if (order.side === "buy" && onePrice > 0 && spendable >= onePrice) {
+      const extraOne = Math.max(0, (1 - Math.max(0, Number(order.quantity) || 0)) * onePrice);
+      const headroomOne = Math.min(
+        dailyBuyHeadroom,
+        capRoomBySymbol.get(order.symbol.toUpperCase()) ?? Infinity,
+      );
+      if (order.side === "buy" && onePrice > 0 && spendable >= onePrice && extraOne <= headroomOne) {
         qty = 1;
+        dailyBuyHeadroom = Math.max(0, dailyBuyHeadroom - extraOne);
+        const roomOne = capRoomBySymbol.get(order.symbol.toUpperCase());
+        if (roomOne !== undefined) {
+          capRoomBySymbol.set(order.symbol.toUpperCase(), Math.max(0, roomOne - extraOne));
+        }
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: portfolio.id,
           user_id: userId,
@@ -1941,7 +1962,10 @@ export async function routeOrdersToBroker(params: {
         });
       } else {
         const reason =
-          order.side === "buy" && onePrice > 0
+          order.side === "buy" && onePrice > 0 && extraOne > headroomOne
+            ? `ticket trimmed below one share and rounding up to one ${order.symbol} share ` +
+              `would exceed today's remaining trading limit — nothing was bought`
+            : order.side === "buy" && onePrice > 0
             ? `ticket trimmed below one share: one ${order.symbol} share costs ` +
               `${onePrice.toFixed(2)} ${orderCcy} and only ${spendable.toFixed(2)} ${orderCcy} ` +
               `is spendable this run — nothing was bought and no money was spent`
@@ -1990,15 +2014,30 @@ export async function routeOrdersToBroker(params: {
     if (!viability.viable && order.side === "buy") {
       const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
       const spendable = spendLedger.get(orderCcy) ?? 0;
+      // An uplift is extra spend the daily BUY ceiling and the single-name cap
+      // never sanctioned upstream, so it is bounded by whatever room each has
+      // left — cash alone is not a safety limit.
+      const capRoom = capRoomBySymbol.get(order.symbol.toUpperCase());
+      const baseNotional = qty * order.price;
+      const maxNotional = Math.min(
+        baseNotional + dailyBuyHeadroom,
+        capRoom === undefined ? Infinity : baseNotional + capRoom,
+      );
       const plan = planViableSizeUp({
         quantity: qty,
         price: order.price,
         minViableNotional: viability.minViableNotional,
         spendable,
+        maxNotional,
       });
       sizeUpNote = plan.note;
       if (plan.applied) {
         sizeUpApplied = true;
+        const extra = Math.max(0, (plan.quantity - qty) * order.price);
+        dailyBuyHeadroom = Math.max(0, dailyBuyHeadroom - extra);
+        if (capRoom !== undefined) {
+          capRoomBySymbol.set(order.symbol.toUpperCase(), Math.max(0, capRoom - extra));
+        }
         qty = plan.quantity;
         viability = assessTradeViability({
           symbol: order.symbol,
