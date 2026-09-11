@@ -264,9 +264,12 @@ export async function routeOrdersToBroker(params: {
   // order until the remaining daily budget is exhausted.
   // Unspent daily BUY notional, shared with the placement loop below.
   let dailyBuyHeadroom = 0;
+  /** Smallest ticket worth trimming an oversized buy down to, base currency. */
+  const DAILY_CAP_TRIM_MIN_TICKET_BASE = 250;
   let budget = gate.remaining;
   const admitted: ExecutedOrderLike[] = [];
   const capped: { symbol: string; notional: number }[] = [];
+  const trimmed: { symbol: string; from: number; to: number }[] = [];
   // The owner-set core top-up gets first call on the day's BUY budget: it is
   // an allocation instruction, so it must never lose its slot to short-term
   // ideas queued ahead of it. The money ceiling itself still binds.
@@ -301,11 +304,32 @@ export async function routeOrdersToBroker(params: {
     // budget must not chop it into pieces.
     const isCoreBuy = coreKeyForOrder != null && dailyCapKeyOf(e.symbol) === coreKeyForOrder;
     if (notional > budget && !isCoreBuy) {
+      // Dropping the whole idea because it is bigger than the day's leftover
+      // money threw away good signals outright (a £25k sim ticket against a
+      // £10k ceiling routed nothing at all). Trim it to the headroom instead,
+      // provided a whole-share ticket of at least the minimum worthwhile size
+      // still fits. The ceiling itself is never exceeded.
+      const trimmedQty = e.price > 0 ? Math.floor(budget / e.price) : 0;
+      const trimmedNotional = trimmedQty * e.price;
+      if (trimmedQty >= 1 && trimmedNotional >= DAILY_CAP_TRIM_MIN_TICKET_BASE) {
+        budget -= trimmedNotional;
+        admitted.push({ ...e, quantity: trimmedQty });
+        trimmed.push({ symbol: e.symbol, from: notional, to: trimmedNotional });
+        continue;
+      }
       capped.push({ symbol: e.symbol, notional });
       continue;
     }
     budget -= notional;
     admitted.push(e);
+  }
+  if (trimmed.length > 0) {
+    await logGuard(
+      "ROUTE_TRIMMED_TO_DAILY_NOTIONAL_CAP",
+      { trimmed, dailyLimit: gate.dailyLimit, spentToday: gate.spentToday, remaining: gate.remaining },
+      `Buy trimmed to the day's remaining budget instead of being skipped ` +
+        `(limit ${gate.dailyLimit}, spent ${gate.spentToday.toFixed(2)})`,
+    );
   }
   budget = Math.max(0, budget);
   if (capped.length > 0) {
