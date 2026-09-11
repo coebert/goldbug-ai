@@ -1238,6 +1238,15 @@ export async function routeOrdersToBroker(params: {
         notionalAcctCcy: number;
         capAcctCcy: number;
       }[] = [];
+      const perOrderTrims: {
+        symbol: string;
+        fromQuantity: number;
+        toQuantity: number;
+        capAcctCcy: number;
+      }[] = [];
+      // Smallest ticket worth dealing after charges; a trimmed order below this
+      // is not worth routing, so it is skipped instead.
+      const MIN_TRIMMED_NOTIONAL = 250;
       if (cap.perOrderCap != null && cap.perOrderCap > 0) {
         for (const o of buysStillRoutable) {
           const instCcy = (o.instrument_ccy ?? acctCcy).toUpperCase();
@@ -1245,6 +1254,22 @@ export async function routeOrdersToBroker(params: {
           const notional = toAcctCcy(notionalRaw, instCcy);
           if (notional == null) continue;
           if (notional > cap.perOrderCap) {
+            // An oversized ticket is a sizing question, not a reason to skip
+            // the idea: cut it to the learned ceiling and route the smaller
+            // order whenever what is left is still worth dealing.
+            const perShareAcct = notional / o.quantity;
+            const trimmedQty = Math.floor(cap.perOrderCap / perShareAcct);
+            const trimmedNotional = trimmedQty * perShareAcct;
+            if (trimmedQty >= 1 && trimmedNotional >= MIN_TRIMMED_NOTIONAL) {
+              perOrderTrims.push({
+                symbol: o.symbol,
+                fromQuantity: o.quantity,
+                toQuantity: trimmedQty,
+                capAcctCcy: cap.perOrderCap,
+              });
+              o.quantity = trimmedQty;
+              continue;
+            }
             const reason = `adaptive-cap: order ${notional.toFixed(2)} ${acctCcy} exceeds learned per-order ceiling ${cap.perOrderCap.toFixed(2)} ${acctCcy} (source=${cap.learnedSource}, rejectRate=${cap.rejectRate.toFixed(2)})`;
             preSkips.set(`${o.symbol}:${o.side}`, reason);
             perOrderSkips.push({
@@ -1255,6 +1280,7 @@ export async function routeOrdersToBroker(params: {
           }
         }
       }
+
 
       if (willAdjustAggregate) {
         brokerCashAvailable = cap.aggregateCap;
