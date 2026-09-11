@@ -55,13 +55,23 @@ function earningsMultiple(value: number | null, good: number, bad: number): numb
   return lowerBetter(value, good, bad);
 }
 
+/**
+ * Valuation, judged relative to business quality.
+ *
+ * A flat "cheap is good" ramp systematically prefers small, shrinking names
+ * over large compounders. `qualityTolerance` widens the expensive bound in
+ * proportion to measured returns, margins, growth and cash generation, so a
+ * genuinely high-quality business is not marked down for trading above the
+ * multiple of a struggling one. The tolerance is bounded (0.85x-1.60x).
+ */
 export function scoreValuation(f: Fundamentals): number | null {
+  const t = qualityTolerance(f);
   return meanOf([
-    earningsMultiple(f.trailing_pe, 10, 45),
-    earningsMultiple(f.forward_pe, 9, 38),
-    earningsMultiple(f.peg, 0.8, 3.5),
-    lowerBetter(f.price_to_book, 1, 12),
-    lowerBetter(f.ev_ebitda, 6, 25),
+    earningsMultiple(f.trailing_pe, 10, 45 * t),
+    earningsMultiple(f.forward_pe, 9, 38 * t),
+    earningsMultiple(f.peg, 0.8, 3.5 * t),
+    lowerBetter(f.price_to_book, 1, 12 * t),
+    lowerBetter(f.ev_ebitda, 6, 25 * t),
   ]);
 }
 
