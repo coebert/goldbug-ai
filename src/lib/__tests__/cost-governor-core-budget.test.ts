@@ -46,7 +46,7 @@ describe("core top-ups vs the friction budget", () => {
   });
 
   it("still enforces the core cap on the core symbol", () => {
-    const plan = planAdmissions([{ ...core, notionalBase: 6_000 }], {
+    const plan = planAdmissions([{ ...core, notionalBase: 5_000 }], {
       ...base,
       coreSymbolKey: "VWRL.L",
       coreCapPctOfNav: 0.55,
