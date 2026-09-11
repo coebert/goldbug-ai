@@ -1939,7 +1939,18 @@ export async function runDailyTick(
           minTicket: 250,
         });
         if (plan.action !== "hold" && plan.quantity > 0) {
-          const symbolForOrder = coreHoldings[0]?.symbol ?? coreCfg.symbol;
+          // Route the order under a symbol the universe knows. Once the core
+          // has been bought, the holding is stored broker-native (VWRL:xlon),
+          // and using that key makes every later top-up fail the universe
+          // lookup with "symbol not in universe" — which silently stalls the
+          // whole core build. Prefer the configured universe symbol whenever
+          // it resolves, and only fall back to the holding's own key.
+          const holdingSymbol = coreHoldings[0]?.symbol;
+          const symbolForOrder = findSymbol(coreCfg.symbol.toUpperCase())
+            ? coreCfg.symbol
+            : (holdingSymbol && findSymbol(holdingSymbol.toUpperCase())
+                ? holdingSymbol
+                : coreCfg.symbol);
           const coreQty = coreHoldings.reduce((s, h) => s + Number(h.quantity), 0);
           // Buys are sized as a share of NAV; sells as a share of the holding.
           const percent = plan.action === "buy"
