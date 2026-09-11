@@ -389,16 +389,16 @@ export function LiveHoldingsCard({
 
   return (
     <Card className={isLive ? "border-primary/40 shadow-sm" : undefined}>
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base">
+      <CardHeader className="px-4 pb-3 pt-4 sm:p-6 sm:pb-3">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
             <Briefcase className="h-4 w-4" />
             {isLive ? "Live positions" : "Holdings"}
             <Badge variant={isLive ? "default" : "secondary"} className="ml-1">
               {rows.length} {rows.length === 1 ? "position" : "positions"}
             </Badge>
           </CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
             {isAnyLive && portfolioId && (
               <ValuationFreshnessBadge portfolioId={portfolioId} />
             )}
@@ -446,9 +446,9 @@ export function LiveHoldingsCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-w-0 space-y-4 px-4 pb-4 sm:p-6 sm:pt-0">
         <TooltipProvider delayDuration={150}>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
                 <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Invested
@@ -515,7 +515,7 @@ export function LiveHoldingsCard({
 
         {showMultiCcy && (
           <div className="rounded-lg border bg-muted/20 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
               <div className="text-xs font-medium text-muted-foreground">
                 By currency
               </div>
@@ -523,8 +523,8 @@ export function LiveHoldingsCard({
                 native totals · no FX conversion
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs tabular-nums">
+            <div className="max-w-full overflow-x-auto">
+              <table className="min-w-[28rem] w-full text-xs tabular-nums">
                 <thead>
                   <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
                     <th className="py-1 pr-3 text-left font-medium">Ccy</th>
@@ -790,9 +790,9 @@ export function LiveHoldingsCard({
                   key={r.id}
                   className="rounded-lg border p-3 hover:bg-muted/40 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="grid min-w-0 grid-cols-1 gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_auto] min-[390px]:gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <SymbolTicker
                           symbol={r.symbol}
                           className="text-base font-semibold tracking-tight"
@@ -850,7 +850,7 @@ export function LiveHoldingsCard({
                         )}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="min-w-0 text-left min-[390px]:shrink-0 min-[390px]:text-right">
                       <div className="text-base font-semibold tabular-nums">
                         {r.unitsUnknown ? "—" : fmt(r.value)}
                       </div>

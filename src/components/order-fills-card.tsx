@@ -48,7 +48,7 @@ export function OrderFillsCard({ portfolioId }: { portfolioId: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-muted-foreground text-xs">Orders &amp; fills ({rows.length})</div>
         {q.data && (
           <Badge variant="outline" className="text-[10px]">
@@ -66,8 +66,8 @@ export function OrderFillsCard({ portfolioId }: { portfolioId: string }) {
         <p className="text-xs italic text-muted-foreground">No broker orders yet.</p>
       )}
       {rows.length > 0 && (
-        <div className="max-h-80 overflow-auto">
-          <table className="w-full text-xs">
+        <div className="max-h-80 max-w-full overflow-auto">
+          <table className="min-w-[46rem] w-full text-xs">
             <thead className="sticky top-0 bg-background">
               <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
                 <th className="py-1 pr-2">Order</th>
