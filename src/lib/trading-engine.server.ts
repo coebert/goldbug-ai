@@ -2987,8 +2987,13 @@ export async function runDailyTick(
       // move the signal actually supports clears that friction with a margin
       // of safety. This is what stops the book bleeding out through tickets
       // that were never big enough, or never convinced enough, to pay for
-      // themselves. Sells are never gated here.
-      {
+      // themselves. Sells are never gated here, and neither is the core
+      // holding: it is a long-term baseline, not a short-horizon trade, so a
+      // broad tracker's modest daily range must not block it being funded.
+      if (isCoreOrder) {
+        sizingNotes.push("core holding · long-term baseline, not edge-gated");
+      }
+      if (!isCoreOrder) {
         const { assessNetEdge } = await import("./net-edge-gate");
         const { planViableSizeUp } = await import("./viable-size-up");
         const horizonDays = cfg.max_hold_days > 0 ? Math.min(cfg.max_hold_days, 20) : 10;
