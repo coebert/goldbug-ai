@@ -288,19 +288,26 @@ export async function routeOrdersToBroker(params: {
         return [...routable.filter(isCoreOrder), ...routable.filter((e) => !isCoreOrder(e))];
       })()
     : routable;
+  const { engineSymbolKey: dailyCapKeyOf } = await import("./price-symbol");
   for (const e of orderedForDailyCap) {
     if (e.side !== "buy") {
       admitted.push(e);
       continue;
     }
     const notional = e.quantity * e.price;
-    if (notional > budget) {
+    // The owner-set core is an allocation instruction sized by its own
+    // target + drift cap and the cash reserve. Building it in one large
+    // ticket costs one dealing fee instead of many, so the day's ticket
+    // budget must not chop it into pieces.
+    const isCoreBuy = coreKeyForOrder != null && dailyCapKeyOf(e.symbol) === coreKeyForOrder;
+    if (notional > budget && !isCoreBuy) {
       capped.push({ symbol: e.symbol, notional });
       continue;
     }
     budget -= notional;
     admitted.push(e);
   }
+  budget = Math.max(0, budget);
   if (capped.length > 0) {
     await logGuard(
       "ROUTE_SKIPPED_DAILY_NOTIONAL_CAP",
@@ -1263,7 +1270,12 @@ export async function routeOrdersToBroker(params: {
       // is not worth routing, so it is skipped instead.
       const MIN_TRIMMED_NOTIONAL = 250;
       if (cap.perOrderCap != null && cap.perOrderCap > 0) {
+        const { engineSymbolKey: adaptiveKeyOf } = await import("./price-symbol");
         for (const o of buysStillRoutable) {
+          // Core top-ups are deliberately large so the whole allocation is
+          // bought in one or two tickets; the learned per-order ceiling is a
+          // reject-rate heuristic for short-term ideas, not for the core.
+          if (coreKeyForOrder != null && adaptiveKeyOf(o.symbol) === coreKeyForOrder) continue;
           const instCcy = (o.instrument_ccy ?? acctCcy).toUpperCase();
           const notionalRaw = o.quantity * o.price;
           const notional = toAcctCcy(notionalRaw, instCcy);
