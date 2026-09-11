@@ -46,6 +46,8 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VUKE.L", name: "Vanguard FTSE 100 ETF", asset_class: "etf" },
   { symbol: "VMID.L", name: "Vanguard FTSE 250 ETF", asset_class: "etf" },
   { symbol: "VWRL.L", name: "Vanguard FTSE All-World ETF", asset_class: "etf" },
+  // Cash sleeve: short-dated GBP bonds, used to earn interest on spare cash.
+  { symbol: "ERNS.L", name: "iShares GBP Ultrashort Bond ETF", asset_class: "etf" },
   { symbol: "VUSA.L", name: "Vanguard S&P 500 ETF (LON)", asset_class: "etf" },
   // Continental Europe — Xetra (.DE), Euronext Paris/Amsterdam (.PA/.AS),
   // Borsa Italiana (.MI), BME Madrid (.MC) and SIX Swiss (.SW). Saxo routes
