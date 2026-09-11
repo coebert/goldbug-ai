@@ -511,7 +511,10 @@ export function planAdmissions(
     const held = exposure.get(symKey) ?? 0;
     const isCore =
       !!cfg.coreSymbolKey && symKey === engineSymbolKey(cfg.coreSymbolKey);
-    const capPct = isCore
+    // A very strong, clearly profitable idea may stretch (never remove) its
+    // concentration cap — see high-conviction-override.
+    const override = !isCore && qualifiesForCapOverride(c);
+    const basePct = isCore
       ? Math.max(
           maxDiversifiedPct,
           Math.min(0.95, cfg.coreCapPctOfNav ?? maxDiversifiedPct),
@@ -519,6 +522,12 @@ export function planAdmissions(
       : c.diversifiedFund
         ? maxDiversifiedPct
         : maxPositionPct;
+    const capPct = override
+      ? stretchedCapPct(
+          basePct,
+          c.diversifiedFund ? OVERRIDE_MAX_DIVERSIFIED_PCT : OVERRIDE_MAX_SINGLE_NAME_PCT,
+        )
+      : basePct;
     const positionCap = Math.max(0, cfg.navBase) * capPct;
     // Room left under the cap once this ticket is on the books; the executor
     // uses it to bound any later fee-viable size-up.
