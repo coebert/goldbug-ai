@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { engineSymbolKey, priceSymbolVariants } from "./price-symbol";
+import { engineSymbolKey, priceSymbolVariants, resolvePriceSymbol } from "./price-symbol";
 import { inferVenue } from "./market-hours";
 import { marketIdentity } from "./signals-by-market";
 import { buildGlobalCoverage, type CoverageFill, type CoverageOrder, type CoverageSuggestion, type GlobalCoverage } from "./global-coverage";
@@ -39,7 +39,7 @@ export const getGlobalCoverage = createServerFn({ method: "POST" })
     }
     const suggestions: CoverageSuggestion[] = rawSuggestions.map((row) => {
       const symbol = String(row.symbol);
-      const identity = marketIdentity(inferVenue(symbol));
+      const identity = marketIdentity(inferVenue(resolvePriceSymbol(symbol)));
       return { id: String(row.id), symbol, name: row.name, market: identity.key, marketLabel: identity.label, suggestedAt: String(row.suggested_at), quantity: Number(row.quantity), conviction: Number(row.conviction), expectedEdgeBps: Number(row.net_edge_bps), expectedProfitBase: Number(row.expected_profit_base), suggestedPrice: Number(row.price), costBase: Number(row.cost_base), fxToBase: 1, recommended: row.recommended, blockedReason: row.blocked_reason };
     });
     const orders: CoverageOrder[] = (orderRes.data ?? []).map((row) => ({ id: String(row.id), symbol: suggestionSymbol.get(engineSymbolKey(String(row.symbol))) ?? String(row.symbol), quantity: Number(row.quantity), status: String(row.status), reason: row.reject_reason, createdAt: String(row.created_at) }));
