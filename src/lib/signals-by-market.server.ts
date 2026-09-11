@@ -15,22 +15,40 @@ export async function buildSignalsByMarket(args: {
   if (!desk) return null;
 
   const now = args.now ?? new Date();
-  const [comparison, blocksRes] = await Promise.all([
+  const [comparison, blocksRes, suggestionsRes] = await Promise.all([
     buildDailyComparison({ userId: args.userId, portfolioId: desk.portfolioId }).catch(() => null),
     supabaseAdmin
       .from("broker_instrument_blocks")
       .select("symbol_key, reason, reject_reason")
       .eq("user_id", args.userId)
       .is("cleared_at", null),
+    supabaseAdmin
+      .from("next_best_trade_suggestions")
+      .select("symbol, conviction, net_edge_bps, suggested_at")
+      .eq("portfolio_id", desk.portfolioId)
+      .gte("suggested_at", new Date(now.getTime() - 7 * 86_400_000).toISOString())
+      .order("suggested_at", { ascending: false })
+      .limit(500),
   ]);
   const current = new Map((comparison?.rows ?? []).map((row) => [engineSymbolKey(row.symbol), row]));
   const blocked = new Map(
     (blocksRes.data ?? []).map((row) => [String(row.symbol_key), String(row.reject_reason ?? row.reason)]),
   );
+  const suggestions = new Map<string, { confidence: number; edge: number; at: string }>();
+  for (const row of suggestionsRes.data ?? []) {
+    const key = engineSymbolKey(String(row.symbol));
+    if (suggestions.has(key)) continue;
+    suggestions.set(key, {
+      confidence: Number(row.conviction),
+      edge: Number(row.net_edge_bps),
+      at: String(row.suggested_at),
+    });
+  }
   const staleBefore = new Date(now.getTime() - 5 * 86_400_000).toISOString().slice(0, 10);
 
   const rows: MarketSignalRow[] = desk.rows.map((deskRow) => {
     const latest = current.get(deskRow.key) ?? null;
+    const suggestion = suggestions.get(deskRow.key) ?? null;
     const venue = inferVenue(deskRow.symbol);
     const identity = marketIdentity(venue);
     const status = getMarketStatusForSymbol(deskRow.symbol, now);
@@ -62,11 +80,11 @@ export async function buildSignalsByMarket(args: {
       marketStatus: status.explanation,
       direction: signalDirection(latest?.modelScore ?? null),
       signalScore: latest?.modelScore ?? null,
-      confidence: deskRow.strength,
-      expectedEdgeBps: deskRow.meanNetBps,
+      confidence: suggestion?.confidence ?? deskRow.strength,
+      expectedEdgeBps: suggestion?.edge ?? deskRow.meanNetBps,
       price: deskRow.lastPrice,
       priceDate: deskRow.priceDate,
-      decisionAt: comparison?.decisionAt ?? null,
+      decisionAt: suggestion?.at ?? comparison?.decisionAt ?? null,
       coverage,
       gapLabel,
     };

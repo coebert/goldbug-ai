@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Receipt,
   Activity,
+  Radar,
   Wrench,
   GitCompare,
   Network,
@@ -114,6 +115,14 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     icon: SlidersHorizontal,
     area: "markets",
     keywords: "signal strength limits stop target cap per symbol overrides",
+  },
+  {
+    to: "/signals-by-market",
+    label: "Signals by market",
+    hint: "Current signals, confidence, expected edge and gaps across every market.",
+    icon: Radar,
+    area: "markets",
+    keywords: "global coverage edge confidence venue gaps",
   },
   {
     to: "/spillover",
