@@ -135,8 +135,10 @@ describe("rankNextBuys", () => {
     expect(rankNextBuys({ ...input, candidates: [{ ...base, heldQuantity: 0 }] })).toEqual([]);
   });
 
-  it("suggests nothing when there is no cash", () => {
-    expect(rankNextBuys({ ...input, cashBase: 10 })).toEqual([]);
+  it("recommends nothing when there is no cash, but explains why", () => {
+    const rows = rankNextBuys({ ...input, cashBase: 10 });
+    expect(rows.every((r) => !r.recommended)).toBe(true);
+    for (const r of rows) expect(r.blockedReason).toMatch(/not enough spare cash/);
   });
 });
 
