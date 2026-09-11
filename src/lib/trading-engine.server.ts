@@ -2653,7 +2653,9 @@ export async function runDailyTick(
         targetOverridePct: cfg.target_invested_pct,
         enabled: cfg.cash_policy_enabled,
       });
-      if (livePolicy.enabled) {
+       // The core is the owner's chosen invested share, so the invested-%
+       // policy cannot shrink it; the cash floor below still binds.
+       if (livePolicy.enabled && !isCoreBuyOrder) {
         if (livePolicy.deployableValue <= 0) {
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
