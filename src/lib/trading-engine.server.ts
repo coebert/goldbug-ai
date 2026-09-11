@@ -1897,6 +1897,10 @@ export async function runDailyTick(
   // per-name concentration cap, the target-weight nibbler or the net-edge
   // gate (a broad tracker's expected daily move never clears a trading hurdle).
   let coreSizing: { key: string; capPct: number } | null = null;
+  // The cash sleeve gets the same treatment as the core: it is an allocation
+  // instruction, not a single-name bet, so the concentration cap, the
+  // target-weight nibbler and the net-edge gate must not shrink it.
+  let cashSleeveSizing: { key: string; capPct: number } | null = null;
   try {
     const { loadCoreAllocationSettings } = await import("./trading-controls.server");
     const coreCfg = await loadCoreAllocationSettings();
@@ -2388,8 +2392,8 @@ export async function runDailyTick(
       // fee) instead of being shaved by the risk dial and signal haircuts.
       const isCoreBuyOrder =
         order.side === "buy" &&
-        coreSizing != null &&
-        engineSymbolKey(meta.symbol) === coreSizing.key;
+        ((coreSizing != null && engineSymbolKey(meta.symbol) === coreSizing.key) ||
+          (cashSleeveSizing != null && engineSymbolKey(meta.symbol) === cashSleeveSizing.key));
       // Risk dial, buy side: position-size multiplier × buy aggressiveness.
       // Every downstream cap (per-symbol, class, vol, cash) still applies.
       let spend = isCoreBuyOrder
