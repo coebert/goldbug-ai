@@ -114,23 +114,30 @@ export function scoreBalanceSheet(f: Fundamentals): number | null {
   return meanOf([gearing, netCash, fcf, higherBetter(f.current_ratio, 0.8, 2)]);
 }
 
-export function scoreShareholder(f: Fundamentals): number | null {
+export function scoreShareholder(f: Fundamentals, region: MarketRegion = "us"): number | null {
   if (f.dividend_yield == null) return null;
-  const yieldScore = higherBetter(f.dividend_yield, 0, 0.05);
+  // European and Japanese blue chips distribute far more of their earnings
+  // than US ones by convention, so a US payout bar marks the whole region
+  // down. The "not covered at all" flag in financialFlags still bites.
+  const coverBar = isNonUsDeveloped(region) ? 1 : 0.85;
+  const yieldScore = higherBetter(f.dividend_yield, 0, isNonUsDeveloped(region) ? 0.06 : 0.05);
   // A payout above 100% of earnings is a cut risk, not a reward.
   const cover =
     f.payout_ratio == null || !Number.isFinite(f.payout_ratio)
       ? null
       : f.payout_ratio <= 0
         ? null
-        : clamp1((0.85 - f.payout_ratio) / 0.85);
+        : clamp1((coverBar - f.payout_ratio) / coverBar);
   return meanOf([yieldScore, cover]);
 }
 
-export function scoreAnalysts(f: Fundamentals): number | null {
+export function scoreAnalysts(f: Fundamentals, region: MarketRegion = "us"): number | null {
   // Consensus rating: 1 strong buy .. 5 strong sell. Ignore thin coverage.
+  // Sell-side coverage outside the US is thinner even on the largest names,
+  // so a US three-analyst floor silently deletes the pillar for Europe/Japan.
+  const minAnalysts = isNonUsDeveloped(region) ? 2 : 3;
   const rating =
-    f.analyst_mean != null && (f.analyst_count ?? 0) >= 3
+    f.analyst_mean != null && (f.analyst_count ?? 0) >= minAnalysts
       ? clamp1((3 - f.analyst_mean) / 1.5)
       : null;
   const upside =
