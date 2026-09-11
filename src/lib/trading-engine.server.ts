@@ -1087,8 +1087,9 @@ export async function runDailyTick(
         "./decision-model/playbook.server"
       );
       const userId = (portfolio as { user_id?: string | null }).user_id ?? null;
-      if (!userId) return null;
-      return formatPlaybookBlock(await loadLatestPlaybook(userId));
+      const own = userId ? await formatPlaybookBlock(await loadLatestPlaybook(userId)) : null;
+      const { SCALE_PREFERENCE_BLOCK } = await import("./quality-scale-prompt");
+      return own ? `${own}\n\n${SCALE_PREFERENCE_BLOCK}` : SCALE_PREFERENCE_BLOCK;
     } catch (e) {
       srvLog.warn("account playbook unavailable for prompt", e);
       return null;

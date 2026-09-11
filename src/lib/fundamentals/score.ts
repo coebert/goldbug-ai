@@ -17,6 +17,7 @@
 
 import type { Fundamentals, FundamentalsScore, FundamentalsSubscores } from "./types";
 import { EMPTY_FUNDAMENTALS_SCORE } from "./types";
+import { qualityTolerance, scaleBonus, scaleTier } from "../quality-scale";
 
 const clamp1 = (x: number): number =>
   Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
@@ -55,13 +56,23 @@ function earningsMultiple(value: number | null, good: number, bad: number): numb
   return lowerBetter(value, good, bad);
 }
 
+/**
+ * Valuation, judged relative to business quality.
+ *
+ * A flat "cheap is good" ramp systematically prefers small, shrinking names
+ * over large compounders. `qualityTolerance` widens the expensive bound in
+ * proportion to measured returns, margins, growth and cash generation, so a
+ * genuinely high-quality business is not marked down for trading above the
+ * multiple of a struggling one. The tolerance is bounded (0.85x-1.60x).
+ */
 export function scoreValuation(f: Fundamentals): number | null {
+  const t = qualityTolerance(f);
   return meanOf([
-    earningsMultiple(f.trailing_pe, 10, 45),
-    earningsMultiple(f.forward_pe, 9, 38),
-    earningsMultiple(f.peg, 0.8, 3.5),
-    lowerBetter(f.price_to_book, 1, 12),
-    lowerBetter(f.ev_ebitda, 6, 25),
+    earningsMultiple(f.trailing_pe, 10, 45 * t),
+    earningsMultiple(f.forward_pe, 9, 38 * t),
+    earningsMultiple(f.peg, 0.8, 3.5 * t),
+    lowerBetter(f.price_to_book, 1, 12 * t),
+    lowerBetter(f.ev_ebitda, 6, 25 * t),
   ]);
 }
 
@@ -149,7 +160,10 @@ export function financialFlags(f: Fundamentals, asOf: string): string[] {
     flags.push(`weak liquidity (current ratio ${f.current_ratio.toFixed(2)})`);
   if (f.payout_ratio != null && f.payout_ratio > 1)
     flags.push(`dividend not covered by earnings (payout ${(f.payout_ratio * 100).toFixed(0)}%)`);
-  if (f.trailing_pe != null && f.trailing_pe > 60)
+  // "Expensive" is quality-relative: a 30%-ROE compounder on 70x is not the
+  // same warning as a no-growth business on 70x. Bounded by qualityTolerance.
+  const peLimit = 60 * qualityTolerance(f);
+  if (f.trailing_pe != null && f.trailing_pe > peLimit)
     flags.push(`stretched valuation (P/E ${f.trailing_pe.toFixed(0)})`);
   if (f.short_percent_float != null && f.short_percent_float > 0.1)
     flags.push(`heavily shorted (${(f.short_percent_float * 100).toFixed(0)}% of float)`);
@@ -163,6 +177,8 @@ export function financialFlags(f: Fundamentals, asOf: string): string[] {
 /** Compact human summary used in the prompt cell and the decision audit. */
 function summarise(f: Fundamentals, subs: FundamentalsSubscores): string {
   const bits: string[] = [];
+  const tier = scaleTier(f.market_cap);
+  if (tier) bits.push(`${tier}-cap`);
   if (f.trailing_pe != null) bits.push(`P/E ${f.trailing_pe.toFixed(1)}`);
   else if (f.forward_pe != null) bits.push(`fwd P/E ${f.forward_pe.toFixed(1)}`);
   if (f.profit_margin != null) bits.push(`net margin ${(f.profit_margin * 100).toFixed(1)}%`);
@@ -200,10 +216,13 @@ export function scoreFundamentals(
   // Hard risks bite: each one shaves the score, capped so flags alone cannot
   // drive a healthy company to maximally negative.
   const penalty = Math.min(0.5, flags.filter((x) => !x.startsWith("results due")).length * 0.12);
+  // Size tilt: bigger, deeper names are cheaper to trade and have carried this
+  // account's winners. Bounded to +/-0.08 so it only ever breaks ties.
+  const size = scaleBonus(f.market_cap);
 
   return {
     symbol: f.symbol,
-    score: Number(clamp1(base - penalty).toFixed(3)),
+    score: Number(clamp1(base - penalty + size).toFixed(3)),
     subscores,
     coverage,
     flags,

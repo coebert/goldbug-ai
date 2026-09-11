@@ -37,6 +37,8 @@ function flag(value: unknown): string {
   return value === true ? "Y" : "n";
 }
 
+import { scaleBonus } from "../quality-scale";
+
 type AnyFeature = Record<string, unknown>;
 
 function sentimentCell(f: AnyFeature): string {
@@ -202,10 +204,16 @@ function fullFundamentalsSymbols(features: readonly AnyFeature[]): Set<string> {
   const scored = features.map((f, i) => {
     const r = f["rank_info"] as AnyFeature | null | undefined;
     const pct = Number(r?.["percentile"]);
+    const d = f["fundamentals"] as AnyFeature | null | undefined;
+    const cap = Number(d?.["market_cap"]);
+    // Bigger, deeper names are cheaper to deal in, so on a close rank they get
+    // the full accounts block ahead of a marginal small cap. Bounded to 0.06 —
+    // it breaks ties, it never outranks a genuinely stronger candidate.
+    const sizeTilt = Number.isFinite(cap) ? Math.max(0, scaleBonus(cap)) * 0.75 : 0;
     return {
       symbol: String(f["symbol"] ?? `#${i}`),
       // Higher is better; unranked names fall back to their input order.
-      score: Number.isFinite(pct) ? pct : 1 - i / Math.max(1, features.length),
+      score: (Number.isFinite(pct) ? pct : 1 - i / Math.max(1, features.length)) + sizeTilt,
       hard: (f["event_features"] as AnyFeature | null | undefined)?.["hard_catalyst"] === true,
     };
   });
