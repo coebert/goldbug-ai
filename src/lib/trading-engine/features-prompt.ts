@@ -209,7 +209,13 @@ function fullFundamentalsSymbols(features: readonly AnyFeature[]): Set<string> {
     // Bigger, deeper names are cheaper to deal in, so on a close rank they get
     // the full accounts block ahead of a marginal small cap. Bounded to 0.06 —
     // it breaks ties, it never outranks a genuinely stronger candidate.
-    const sizeTilt = Number.isFinite(cap) ? Math.max(0, scaleBonus(cap)) * 0.75 : 0;
+    // Market caps arrive in the reporting currency, so a yen or euro cap has
+    // to be normalised before it can be banded against a US one.
+    const capCcy =
+      (d?.["financial_currency"] as string | null | undefined) ??
+      (d?.["currency"] as string | null | undefined) ??
+      null;
+    const sizeTilt = Number.isFinite(cap) ? Math.max(0, scaleBonus(cap, capCcy)) * 0.75 : 0;
     return {
       symbol: String(f["symbol"] ?? `#${i}`),
       // Higher is better; unranked names fall back to their input order.
