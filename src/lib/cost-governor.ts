@@ -183,6 +183,15 @@ export const DEFAULT_HIGH_EDGE_RESERVE_TICKETS = 1;
 export const RESERVE_EDGE_MULTIPLE = 5;
 /** …and the idea must be a genuinely strong one. */
 export const RESERVE_MIN_CONVICTION = 0.6;
+/**
+ * Overwhelming-cover path. Live logs showed ideas whose expected gross edge
+ * covered their own friction 6x–29x turned away purely because conviction sat
+ * just under 0.6 — the budget behaved as a stop for exactly the trades worth
+ * doing. When cover is this large the trade is profitable across a wide band
+ * of conviction error, so a moderately convinced idea may draw the reserve.
+ */
+export const RESERVE_STRONG_EDGE_MULTIPLE = 10;
+export const RESERVE_STRONG_MIN_CONVICTION = 0.4;
 /** No BUY fill for this many days ⇒ the reserve bar drops (stall breaker). */
 export const STALL_DAYS = 5;
 /** Relaxed reserve bar once the book has stalled. */
