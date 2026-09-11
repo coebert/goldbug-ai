@@ -22,6 +22,14 @@ export type SectorCandidate = {
   symbol: string;
   sector: string | null;
   notionalBase: number;
+  /**
+   * Broad, physically diversified index funds (VWRL, VUSA, ISF…). They span
+   * every sector by construction, so the sector budget does not apply — the
+   * per-name position cap governs them instead. Without this a global tracker
+   * lands in the "unclassified" bucket and is capped at 15% of NAV, which
+   * silently blocks the core allocation on every run.
+   */
+  diversified?: boolean;
 };
 
 export type SectorDecision =
@@ -44,6 +52,7 @@ export const DEFAULT_SECTOR_BUDGET: Omit<SectorBudgetConfig, "navBase"> = {
 };
 
 const UNKNOWN = "__unknown__";
+const DIVERSIFIED = "__diversified__";
 
 function keyFor(sector: string | null): string {
   const s = (sector ?? "").trim().toLowerCase();
@@ -74,6 +83,11 @@ export function planSectorAdmissions(
   const ordered = candidates.slice().sort((a, b) => b.notionalBase - a.notionalBase);
 
   for (const c of ordered) {
+    if (c.diversified) {
+      exposure[DIVERSIFIED] = (exposure[DIVERSIFIED] ?? 0) + Math.max(0, c.notionalBase);
+      decisions.push({ kind: "admit", candidate: c });
+      continue;
+    }
     const key = keyFor(c.sector);
     const cap = capFor(key);
     const current = exposure[key] ?? 0;
