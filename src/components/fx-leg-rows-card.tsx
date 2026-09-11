@@ -19,6 +19,13 @@ import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
 import { getFxLegHygiene } from "@/lib/fx-leg-hygiene.functions";
 import { closeFxLeg } from "@/lib/fx-leg-close.functions";
+import {
+  getFxAutoCloseSettings,
+  setFxAutoCloseSettings,
+} from "@/lib/fx-auto-close.functions";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 
 function money(n: number, ccy: string, signed = true) {
@@ -28,6 +35,65 @@ function money(n: number, ccy: string, signed = true) {
     maximumFractionDigits: 0,
     signDisplay: signed ? "exceptZero" : "auto",
   }).format(n);
+}
+
+/**
+ * Switch and trigger for the automatic close of spare, losing currency legs.
+ * Legs still funding foreign holdings are never touched by it, so this only
+ * governs money the book isn't using.
+ */
+function AutoCloseControl() {
+  const getFn = useServerFn(getFxAutoCloseSettings);
+  const setFn = useServerFn(setFxAutoCloseSettings);
+  const queryClient = useQueryClient();
+  const settings = useQuery({
+    queryKey: ["fx-auto-close-settings"],
+    queryFn: () => getFn(),
+    staleTime: 5 * 60_000,
+  });
+  const save = useMutation({
+    mutationFn: (next: { enabled: boolean; lossPct: number }) => setFn({ data: next }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("Could not save the setting", { description: res.error });
+        return;
+      }
+      void queryClient.invalidateQueries({ queryKey: ["fx-auto-close-settings"] });
+    },
+  });
+
+  const s = settings.data;
+  if (!s) return null;
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Switch
+        id="fx-auto-close"
+        checked={s.enabled}
+        disabled={save.isPending}
+        onCheckedChange={(enabled) => save.mutate({ enabled, lossPct: s.lossPct })}
+      />
+      <Label htmlFor="fx-auto-close" className="text-xs font-normal">
+        Auto-close spare currency losing
+      </Label>
+      <Input
+        type="number"
+        step="0.1"
+        min="0.1"
+        max="25"
+        defaultValue={s.lossPct}
+        disabled={!s.enabled || save.isPending}
+        className="h-7 w-16 text-xs"
+        onBlur={(e) => {
+          const lossPct = Number(e.currentTarget.value);
+          if (Number.isFinite(lossPct) && lossPct >= 0.1 && lossPct !== s.lossPct) {
+            save.mutate({ enabled: s.enabled, lossPct });
+          }
+        }}
+      />
+      <span>% or more</span>
+    </div>
+  );
 }
 
 /**
@@ -98,6 +164,7 @@ export function FxLegRowsCard({
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-base">Open FX legs</CardTitle>
+          <AutoCloseControl />
           {selectedPair && (
             <Button
               size="sm"
