@@ -29,6 +29,7 @@ import { Route as DecisionModelRouteImport } from './routes/decision-model'
 import { Route as DailyReportRouteImport } from './routes/daily-report'
 import { Route as CostsRouteImport } from './routes/costs'
 import { Route as CoreProgressRouteImport } from './routes/core-progress'
+import { Route as CorePerformanceRouteImport } from './routes/core-performance'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -177,6 +178,11 @@ const CostsRoute = CostsRouteImport.update({
 const CoreProgressRoute = CoreProgressRouteImport.update({
   id: '/core-progress',
   path: '/core-progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CorePerformanceRoute = CorePerformanceRouteImport.update({
+  id: '/core-performance',
+  path: '/core-performance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompareRoute = CompareRouteImport.update({
@@ -452,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
+  '/core-performance': typeof CorePerformanceRoute
   '/core-progress': typeof CoreProgressRoute
   '/costs': typeof CostsRoute
   '/daily-report': typeof DailyReportRoute
@@ -523,6 +530,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
+  '/core-performance': typeof CorePerformanceRoute
   '/core-progress': typeof CoreProgressRoute
   '/costs': typeof CostsRoute
   '/daily-report': typeof DailyReportRoute
@@ -595,6 +603,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
+  '/core-performance': typeof CorePerformanceRoute
   '/core-progress': typeof CoreProgressRoute
   '/costs': typeof CostsRoute
   '/daily-report': typeof DailyReportRoute
@@ -668,6 +677,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/broker-blocks'
     | '/compare'
+    | '/core-performance'
     | '/core-progress'
     | '/costs'
     | '/daily-report'
@@ -739,6 +749,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/broker-blocks'
     | '/compare'
+    | '/core-performance'
     | '/core-progress'
     | '/costs'
     | '/daily-report'
@@ -810,6 +821,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/broker-blocks'
     | '/compare'
+    | '/core-performance'
     | '/core-progress'
     | '/costs'
     | '/daily-report'
@@ -882,6 +894,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BrokerBlocksRoute: typeof BrokerBlocksRoute
   CompareRoute: typeof CompareRoute
+  CorePerformanceRoute: typeof CorePerformanceRoute
   CoreProgressRoute: typeof CoreProgressRoute
   CostsRoute: typeof CostsRoute
   DailyReportRoute: typeof DailyReportRoute
@@ -1088,6 +1101,13 @@ declare module '@tanstack/react-router' {
       path: '/core-progress'
       fullPath: '/core-progress'
       preLoaderRoute: typeof CoreProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/core-performance': {
+      id: '/core-performance'
+      path: '/core-performance'
+      fullPath: '/core-performance'
+      preLoaderRoute: typeof CorePerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compare': {
@@ -1442,6 +1462,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BrokerBlocksRoute: BrokerBlocksRoute,
   CompareRoute: CompareRoute,
+  CorePerformanceRoute: CorePerformanceRoute,
   CoreProgressRoute: CoreProgressRoute,
   CostsRoute: CostsRoute,
   DailyReportRoute: DailyReportRoute,
