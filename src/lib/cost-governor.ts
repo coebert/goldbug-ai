@@ -361,7 +361,7 @@ export type GovernorPlan = {
  * nibbled to 31% of a £10k book across nine tickets, so the account's fate
  * hung on one mid-cap retailer that no sizing decision ever sanctioned.
  */
-export const DEFAULT_MAX_POSITION_PCT_OF_NAV = 0.15;
+export const DEFAULT_MAX_POSITION_PCT_OF_NAV = 0.2;
 
 /** Sensible defaults for a small (< £50k) single-account portfolio. */
 
