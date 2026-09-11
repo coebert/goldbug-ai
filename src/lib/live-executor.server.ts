@@ -162,7 +162,26 @@ export async function routeOrdersToBroker(params: {
   // Hard safety gate (independent of strategy logic): admin kill switch plus a
   // per-day BUY notional ceiling. Fails closed — see trading-controls.server.
   const { loadTradingGate } = await import("./trading-controls.server");
-  const gate = await loadTradingGate();
+  // A practice book scales the day's buy ceiling to its own NAV; the
+  // real-money figure the operator set stays exactly as configured.
+  const gateNavBase = await (async (): Promise<number | null> => {
+    if (portfolio.mode === "live_prod") return null;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("equity_snapshots")
+        .select("total_value")
+        .eq("portfolio_id", portfolio.id)
+        .order("snapshot_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nav = Number((data as { total_value?: number | null } | null)?.total_value);
+      return Number.isFinite(nav) && nav > 0 ? nav : null;
+    } catch {
+      return null;
+    }
+  })();
+  const gate = await loadTradingGate({ mode: portfolio.mode, navBase: gateNavBase });
 
   let routable = executed.filter(
     (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
@@ -1528,6 +1547,34 @@ export async function routeOrdersToBroker(params: {
         // the single biggest reason US buys never got funded.
         const consolidated = consolidateFxLegs(trim.fxLegs, { available: wallet });
         for (const leg of consolidated) {
+          // A leg the wallet cannot lift to the pair minimum is a certain
+          // broker reject. Don't spend an order slot proving it — record the
+          // real reason so the dependent buys read "not enough spare GBP to
+          // reach the 1,000 minimum conversion", not "fx spot rejected".
+          if (leg.shortfallReason) {
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolio.id,
+              user_id: userId,
+              broker: "saxo",
+              env: portfolio.mode === "live_prod" ? "live" : "sim",
+              method: "FX_SPOT_BELOW_MINIMUM",
+              path: `/fx-spot/${leg.fromCcy}->${leg.toCcy}`,
+              status: 412,
+              request: asJson({
+                asOf,
+                decisionId,
+                requiredFrom: leg.requiredFrom,
+                triggerSymbols: leg.triggerSymbols,
+              }),
+              response: asJson({ skippedBeforeBroker: true }),
+              error: leg.shortfallReason,
+            });
+            for (const triggerSymbol of leg.triggerSymbols) {
+              outcomes.push({ kind: "failed", triggerSymbol, reason: leg.shortfallReason });
+              reconFxOutcomes.push({ triggerSymbol, kind: "failed", reason: leg.shortfallReason });
+            }
+            continue;
+          }
           // Saxo caps ExternalReference at 50 chars; a raw uuid + symbol + pair
           // overflows it and the whole order is rejected with InvalidModelState.
           // Hash instead so the key stays deterministic (idempotent retries) and short.
@@ -1872,14 +1919,54 @@ export async function routeOrdersToBroker(params: {
     // Amount). Skip if this rounds to zero.
     let qty = Math.floor(order.quantity);
     if (qty <= 0) {
-      results.push({
-        symbol: order.symbol,
-        side: order.side,
-        quantity: order.quantity,
-        status: "skipped",
-        skipped: "quantity < 1 whole share",
-      });
-      continue;
+      // A buy trimmed to a fraction of a share is not an error — the idea
+      // survived every merit gate and then lost the rounding. Buy one whole
+      // share when the cash is genuinely there, otherwise say plainly why
+      // nothing was bought instead of emitting a bare "quantity < 1".
+      const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
+      const spendable = spendLedger.get(orderCcy) ?? 0;
+      const onePrice = Number(order.price) || 0;
+      if (order.side === "buy" && onePrice > 0 && spendable >= onePrice) {
+        qty = 1;
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "TRADE_ROUNDED_UP_TO_ONE_SHARE",
+          path: "live_orders",
+          status: 200,
+          request: asJson({ symbol: order.symbol, requested: order.quantity, price: onePrice }),
+          response: asJson({ quantity: 1, spendable }),
+        });
+      } else {
+        const reason =
+          order.side === "buy" && onePrice > 0
+            ? `ticket trimmed below one share: one ${order.symbol} share costs ` +
+              `${onePrice.toFixed(2)} ${orderCcy} and only ${spendable.toFixed(2)} ${orderCcy} ` +
+              `is spendable this run — nothing was bought and no money was spent`
+            : "quantity < 1 whole share";
+        results.push({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: order.quantity,
+          status: "skipped",
+          skipped: reason,
+        });
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "TRADE_SUB_SHARE_SKIPPED",
+          path: "live_orders",
+          status: 412,
+          request: asJson({ symbol: order.symbol, side: order.side, requested: order.quantity, price: onePrice }),
+          response: asJson({ spendable, currency: orderCcy }),
+          error: reason,
+        });
+        continue;
+      }
     }
 
     // Trade-viability gate. Sizing upstream works on a *notional* budget, but

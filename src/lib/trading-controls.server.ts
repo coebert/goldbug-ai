@@ -57,8 +57,17 @@ export async function loadCostHurdleMultiple(): Promise<number | null> {
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
-/** Read the singleton controls row and today's routed BUY notional. */
-export async function loadTradingGate(): Promise<TradingGate> {
+/**
+ * Read the singleton controls row and today's routed BUY notional.
+ *
+ * `scaleFor` lets a practice (non-`live_prod`) book scale the ceiling to its
+ * own NAV — the operator's figure is sized for the real account and would
+ * otherwise stop a much larger simulated book from testing anything.
+ */
+export async function loadTradingGate(scaleFor?: {
+  mode?: string | null;
+  navBase?: number | null;
+}): Promise<TradingGate> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const { data: controls } = await supabaseAdmin
@@ -79,7 +88,12 @@ export async function loadTradingGate(): Promise<TradingGate> {
     };
   }
 
-  const dailyLimit = Number(controls.daily_notional_limit ?? 0);
+  const { resolveDailyNotionalLimit } = await import("./daily-notional-limit");
+  const dailyLimit = resolveDailyNotionalLimit({
+    configuredLimit: Number(controls.daily_notional_limit ?? 0),
+    mode: scaleFor?.mode ?? "live_prod",
+    navBase: scaleFor?.navBase ?? null,
+  }).limit;
   const todayKey = ukDayKey(new Date());
   const since = new Date(Date.now() - 36 * 3600_000).toISOString();
 

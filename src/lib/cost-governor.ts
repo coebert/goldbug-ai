@@ -542,6 +542,21 @@ export function planAdmissions(
     }
 
     if (c.estCostBase > budgetLeft) {
+      // The owner-set core holding is an allocation decision, not a trading
+      // idea: its size is fixed by the core target and its top-ups are the
+      // cheapest, lowest-turnover tickets the book places. Charging them
+      // against a window budget that short-term churn has already spent left
+      // a 50%-core account unable to reach its own target for weeks. Core
+      // top-ups therefore pass the friction budget (every other guard — min
+      // ticket, core cap, daily cap, cooldown — still applies) and their cost
+      // is still booked against the window.
+      if (isCore) {
+        budgetLeft = Math.max(0, budgetLeft - c.estCostBase);
+        buysAdmitted += 1;
+        exposure.set(symKey, held + c.notionalBase);
+        decisions.push({ kind: "admit", candidate: c });
+        continue;
+      }
       // Reserve: an exceptional idea may still go, so an exhausted window can
       // never mean "no trading at all" while the signal is strong.
       const conviction = Number.isFinite(c.edgeScore) ? Number(c.edgeScore) : 0;
