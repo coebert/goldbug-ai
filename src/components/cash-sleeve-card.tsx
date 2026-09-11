@@ -54,7 +54,10 @@ export function CashSleeveCard() {
           <div className="space-y-0.5">
             <Label htmlFor="sleeve-enabled">Put spare cash to work</Label>
             <p className="text-xs text-muted-foreground">
-              Trading always comes first: the buffer is refilled before anything else.
+              Trading always comes first: the buffer is refilled before anything else. This applies
+              to every account, practice ones included. The buffer grows with a larger account (at
+              least 5% of its value) and shrinks for a small one, and euro accounts use a euro cash
+              fund so no exchange-rate risk is added.
             </p>
           </div>
           <Switch
