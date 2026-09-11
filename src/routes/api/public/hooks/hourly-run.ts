@@ -19,12 +19,22 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         if (!verified.ok) return verified.response;
         let manualTrigger = false;
         let forceClear = false;
+        let forceTick = false;
+        let portfolioIds: string[] | undefined;
         try {
           const bodyText = await request.clone().text();
           if (bodyText) {
             const parsed = JSON.parse(bodyText);
             manualTrigger = parsed?.manual === true;
             forceClear = parsed?.force === true;
+            forceTick = parsed?.forceTick === true;
+            // Optional scoping: a manual call may target specific portfolios
+            // so one account can be ticked without waiting for the others.
+            if (Array.isArray(parsed?.portfolioIds)) {
+              portfolioIds = parsed.portfolioIds
+                .filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+                .slice(0, 50);
+            }
           }
         } catch { /* body optional */ }
         const { runHourlyCycle, RunInProgressError } = await import("@/lib/hourly-run.server");
@@ -36,6 +46,8 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           const result = await runHourlyCycle({
             triggeredBy: manualTrigger ? "manual" : "cron",
             force: forceClear,
+            forceTick,
+            ...(portfolioIds && portfolioIds.length > 0 ? { portfolioIds } : {}),
             timeBudgetMs: 55_000,
             skipNewsInTicks: true,
           });

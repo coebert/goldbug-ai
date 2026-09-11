@@ -732,6 +732,15 @@ export async function routeOrdersToBroker(params: {
           }),
         };
       });
+    // The owner-set core holding is a deliberate baseline governed by its own
+    // target + drift cap, so the sector budget must never block it.
+    if (coreCaps.coreSymbolKey) {
+      const { engineSymbolKey: coreKeyOf } = await import("./price-symbol");
+      const coreKey = coreKeyOf(coreCaps.coreSymbolKey);
+      for (const c of sectorCandidates) {
+        if (coreKeyOf(c.symbol) === coreKey) c.diversified = true;
+      }
+    }
     const sectorPlan = planSectorAdmissions(sectorCandidates, inputs.sectorExposureBase, {
       navBase: inputs.navBase,
       ...DEFAULT_SECTOR_BUDGET,
@@ -1229,6 +1238,15 @@ export async function routeOrdersToBroker(params: {
         notionalAcctCcy: number;
         capAcctCcy: number;
       }[] = [];
+      const perOrderTrims: {
+        symbol: string;
+        fromQuantity: number;
+        toQuantity: number;
+        capAcctCcy: number;
+      }[] = [];
+      // Smallest ticket worth dealing after charges; a trimmed order below this
+      // is not worth routing, so it is skipped instead.
+      const MIN_TRIMMED_NOTIONAL = 250;
       if (cap.perOrderCap != null && cap.perOrderCap > 0) {
         for (const o of buysStillRoutable) {
           const instCcy = (o.instrument_ccy ?? acctCcy).toUpperCase();
@@ -1236,6 +1254,22 @@ export async function routeOrdersToBroker(params: {
           const notional = toAcctCcy(notionalRaw, instCcy);
           if (notional == null) continue;
           if (notional > cap.perOrderCap) {
+            // An oversized ticket is a sizing question, not a reason to skip
+            // the idea: cut it to the learned ceiling and route the smaller
+            // order whenever what is left is still worth dealing.
+            const perShareAcct = notional / o.quantity;
+            const trimmedQty = Math.floor(cap.perOrderCap / perShareAcct);
+            const trimmedNotional = trimmedQty * perShareAcct;
+            if (trimmedQty >= 1 && trimmedNotional >= MIN_TRIMMED_NOTIONAL) {
+              perOrderTrims.push({
+                symbol: o.symbol,
+                fromQuantity: o.quantity,
+                toQuantity: trimmedQty,
+                capAcctCcy: cap.perOrderCap,
+              });
+              o.quantity = trimmedQty;
+              continue;
+            }
             const reason = `adaptive-cap: order ${notional.toFixed(2)} ${acctCcy} exceeds learned per-order ceiling ${cap.perOrderCap.toFixed(2)} ${acctCcy} (source=${cap.learnedSource}, rejectRate=${cap.rejectRate.toFixed(2)})`;
             preSkips.set(`${o.symbol}:${o.side}`, reason);
             perOrderSkips.push({
@@ -1247,11 +1281,18 @@ export async function routeOrdersToBroker(params: {
         }
       }
 
+
       if (willAdjustAggregate) {
         brokerCashAvailable = cap.aggregateCap;
       }
 
-      if (willAdjustAggregate || perOrderSkips.length > 0 || cap.samples.total > 0) {
+      if (
+        willAdjustAggregate ||
+        perOrderSkips.length > 0 ||
+        perOrderTrims.length > 0 ||
+        cap.samples.total > 0
+      ) {
+
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: portfolio.id,
           user_id: userId,
@@ -1277,6 +1318,8 @@ export async function routeOrdersToBroker(params: {
             appliedAggregateHaircut: willAdjustAggregate,
             brokerCashAvailableAfter: brokerCashAvailable,
             perOrderSkips,
+            perOrderTrims,
+
             notes: cap.notes,
           }),
           error: null,

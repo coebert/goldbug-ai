@@ -490,8 +490,14 @@ export function planAdmissions(
   for (const c of buys) {
     const symKey = engineSymbolKey(c.symbol);
     const cooldown = cfg.lastBuyDaysAgo[symKey] ?? cfg.lastBuyDaysAgo[c.symbol];
+    // The owner-set core is a deterministic, scheduled build towards a fixed
+    // target weight, not a re-entry into a name we just traded, so the
+    // same-name churn rest does not apply to it. Its target + drift cap and
+    // the daily money ceiling still bind.
+    const isCoreBuy =
+      !!cfg.coreSymbolKey && symKey === engineSymbolKey(cfg.coreSymbolKey);
 
-    if (cooldown !== undefined && cooldown < cfg.addCooldownDays) {
+    if (!isCoreBuy && cooldown !== undefined && cooldown < cfg.addCooldownDays) {
       decisions.push({
         kind: "skip",
         candidate: c,
