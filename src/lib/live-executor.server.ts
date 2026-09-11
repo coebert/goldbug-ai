@@ -162,7 +162,26 @@ export async function routeOrdersToBroker(params: {
   // Hard safety gate (independent of strategy logic): admin kill switch plus a
   // per-day BUY notional ceiling. Fails closed — see trading-controls.server.
   const { loadTradingGate } = await import("./trading-controls.server");
-  const gate = await loadTradingGate();
+  // A practice book scales the day's buy ceiling to its own NAV; the
+  // real-money figure the operator set stays exactly as configured.
+  const gateNavBase = await (async (): Promise<number | null> => {
+    if (portfolio.mode === "live_prod") return null;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("equity_snapshots")
+        .select("total_value")
+        .eq("portfolio_id", portfolio.id)
+        .order("snapshot_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nav = Number((data as { total_value?: number | null } | null)?.total_value);
+      return Number.isFinite(nav) && nav > 0 ? nav : null;
+    } catch {
+      return null;
+    }
+  })();
+  const gate = await loadTradingGate({ mode: portfolio.mode, navBase: gateNavBase });
 
   let routable = executed.filter(
     (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
