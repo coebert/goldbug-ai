@@ -19,6 +19,13 @@ import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
 import { getFxLegHygiene } from "@/lib/fx-leg-hygiene.functions";
 import { closeFxLeg } from "@/lib/fx-leg-close.functions";
+import {
+  getFxAutoCloseSettings,
+  setFxAutoCloseSettings,
+} from "@/lib/fx-auto-close.functions";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 
 function money(n: number, ccy: string, signed = true) {
