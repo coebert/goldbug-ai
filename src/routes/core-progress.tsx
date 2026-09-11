@@ -55,16 +55,11 @@ function CoreProgressPage() {
   return (
     <>
       <AppHeader />
-      <PageShell>
+      <PageShell
+        title="Core progress"
+        purpose="Your long-term core holding, how far it is from its target share of the account, and what it still costs to finish."
+      >
         <div className="space-y-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Core progress</h1>
-            <p className="text-sm text-muted-foreground">
-              Your long-term core holding, how far it is from its target share of the account,
-              and what it still costs to finish.
-            </p>
-          </div>
-
           {query.isLoading ? (
             <Card>
               <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
