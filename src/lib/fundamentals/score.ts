@@ -160,7 +160,10 @@ export function financialFlags(f: Fundamentals, asOf: string): string[] {
     flags.push(`weak liquidity (current ratio ${f.current_ratio.toFixed(2)})`);
   if (f.payout_ratio != null && f.payout_ratio > 1)
     flags.push(`dividend not covered by earnings (payout ${(f.payout_ratio * 100).toFixed(0)}%)`);
-  if (f.trailing_pe != null && f.trailing_pe > 60)
+  // "Expensive" is quality-relative: a 30%-ROE compounder on 70x is not the
+  // same warning as a no-growth business on 70x. Bounded by qualityTolerance.
+  const peLimit = 60 * qualityTolerance(f);
+  if (f.trailing_pe != null && f.trailing_pe > peLimit)
     flags.push(`stretched valuation (P/E ${f.trailing_pe.toFixed(0)})`);
   if (f.short_percent_float != null && f.short_percent_float > 0.1)
     flags.push(`heavily shorted (${(f.short_percent_float * 100).toFixed(0)}% of float)`);
