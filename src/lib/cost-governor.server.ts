@@ -139,9 +139,16 @@ export async function loadGovernorInputs(args: {
       // of the window at once — a live account sat on cash for eleven trading
       // days that way. Weighting each fill by how much of the window it has
       // left refills headroom continuously as the burst ages.
+      // Exponential decay, not linear. A linear 30-day taper still counts
+      // three-week-old commission at a third of face value, so one busy week
+      // kept a small book blocked for a month (observed: £188 of trailing
+      // cost against a £39 window). A half-life of a quarter of the window
+      // (~7.5 days) refills headroom at the pace the account actually trades
+      // while still remembering a genuine churn burst.
       const t = Date.parse(filledAt);
       const ageDays = Number.isFinite(t) ? Math.max(0, (now - t) / 86_400_000) : 0;
-      const weight = Math.max(0, Math.min(1, 1 - ageDays / windowDays));
+      const halfLife = Math.max(1, windowDays / 4);
+      const weight = ageDays >= windowDays ? 0 : Math.pow(0.5, ageDays / halfLife);
       trailingCostBase += (await toBase(oneWay, ccy)) * weight;
 
       if (side === "buy") {
