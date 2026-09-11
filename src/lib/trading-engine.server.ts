@@ -2311,9 +2311,18 @@ export async function runDailyTick(
       }
 
       const spendableCash = Math.max(0, workingCash - cashFloor);
+      // The owner-set core is an allocation instruction, not a trading idea:
+      // its size is the gap to the target, so it is bought whole (one dealing
+      // fee) instead of being shaved by the risk dial and signal haircuts.
+      const isCoreBuyOrder =
+        order.side === "buy" &&
+        coreSizing != null &&
+        engineSymbolKey(meta.symbol) === coreSizing.key;
       // Risk dial, buy side: position-size multiplier × buy aggressiveness.
       // Every downstream cap (per-symbol, class, vol, cash) still applies.
-      let spend = aggressiveBuySpend(spendableCash * pct, aggression);
+      let spend = isCoreBuyOrder
+        ? Math.min(spendableCash, Math.max(0, totalValue * pct))
+        : aggressiveBuySpend(spendableCash * pct, aggression);
       const sizingNotes: string[] = [
         `dial ${aggression.level} (${aggression.name}) size×${aggression.sizeMult.toFixed(2)} buy×${aggression.buy.toFixed(2)}`,
       ];
@@ -2522,7 +2531,7 @@ export async function runDailyTick(
         brk.mult < 1 ? { label: "breakout", mult: brk.mult } : null,
 
       ]);
-      if (haircuts.mult < 1) {
+      if (haircuts.mult < 1 && !isCoreBuyOrder) {
         spend *= haircuts.mult;
         if (haircuts.note) sizingNotes.push(haircuts.note);
         if (systematic.note) sizingNotes.push(systematic.note);
@@ -2533,7 +2542,7 @@ export async function runDailyTick(
         phaseMult.mult > 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
         brk.mult > 1 ? { label: "breakout", mult: brk.mult } : null,
       ]);
-      if (boosts.mult > 1) {
+      if (boosts.mult > 1 && !isCoreBuyOrder) {
         spend *= boosts.mult;
         if (boosts.note) sizingNotes.push(boosts.note);
       }
@@ -2644,7 +2653,9 @@ export async function runDailyTick(
         targetOverridePct: cfg.target_invested_pct,
         enabled: cfg.cash_policy_enabled,
       });
-      if (livePolicy.enabled) {
+       // The core is the owner's chosen invested share, so the invested-%
+       // policy cannot shrink it; the cash floor below still binds.
+       if (livePolicy.enabled && !isCoreBuyOrder) {
         if (livePolicy.deployableValue <= 0) {
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
