@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TradesRouteImport } from './routes/trades'
 import { Route as SpilloverRouteImport } from './routes/spillover'
 import { Route as SimulationReportRouteImport } from './routes/simulation-report'
+import { Route as SignalsByMarketRouteImport } from './routes/signals-by-market'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
@@ -90,6 +91,11 @@ const SpilloverRoute = SpilloverRouteImport.update({
 const SimulationReportRoute = SimulationReportRouteImport.update({
   id: '/simulation-report',
   path: '/simulation-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignalsByMarketRoute = SignalsByMarketRouteImport.update({
+  id: '/signals-by-market',
+  path: '/signals-by-market',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -455,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
+  '/signals-by-market': typeof SignalsByMarketRoute
   '/simulation-report': typeof SimulationReportRoute
   '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
@@ -524,6 +531,7 @@ export interface FileRoutesByTo {
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
+  '/signals-by-market': typeof SignalsByMarketRoute
   '/simulation-report': typeof SimulationReportRoute
   '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
@@ -594,6 +602,7 @@ export interface FileRoutesById {
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
+  '/signals-by-market': typeof SignalsByMarketRoute
   '/simulation-report': typeof SimulationReportRoute
   '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
@@ -665,6 +674,7 @@ export interface FileRouteTypes {
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/settings'
+    | '/signals-by-market'
     | '/simulation-report'
     | '/spillover'
     | '/trades'
@@ -734,6 +744,7 @@ export interface FileRouteTypes {
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/settings'
+    | '/signals-by-market'
     | '/simulation-report'
     | '/spillover'
     | '/trades'
@@ -803,6 +814,7 @@ export interface FileRouteTypes {
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/settings'
+    | '/signals-by-market'
     | '/simulation-report'
     | '/spillover'
     | '/trades'
@@ -873,6 +885,7 @@ export interface RootRouteChildren {
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
   SettingsRoute: typeof SettingsRoute
+  SignalsByMarketRoute: typeof SignalsByMarketRoute
   SimulationReportRoute: typeof SimulationReportRoute
   SpilloverRoute: typeof SpilloverRoute
   TradesRoute: typeof TradesRoute
@@ -943,6 +956,13 @@ declare module '@tanstack/react-router' {
       path: '/simulation-report'
       fullPath: '/simulation-report'
       preLoaderRoute: typeof SimulationReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signals-by-market': {
+      id: '/signals-by-market'
+      path: '/signals-by-market'
+      fullPath: '/signals-by-market'
+      preLoaderRoute: typeof SignalsByMarketRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -1417,6 +1437,7 @@ const rootRouteChildren: RootRouteChildren = {
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
   SettingsRoute: SettingsRoute,
+  SignalsByMarketRoute: SignalsByMarketRoute,
   SimulationReportRoute: SimulationReportRoute,
   SpilloverRoute: SpilloverRoute,
   TradesRoute: TradesRoute,
