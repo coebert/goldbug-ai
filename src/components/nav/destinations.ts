@@ -1,4 +1,5 @@
 import {
+  Target,
   Home,
   LineChart,
   FlaskConical,
@@ -205,6 +206,15 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     icon: Receipt,
     area: "trades",
     keywords: "costs fees commission stamp duty slippage floor hurdle spread",
+  },
+  {
+    to: "/core-progress",
+    label: "Core progress",
+    tabLabel: "Core",
+    hint: "How much of your long-term core is built, and the cash and date to finish it.",
+    icon: Target,
+    area: "trades",
+    keywords: "core allocation target progress build cash needed date vwrl tracker",
   },
 
 
