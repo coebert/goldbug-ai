@@ -512,7 +512,13 @@ export function planAdmissions(
     const isCoreBuy =
       !!cfg.coreSymbolKey && symKey === engineSymbolKey(cfg.coreSymbolKey);
 
-    if (!isCoreBuy && cooldown !== undefined && cooldown < cfg.addCooldownDays) {
+    // A very strong, clearly profitable idea may re-enter a resting name:
+    // the churn guard exists to stop fee-bleeding nibbles, and an idea whose
+    // expected edge clears its friction many times over is not a nibble. All
+    // other guards (min ticket, caps, daily money, net edge) still bind.
+    const cooldownOverride = !isCoreBuy && qualifiesForCapOverride(c);
+
+    if (!isCoreBuy && !cooldownOverride && cooldown !== undefined && cooldown < cfg.addCooldownDays) {
       decisions.push({
         kind: "skip",
         candidate: c,

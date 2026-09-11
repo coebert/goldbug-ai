@@ -79,6 +79,25 @@ describe("cost governor", () => {
     ).toBe("admit");
   });
 
+  it("lets a very strong, cost-clearing idea re-enter a resting name", () => {
+    // Bought yesterday — ordinary ideas still rest, but conviction 0.9 with a
+    // 10% expected move on £900 clears ~£81 gross edge against £5 friction
+    // (16x, above the 6x bar), so the churn guard must not block it.
+    const strong = planAdmissions(
+      [{ ...buy("MKS.L", 900, 5), edgeScore: 0.9, expectedMovePct: 0.1 }],
+      { ...base, lastBuyDaysAgo: { "MKS.L": 1 } },
+    );
+    expect(strong.decisions[0]!.kind).toBe("admit");
+    // A merely decent idea still rests.
+    const ordinary = planAdmissions(
+      [{ ...buy("MKS.L", 900, 5), edgeScore: 0.6, expectedMovePct: 0.03 }],
+      { ...base, lastBuyDaysAgo: { "MKS.L": 1 } },
+    );
+    const d = ordinary.decisions[0]!;
+    expect(d.kind).toBe("skip");
+    expect("reason" in d ? d.reason : "").toMatch(/churn guard/);
+  });
+
   it("loosens caps as the account grows", () => {
     expect(governorForNav(10_000).maxBuysPerDay).toBe(3);
     expect(governorForNav(60_000).maxBuysPerDay).toBe(5);
