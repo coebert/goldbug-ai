@@ -4092,6 +4092,9 @@ export type Database = {
       trading_controls: {
         Row: {
           base_currency: string
+          cash_sleeve_buffer: number
+          cash_sleeve_enabled: boolean
+          cash_sleeve_symbol: string
           core_allocation_pct: number
           core_band_pct: number
           core_symbol: string
@@ -4108,6 +4111,9 @@ export type Database = {
         }
         Insert: {
           base_currency?: string
+          cash_sleeve_buffer?: number
+          cash_sleeve_enabled?: boolean
+          cash_sleeve_symbol?: string
           core_allocation_pct?: number
           core_band_pct?: number
           core_symbol?: string
@@ -4124,6 +4130,9 @@ export type Database = {
         }
         Update: {
           base_currency?: string
+          cash_sleeve_buffer?: number
+          cash_sleeve_enabled?: boolean
+          cash_sleeve_symbol?: string
           core_allocation_pct?: number
           core_band_pct?: number
           core_symbol?: string
