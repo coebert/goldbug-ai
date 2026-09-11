@@ -100,7 +100,7 @@ export const getCorePerformance = createServerFn({ method: "POST" })
     });
     const aligned = alignSeriesCommonWindow(converted);
     const funds = aligned.map((fund): FundPerformance => {
-      const metrics = calculatePerformance(series);
+      const metrics = calculatePerformance(fund.series);
       return {
         symbol: fund.symbol,
         name: fund.name,
