@@ -52,6 +52,7 @@ export const DEFAULT_SECTOR_BUDGET: Omit<SectorBudgetConfig, "navBase"> = {
 };
 
 const UNKNOWN = "__unknown__";
+const DIVERSIFIED = "__diversified__";
 
 function keyFor(sector: string | null): string {
   const s = (sector ?? "").trim().toLowerCase();
