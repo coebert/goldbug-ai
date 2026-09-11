@@ -110,6 +110,17 @@ export type NextBuyRow = {
 
 export const DEFAULT_TARGET_WEIGHT_PCT = 0.12;
 export const DEFAULT_HORIZON_DAYS = 10;
+/** Most of the spare cash a single suggestion may take by default. */
+export const DEFAULT_MAX_CASH_SHARE_PCT = 0.6;
+
+/**
+ * Cash the executor keeps back: 2% of NAV plus a flat settlement buffer.
+ * Same shape as `trading-engine.server.ts` uses when it sizes a core top-up,
+ * so the panel can never suggest money the live path would refuse to spend.
+ */
+export function cashReserveForNav(navBase: number): number {
+  return Math.max(0, navBase * 0.02) + 250;
+}
 
 /**
  * Trend and momentum read for one name, expressed as 0..1 conviction plus the
