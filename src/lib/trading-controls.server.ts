@@ -168,3 +168,37 @@ export async function loadCoreAllocationSettings(): Promise<CoreAllocationSettin
     return off;
   }
 }
+
+export interface CashSleeveSettings {
+  /** Off by default: an unreadable knob must never start trading on its own. */
+  enabled: boolean;
+  /** Ticker of the cash-like interest fund. */
+  symbol: string;
+  /** Cash always kept liquid for trades, charges and settlement, base ccy. */
+  buffer: number;
+}
+
+/**
+ * The owner's cash-sleeve setting (Settings → spare cash). Reads fail SAFE to
+ * "off" and to a generous buffer.
+ */
+export async function loadCashSleeveSettings(): Promise<CashSleeveSettings> {
+  const off: CashSleeveSettings = { enabled: false, symbol: "ERNS.L", buffer: 1500 };
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("trading_controls")
+      .select("cash_sleeve_enabled, cash_sleeve_symbol, cash_sleeve_buffer")
+      .eq("id", true)
+      .maybeSingle();
+    if (!data) return off;
+    const buffer = Number(data.cash_sleeve_buffer);
+    return {
+      enabled: Boolean(data.cash_sleeve_enabled),
+      symbol: String(data.cash_sleeve_symbol || "ERNS.L").toUpperCase(),
+      buffer: Number.isFinite(buffer) ? Math.max(0, buffer) : 1500,
+    };
+  } catch {
+    return off;
+  }
+}
