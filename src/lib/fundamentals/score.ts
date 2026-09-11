@@ -182,8 +182,12 @@ export function financialFlags(f: Fundamentals, asOf: string): string[] {
     flags.push(`heavily shorted (${(f.short_percent_float * 100).toFixed(0)}% of float)`);
   if (f.revenue_growth != null && f.revenue_growth < -0.1)
     flags.push(`revenue shrinking ${(f.revenue_growth * 100).toFixed(0)}%`);
+  // Outside the US the scheduled date is usually an estimate and pre-print
+  // drift is smaller, so the caution window is tighter rather than absent.
+  const region = marketRegion(f.symbol);
+  const window = isNonUsDeveloped(region) ? 3 : 5;
   const d = daysBetween(asOf, f.next_earnings_date);
-  if (d != null && d >= 0 && d <= 5) flags.push(`results due in ${d}d`);
+  if (d != null && d >= 0 && d <= window) flags.push(`results due in ${d}d`);
   return flags;
 }
 
