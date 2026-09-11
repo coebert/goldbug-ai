@@ -267,6 +267,7 @@ export async function routeOrdersToBroker(params: {
   let budget = gate.remaining;
   const admitted: ExecutedOrderLike[] = [];
   const capped: { symbol: string; notional: number }[] = [];
+  const trimmed: { symbol: string; from: number; to: number }[] = [];
   // The owner-set core top-up gets first call on the day's BUY budget: it is
   // an allocation instruction, so it must never lose its slot to short-term
   // ideas queued ahead of it. The money ceiling itself still binds.
