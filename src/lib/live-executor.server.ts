@@ -697,10 +697,18 @@ export async function routeOrdersToBroker(params: {
       .map((d) => {
         const c = (d as { candidate: { symbol: string; notionalBase: number } }).candidate;
         const held = routable.find((o) => o.symbol === c.symbol && o.side === "buy");
+        const meta = held as { sector?: string | null; assetClass?: string | null; name?: string | null } | undefined;
         return {
           symbol: c.symbol,
           sector: held?.sector ?? symbolSector(c.symbol),
           notionalBase: c.notionalBase,
+          // Broad global/market trackers span every sector; the per-name
+          // position cap governs them, not the sector budget.
+          diversified: isDiversifiedFund({
+            symbol: c.symbol,
+            assetClass: meta?.assetClass ?? null,
+            name: meta?.name ?? symbolDisplayName(c.symbol) ?? null,
+          }),
         };
       });
     const sectorPlan = planSectorAdmissions(sectorCandidates, inputs.sectorExposureBase, {
