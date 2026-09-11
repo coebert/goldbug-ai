@@ -32,6 +32,12 @@
 import { engineSymbolKey } from "./price-symbol";
 import { DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV } from "./diversified-fund";
 import {
+  qualifiesForCapOverride,
+  stretchedCapPct,
+  OVERRIDE_MAX_DIVERSIFIED_PCT,
+  OVERRIDE_MAX_SINGLE_NAME_PCT,
+} from "./high-conviction-override";
+import {
   edgesComparable,
   stampPreferenceSurcharge,
   type StampExemptPreference,
