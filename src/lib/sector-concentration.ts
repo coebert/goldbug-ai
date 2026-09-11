@@ -10,6 +10,12 @@
 // hold, how much more of this sector can we buy? It is pure — the caller
 // resolves NAV, existing exposure by sector and the sector of each candidate.
 
+import {
+  qualifiesForCapOverride,
+  stretchedCapPct,
+  OVERRIDE_MAX_SECTOR_PCT,
+} from "./high-conviction-override";
+
 export type SectorBudgetConfig = {
   navBase: number;
   /** Max gross exposure to any one sector, as a fraction of NAV. */
@@ -30,6 +36,12 @@ export type SectorCandidate = {
    * silently blocks the core allocation on every run.
    */
   diversified?: boolean;
+  /** Conviction in [0,1] (|unifiedScore|) for the cap-stretch test. */
+  edgeScore?: number;
+  /** Expected favourable move as a fraction of notional. */
+  expectedMovePct?: number;
+  /** Estimated round-trip friction for this ticket, base currency. */
+  estCostBase?: number;
 };
 
 export type SectorDecision =
@@ -89,7 +101,12 @@ export function planSectorAdmissions(
       continue;
     }
     const key = keyFor(c.sector);
-    const cap = capFor(key);
+    // An exceptionally strong, cost-clearing idea stretches its sector cap
+    // (bounded by OVERRIDE_MAX_SECTOR_PCT) instead of being turned away.
+    const override = qualifiesForCapOverride(c);
+    const capPct = key === UNKNOWN ? cfg.maxUnknownPctOfNav : cfg.maxSectorPctOfNav;
+    const effPct = override ? stretchedCapPct(capPct, OVERRIDE_MAX_SECTOR_PCT) : capPct;
+    const cap = nav * effPct;
     const current = exposure[key] ?? 0;
     const after = current + Math.max(0, c.notionalBase);
     if (nav > 0 && after > cap) {
@@ -99,7 +116,7 @@ export function planSectorAdmissions(
         reason:
           `sector budget: ${key === UNKNOWN ? "unclassified" : key} exposure would reach ` +
           `${after.toFixed(0)} of a ${cap.toFixed(0)} cap ` +
-          `(${((key === UNKNOWN ? cfg.maxUnknownPctOfNav : cfg.maxSectorPctOfNav) * 100).toFixed(0)}% of NAV ${nav.toFixed(0)}); ` +
+          `(${(effPct * 100).toFixed(0)}% of NAV ${nav.toFixed(0)}${override ? ", already stretched for a very strong signal" : ""}); ` +
           `already holding ${current.toFixed(0)}`,
       });
       continue;

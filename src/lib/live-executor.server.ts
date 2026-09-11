@@ -716,13 +716,28 @@ export async function routeOrdersToBroker(params: {
     const sectorCandidates = plan.decisions
       .filter((d) => d.kind === "admit" && d.candidate.side === "buy")
       .map((d) => {
-        const c = (d as { candidate: { symbol: string; notionalBase: number } }).candidate;
+        const c = (
+          d as {
+            candidate: {
+              symbol: string;
+              notionalBase: number;
+              edgeScore?: number;
+              expectedMovePct?: number;
+              estCostBase?: number;
+            };
+          }
+        ).candidate;
         const held = routable.find((o) => o.symbol === c.symbol && o.side === "buy");
         const meta = held as { sector?: string | null; assetClass?: string | null; name?: string | null } | undefined;
         return {
           symbol: c.symbol,
           sector: held?.sector ?? symbolSector(c.symbol),
           notionalBase: c.notionalBase,
+          // Lets an exceptionally strong, cost-clearing idea stretch the
+          // sector cap instead of being turned away.
+          edgeScore: c.edgeScore,
+          expectedMovePct: c.expectedMovePct,
+          estCostBase: c.estCostBase,
           // Broad global/market trackers span every sector; the per-name
           // position cap governs them, not the sector budget.
           diversified: isDiversifiedFund({
