@@ -1175,6 +1175,11 @@ function PortfolioPage() {
 
                   </div>
                 )}
+                <div className="mb-6">
+                  <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                    <HoldingCurrencyRiskCard portfolioId={id} active={tab === "overview"} />
+                  </Suspense>
+                </div>
                 {p.mode === "live_prod" && (
                   <div className="mb-6">
                     <HoldingEquityChangeChart portfolioId={id} />
