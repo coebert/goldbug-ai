@@ -78,6 +78,8 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VWCE.DE", name: "Vanguard FTSE All-World Acc ETF (XETRA)", asset_class: "etf" },
   { symbol: "MEUD.PA", name: "Amundi Stoxx Europe 600 ETF (Paris)", asset_class: "etf" },
   { symbol: "IWDA.AS", name: "iShares Core MSCI World ETF (Amsterdam)", asset_class: "etf" },
+  // Euro cash sleeve: overnight-rate ETC used to park idle EUR balances.
+  { symbol: "XEON.DE", name: "Xtrackers EUR Overnight Rate ETF (XETRA)", asset_class: "etf" },
   // Short sleeve — cash-funded inverse (-1x) UCITS ETFs. Buying these is how
   // the AI expresses a bearish view without margin or borrowing; see
   // src/lib/short-sleeve.ts for the gross/sleeve caps that govern them.

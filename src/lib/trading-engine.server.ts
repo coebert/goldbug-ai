@@ -1986,8 +1986,15 @@ export async function runDailyTick(
   // working buffer is short, so it can never be the reason a trade fails.
   try {
     const { loadCashSleeveSettings } = await import("./trading-controls.server");
-    const sleeveCfg = await loadCashSleeveSettings();
-    if (sleeveCfg.enabled) {
+    const loaded = await loadCashSleeveSettings();
+    // Park cash in the book's OWN currency: holding a GBP fund inside a EUR
+    // account turns a cash balance into an FX bet, which is the opposite of
+    // what a cash sleeve is for. Books in a currency with no listed sleeve
+    // keep their cash as cash.
+    const sleeveByCcy: Record<string, string> = { GBP: loaded.symbol, EUR: "XEON.DE" };
+    const sleeveSymbol = sleeveByCcy[portfolioBaseCcy.toUpperCase()];
+    const sleeveCfg = { ...loaded, symbol: sleeveSymbol ?? loaded.symbol };
+    if (loaded.enabled && sleeveSymbol) {
       const { planCashSleeve } = await import("./cash-sleeve");
       const sleeveKey = engineSymbolKey(sleeveCfg.symbol);
       cashSleeveSizing = { key: sleeveKey, capPct: 0.95 };
@@ -2014,12 +2021,20 @@ export async function runDailyTick(
         .filter((o) => o.side === "buy")
         .reduce((s, o) => s + (totalValue * Math.max(0, Number(o.percent) || 0)) / 100, 0);
       if (sleevePrice != null && !sleeveAlreadyOrdered) {
+        // One fixed buffer cannot fit every book: the same £1,500 that is a
+        // sensible working float on the real account would leave a £1m
+        // simulation with nothing to trade on, and would swallow a tiny
+        // backtest whole. Scale it with NAV, never below a workable ticket.
+        const effectiveBuffer = Math.min(
+          Math.max(sleeveCfg.buffer, totalValue * 0.05),
+          Math.max(250, totalValue * 0.25),
+        );
         const plan = planCashSleeve({
           nav: totalValue,
           sleeveValue,
           sleeveQuantity,
           cash: cash - committed,
-          buffer: sleeveCfg.buffer,
+          buffer: effectiveBuffer,
           price: sleevePrice,
           minTicket: 250,
         });
