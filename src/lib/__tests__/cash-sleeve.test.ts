@@ -25,7 +25,8 @@ describe("planCashSleeve", () => {
 
   it("never leaves the buffer short after a buy", () => {
     const p = planCashSleeve({ ...base, cash: 2_000 });
-    expect(p.action).toBe("hold");
+    expect(p.action).toBe("buy");
+    expect(2_000 - p.notional).toBeGreaterThanOrEqual(1_500);
   });
 
   it("sells back to restore a short buffer", () => {
