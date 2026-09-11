@@ -1,0 +1,12 @@
+---
+name: Cash sleeve
+description: Spare cash above a £1,500 buffer parked in ERNS.L short-dated GBP bonds, sold back before any trade is blocked
+type: feature
+---
+Idle cash earns nothing at the broker, so a deterministic cash sleeve parks anything above the working buffer in a cash-like fund.
+
+- Fund: `ERNS.L` (iShares £ Ultrashort Bond, quotes in whole GBP ~101 — added to the GBX allowlist so it is never divided by 100).
+- Buffer: £1,500 of cash always kept liquid; the sleeve is SOLD first whenever cash falls below it, so it can never block a trade.
+- Sized by the cash balance only, never by a signal. Cash already committed to buys proposed earlier in the same tick is deducted before parking.
+- Runs after the core-allocation block in `trading-engine.server.ts`; exempt from the concentration cap, target-weight nibbler and net-edge gate, like the core.
+- Settings: `trading_controls.cash_sleeve_enabled / _symbol / _buffer`, surfaced on the Risk page. Reads fail safe to off.
