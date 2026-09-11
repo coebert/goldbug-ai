@@ -82,6 +82,11 @@ export function planSectorAdmissions(
   const ordered = candidates.slice().sort((a, b) => b.notionalBase - a.notionalBase);
 
   for (const c of ordered) {
+    if (c.diversified) {
+      exposure[DIVERSIFIED] = (exposure[DIVERSIFIED] ?? 0) + Math.max(0, c.notionalBase);
+      decisions.push({ kind: "admit", candidate: c });
+      continue;
+    }
     const key = keyFor(c.sector);
     const cap = capFor(key);
     const current = exposure[key] ?? 0;
