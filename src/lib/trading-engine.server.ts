@@ -2311,9 +2311,18 @@ export async function runDailyTick(
       }
 
       const spendableCash = Math.max(0, workingCash - cashFloor);
+      // The owner-set core is an allocation instruction, not a trading idea:
+      // its size is the gap to the target, so it is bought whole (one dealing
+      // fee) instead of being shaved by the risk dial and signal haircuts.
+      const isCoreBuyOrder =
+        order.side === "buy" &&
+        coreSizing != null &&
+        engineSymbolKey(meta.symbol) === coreSizing.key;
       // Risk dial, buy side: position-size multiplier × buy aggressiveness.
       // Every downstream cap (per-symbol, class, vol, cash) still applies.
-      let spend = aggressiveBuySpend(spendableCash * pct, aggression);
+      let spend = isCoreBuyOrder
+        ? Math.min(spendableCash, Math.max(0, totalValue * pct))
+        : aggressiveBuySpend(spendableCash * pct, aggression);
       const sizingNotes: string[] = [
         `dial ${aggression.level} (${aggression.name}) size×${aggression.sizeMult.toFixed(2)} buy×${aggression.buy.toFixed(2)}`,
       ];
