@@ -123,3 +123,29 @@ describe("cost governor", () => {
   });
 });
 
+
+describe("core holding cap", () => {
+  const coreCfg = {
+    ...base,
+    coreSymbolKey: "VWRL.L",
+    coreCapPctOfNav: 0.65,
+    positionExposureBase: { "VWRL.L": 4_000 },
+  };
+
+  it("lets the core holding be funded past the diversified-fund cap", () => {
+    const plan = planAdmissions([buy("VWRL.L", 2_000)], coreCfg);
+    expect(plan.decisions[0]?.kind).toBe("admit");
+  });
+
+  it("still stops the core above its own cap", () => {
+    const plan = planAdmissions([buy("VWRL.L", 4_000)], coreCfg);
+    const d = plan.decisions[0];
+    expect(d?.kind).toBe("skip");
+    expect(d?.kind === "skip" && d.reason).toContain("core-holding cap");
+  });
+
+  it("does not widen the cap for other names", () => {
+    const plan = planAdmissions([buy("AAPL", 4_000)], coreCfg);
+    expect(plan.decisions[0]?.kind).toBe("skip");
+  });
+});
