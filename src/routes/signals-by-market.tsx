@@ -49,7 +49,7 @@ function SignalsByMarketPage() {
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
   });
-  useLiveFillStream(query.data?.portfolioId, () => void query.refetch());
+  useLiveFillStream(query.data?.portfolioId ?? null, () => void query.refetch());
   const groups = useMemo(() => (query.data?.groups ?? [])
     .filter((group) => market === "all" || group.market === market)
     .map((group) => ({ ...group, rows: group.rows.filter((row) => coverage === "all" || row.coverage === coverage) }))
