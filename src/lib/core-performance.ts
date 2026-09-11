@@ -82,6 +82,13 @@ export function targetAllocationReturn(fundReturn: number, targetPct: number): n
   return fundReturn * Math.max(0, Math.min(1, targetPct));
 }
 
+export function alignSeriesCommonWindow<T extends { series: PricePoint[] }>(funds: readonly T[]): T[] {
+  const starts = funds.map((fund) => cleanPriceSeries(fund.series)[0]?.date).filter((date): date is string => Boolean(date));
+  if (starts.length !== funds.length || starts.length === 0) return funds.map((fund) => ({ ...fund, series: cleanPriceSeries(fund.series) }));
+  const commonStart = starts.sort().at(-1) ?? "";
+  return funds.map((fund) => ({ ...fund, series: cleanPriceSeries(fund.series).filter((point) => point.date >= commonStart) }));
+}
+
 export function mergeNormalisedSeries(
   funds: readonly Pick<FundPerformance, "symbol" | "series">[],
 ): Array<Record<string, string | number>> {

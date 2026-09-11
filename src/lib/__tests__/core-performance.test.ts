@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePerformance, cleanPriceSeries, mergeNormalisedSeries, normalizeReturns, targetAllocationReturn } from "../core-performance";
+import { alignSeriesCommonWindow, calculatePerformance, cleanPriceSeries, mergeNormalisedSeries, normalizeReturns, targetAllocationReturn } from "../core-performance";
 
 describe("core performance", () => {
   it("cleans, deduplicates and orders prices", () => {
@@ -33,6 +33,15 @@ describe("core performance", () => {
   it("scales fund return by the configured allocation", () => {
     expect(targetAllocationReturn(0.2, 0.5)).toBeCloseTo(0.1);
     expect(targetAllocationReturn(-0.2, 0.5)).toBeCloseTo(-0.1);
+  });
+
+  it("aligns funds to the latest common start", () => {
+    const aligned = alignSeriesCommonWindow([
+      { series: [{ date: "2024-01-01", close: 10 }, { date: "2025-01-01", close: 12 }] },
+      { series: [{ date: "2025-01-01", close: 20 }, { date: "2025-02-01", close: 21 }] },
+    ]);
+    expect(aligned[0].series[0].date).toBe("2025-01-01");
+    expect(aligned[1].series[0].date).toBe("2025-01-01");
   });
 
   it("returns null for insufficient history", () => {

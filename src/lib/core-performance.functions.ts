@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { calculatePerformance, cleanPriceSeries, targetAllocationReturn, type FundPerformance, type PricePoint } from "./core-performance";
+import { alignSeriesCommonWindow, calculatePerformance, cleanPriceSeries, targetAllocationReturn, type FundPerformance, type PricePoint } from "./core-performance";
 import { engineSymbolKey } from "./price-symbol";
 import { normalizeMarketPriceForTrading } from "./market-price-units";
 
@@ -93,15 +93,19 @@ export const getCorePerformance = createServerFn({ method: "POST" })
 
     const eurGbp = (history[FUNDS.length] ?? []).map((point) => ({ date: point.date, close: point.close }));
     const gbpUsd = (history[FUNDS.length + 1] ?? []).map((point) => ({ date: point.date, close: point.close }));
-    const funds = FUNDS.map((fund, index): FundPerformance => {
+    const converted = FUNDS.map((fund, index) => {
       const raw = (history[index] ?? []).map((point) => ({ date: point.date, close: point.close }));
       const series = toGbpSeries(fund.symbol, fund.currency, raw, eurGbp, gbpUsd);
+      return { ...fund, series };
+    });
+    const aligned = alignSeriesCommonWindow(converted);
+    const funds = aligned.map((fund): FundPerformance => {
       const metrics = calculatePerformance(series);
       return {
         symbol: fund.symbol,
         name: fund.name,
         currency: "GBP",
-        series,
+        series: fund.series,
         metrics,
         targetAllocationReturn: metrics ? targetAllocationReturn(metrics.totalReturn, core.targetPct) : null,
       };
