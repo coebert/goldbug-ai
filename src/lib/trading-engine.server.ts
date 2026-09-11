@@ -340,11 +340,10 @@ export async function runDailyTick(
     fullUniverse = fullUniverse.filter((u) => !proxies.has(u.symbol));
   }
 
-  // Live-broker tradeability filter. Our Saxo integration only reliably resolves
-  // plain equities/ETFs (US + LSE `.L`). Yahoo FX pairs (`=X`), futures (`=F`),
-  // and crypto spot (`-USD`) do not map to Saxo retail cash-account UICs and
-  // consistently fail with "instrument not found", so exclude them from the
-  // universe for live_prod portfolios. live_sim and backtest keep the full set.
+  // Live-broker tradeability filter. Cash equities/ETFs across the configured
+  // US, UK, European, Japanese and Australian venues resolve through the broker
+  // map. Yahoo FX pairs (`=X`), futures (`=F`) and crypto spot (`-USD`) do not,
+  // so exclude only those feeds (plus learned account blocks) from live_prod.
   const brokerBlockedSymbols: string[] = [];
   if (portfolio.mode === "live_prod") {
     const originalCount = fullUniverse.length;

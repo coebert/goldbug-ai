@@ -358,7 +358,7 @@ async function runHourlyCycleInner(
     for (const p of portfolios) {
       try {
         const universe = filterUniverse(classesFromUniverse(p.universe));
-        for (const c of universe.slice(0, 22)) symbolSet.add(c.symbol);
+        for (const c of universe) symbolSet.add(c.symbol);
       } catch (e) {
         srvLog.warn("hourly-run: universe parse failed", p.id, e);
       }
@@ -500,7 +500,7 @@ async function runHourlyCycleInner(
         let excludedSymbols: Array<{ symbol: string; venue: string; phase: string }> = [];
         try {
           const universe = filterUniverse(classesFromUniverse(p.universe));
-          const symbols = universe.slice(0, 22).map((u) => u.symbol);
+          const symbols = universe.map((u) => u.symbol);
           for (const s of symbols) {
             const st = getMarketStatusForSymbol(s);
             if (st.isOpen) tradeableSymbols.push(s);
