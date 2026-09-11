@@ -18,6 +18,12 @@
 import type { Fundamentals, FundamentalsScore, FundamentalsSubscores } from "./types";
 import { EMPTY_FUNDAMENTALS_SCORE } from "./types";
 import { qualityTolerance, scaleBonus, scaleTier } from "../quality-scale";
+import { isNonUsDeveloped, marketRegion, type MarketRegion } from "../market-region";
+
+/** Currency the accounts (and therefore the market cap) are reported in. */
+function reportingCurrency(f: Fundamentals): string | null {
+  return f.financial_currency ?? f.currency ?? null;
+}
 
 const clamp1 = (x: number): number =>
   Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
@@ -114,8 +120,12 @@ export function scoreBalanceSheet(f: Fundamentals): number | null {
   return meanOf([gearing, netCash, fcf, higherBetter(f.current_ratio, 0.8, 2)]);
 }
 
-export function scoreShareholder(f: Fundamentals): number | null {
+export function scoreShareholder(f: Fundamentals, region: MarketRegion = "us"): number | null {
   if (f.dividend_yield == null) return null;
+  // European and Japanese blue chips distribute far more of their earnings
+  // than US ones by convention, so a US payout bar marks the whole region
+  // down. The "not covered at all" flag in financialFlags still bites.
+  const coverBar = isNonUsDeveloped(region) ? 1 : 0.85;
   const yieldScore = higherBetter(f.dividend_yield, 0, 0.05);
   // A payout above 100% of earnings is a cut risk, not a reward.
   const cover =
@@ -123,14 +133,17 @@ export function scoreShareholder(f: Fundamentals): number | null {
       ? null
       : f.payout_ratio <= 0
         ? null
-        : clamp1((0.85 - f.payout_ratio) / 0.85);
+        : clamp1((coverBar - f.payout_ratio) / coverBar);
   return meanOf([yieldScore, cover]);
 }
 
-export function scoreAnalysts(f: Fundamentals): number | null {
+export function scoreAnalysts(f: Fundamentals, region: MarketRegion = "us"): number | null {
   // Consensus rating: 1 strong buy .. 5 strong sell. Ignore thin coverage.
+  // Sell-side coverage outside the US is thinner even on the largest names,
+  // so a US three-analyst floor silently deletes the pillar for Europe/Japan.
+  const minAnalysts = isNonUsDeveloped(region) ? 2 : 3;
   const rating =
-    f.analyst_mean != null && (f.analyst_count ?? 0) >= 3
+    f.analyst_mean != null && (f.analyst_count ?? 0) >= minAnalysts
       ? clamp1((3 - f.analyst_mean) / 1.5)
       : null;
   const upside =
@@ -169,15 +182,19 @@ export function financialFlags(f: Fundamentals, asOf: string): string[] {
     flags.push(`heavily shorted (${(f.short_percent_float * 100).toFixed(0)}% of float)`);
   if (f.revenue_growth != null && f.revenue_growth < -0.1)
     flags.push(`revenue shrinking ${(f.revenue_growth * 100).toFixed(0)}%`);
+  // Outside the US the scheduled date is usually an estimate and pre-print
+  // drift is smaller, so the caution window is tighter rather than absent.
+  const region = marketRegion(f.symbol);
+  const window = isNonUsDeveloped(region) ? 3 : 5;
   const d = daysBetween(asOf, f.next_earnings_date);
-  if (d != null && d >= 0 && d <= 5) flags.push(`results due in ${d}d`);
+  if (d != null && d >= 0 && d <= window) flags.push(`results due in ${d}d`);
   return flags;
 }
 
 /** Compact human summary used in the prompt cell and the decision audit. */
 function summarise(f: Fundamentals, subs: FundamentalsSubscores): string {
   const bits: string[] = [];
-  const tier = scaleTier(f.market_cap);
+  const tier = scaleTier(f.market_cap, reportingCurrency(f));
   if (tier) bits.push(`${tier}-cap`);
   if (f.trailing_pe != null) bits.push(`P/E ${f.trailing_pe.toFixed(1)}`);
   else if (f.forward_pe != null) bits.push(`fwd P/E ${f.forward_pe.toFixed(1)}`);
@@ -199,13 +216,14 @@ export function scoreFundamentals(
 ): FundamentalsScore {
   if (!f) return EMPTY_FUNDAMENTALS_SCORE(symbol ?? "?");
 
+  const region: MarketRegion = marketRegion(symbol ?? f.symbol);
   const subscores: FundamentalsSubscores = {
     valuation: scoreValuation(f),
     profitability: scoreProfitability(f),
     growth: scoreGrowth(f),
     balance_sheet: scoreBalanceSheet(f),
-    shareholder: scoreShareholder(f),
-    analysts: scoreAnalysts(f),
+    shareholder: scoreShareholder(f, region),
+    analysts: scoreAnalysts(f, region),
   };
 
   const pillars = Object.values(subscores);
@@ -218,7 +236,7 @@ export function scoreFundamentals(
   const penalty = Math.min(0.5, flags.filter((x) => !x.startsWith("results due")).length * 0.12);
   // Size tilt: bigger, deeper names are cheaper to trade and have carried this
   // account's winners. Bounded to +/-0.08 so it only ever breaks ties.
-  const size = scaleBonus(f.market_cap);
+  const size = scaleBonus(f.market_cap, reportingCurrency(f));
 
   return {
     symbol: f.symbol,

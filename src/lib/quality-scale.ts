@@ -15,21 +15,69 @@
 //
 // Both are bounded and deterministic, and neither can block or force a trade.
 
-/** Market-cap band, in the currency the accounts are reported in. */
+/** Market-cap band, always judged in USD. */
 export type ScaleTier = "mega" | "large" | "mid" | "small" | "micro";
 
-export function scaleTier(marketCap: number | null | undefined): ScaleTier | null {
+/**
+ * Rough USD value of one unit of each reporting currency.
+ *
+ * Market caps arrive in whatever currency the company reports in, so a Tokyo
+ * name reporting in yen looked ~150x bigger than an identical US one and a
+ * European mid cap looked smaller than it is. The tiers are decade-wide bands,
+ * so slow-moving reference rates are accurate enough and keep this module pure
+ * (no IO, no clock). Unknown currencies are treated as USD.
+ */
+const USD_PER_UNIT: Record<string, number> = {
+  USD: 1,
+  EUR: 1.08,
+  GBP: 1.27,
+  GBP_PENCE: 0.0127,
+  GBX: 0.0127,
+  GBp: 0.0127,
+  CHF: 1.15,
+  SEK: 0.095,
+  NOK: 0.093,
+  DKK: 0.145,
+  JPY: 0.0067,
+  AUD: 0.66,
+  CAD: 0.73,
+  HKD: 0.128,
+  SGD: 0.74,
+  PLN: 0.25,
+  CZK: 0.043,
+  ILS: 0.27,
+};
+
+/** Convert a reported market cap into USD for banding purposes. */
+export function marketCapUsd(
+  marketCap: number | null | undefined,
+  currency?: string | null,
+): number | null {
   if (marketCap == null || !Number.isFinite(marketCap) || marketCap <= 0) return null;
-  if (marketCap >= 200e9) return "mega";
-  if (marketCap >= 50e9) return "large";
-  if (marketCap >= 10e9) return "mid";
-  if (marketCap >= 2e9) return "small";
+  const raw = (currency ?? "USD").trim();
+  const rate = USD_PER_UNIT[raw] ?? USD_PER_UNIT[raw.toUpperCase()] ?? 1;
+  return marketCap * rate;
+}
+
+export function scaleTier(
+  marketCap: number | null | undefined,
+  currency?: string | null,
+): ScaleTier | null {
+  const usd = marketCapUsd(marketCap, currency);
+  if (usd == null) return null;
+  if (usd >= 200e9) return "mega";
+  if (usd >= 50e9) return "large";
+  if (usd >= 10e9) return "mid";
+  if (usd >= 2e9) return "small";
   return "micro";
 }
 
 /** Bounded score nudge by size: deep, liquid names cost less to get in and out of. */
-export function scaleBonus(marketCap: number | null | undefined): number {
-  switch (scaleTier(marketCap)) {
+export function scaleBonus(
+  marketCap: number | null | undefined,
+  currency?: string | null,
+): number {
+  switch (scaleTier(marketCap, currency)) {
     case "mega":
       return 0.08;
     case "large":
