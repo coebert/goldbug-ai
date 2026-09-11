@@ -70,6 +70,13 @@ export type NextBuyInput = {
   horizonDays?: number;
   /** Share of NAV a fresh add aims at before caps and cash bite. */
   targetWeightPct?: number;
+  /**
+   * Cash the account must keep back (settlement, fees, the executor's safety
+   * buffer). Suggestions are sized out of cash ABOVE this, never through it.
+   */
+  cashReserveBase?: number;
+  /** Most of the spare cash one suggestion may consume (0-1). */
+  maxCashSharePct?: number;
 };
 
 export type NextBuyRow = {
