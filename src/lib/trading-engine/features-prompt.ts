@@ -37,6 +37,8 @@ function flag(value: unknown): string {
   return value === true ? "Y" : "n";
 }
 
+import { scaleBonus } from "../quality-scale";
+
 type AnyFeature = Record<string, unknown>;
 
 function sentimentCell(f: AnyFeature): string {
