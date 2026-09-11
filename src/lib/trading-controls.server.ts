@@ -88,7 +88,12 @@ export async function loadTradingGate(scaleFor?: {
     };
   }
 
-  const dailyLimit = Number(controls.daily_notional_limit ?? 0);
+  const { resolveDailyNotionalLimit } = await import("./daily-notional-limit");
+  const dailyLimit = resolveDailyNotionalLimit({
+    configuredLimit: Number(controls.daily_notional_limit ?? 0),
+    mode: scaleFor?.mode ?? "live_prod",
+    navBase: scaleFor?.navBase ?? null,
+  }).limit;
   const todayKey = ukDayKey(new Date());
   const since = new Date(Date.now() - 36 * 3600_000).toISOString();
 
