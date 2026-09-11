@@ -321,7 +321,16 @@ export function adaptiveReserveCap(args: {
 
 
 export type GovernorDecision =
-  | { kind: "admit"; candidate: GovernorCandidate }
+  | {
+      kind: "admit";
+      candidate: GovernorCandidate;
+      /**
+       * Base-currency room left under this name's position cap AFTER the
+       * admitted ticket. Executors that enlarge a ticket later (fee-viable
+       * size-up) must not exceed it. Undefined when no cap applies.
+       */
+      capRoomBase?: number;
+    }
   | { kind: "skip"; candidate: GovernorCandidate; reason: string };
 
 export type GovernorPlan = {
