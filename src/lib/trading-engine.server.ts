@@ -1892,6 +1892,11 @@ export async function runDailyTick(
   // set a core target in Risk controls, top the core holding up (or trim it)
   // BEFORE the AI's own orders are sized, so the deterministic baseline gets
   // first call on cash and then runs through every normal gate below.
+  // Sizing exemption for the core holding: it is a deliberate, owner-set
+  // baseline, not a single-name bet, so it must not be squeezed by the
+  // per-name concentration cap, the target-weight nibbler or the net-edge
+  // gate (a broad tracker's expected daily move never clears a trading hurdle).
+  let coreSizing: { key: string; capPct: number } | null = null;
   try {
     const { loadCoreAllocationSettings } = await import("./trading-controls.server");
     const coreCfg = await loadCoreAllocationSettings();
@@ -1899,6 +1904,10 @@ export async function runDailyTick(
       const { planCoreAllocation } = await import("./core-allocation");
       const { engineSymbolKey } = await import("./price-symbol");
       const coreKey = engineSymbolKey(coreCfg.symbol);
+      coreSizing = {
+        key: coreKey,
+        capPct: Math.min(0.95, coreCfg.targetPct + Math.max(0, coreCfg.bandPct)),
+      };
       const coreHoldings = (holdings ?? []).filter(
         (h) => engineSymbolKey(String(h.symbol)) === coreKey,
       );
