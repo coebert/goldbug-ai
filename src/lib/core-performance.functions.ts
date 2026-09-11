@@ -24,6 +24,7 @@ export type CorePerformancePanel = {
   coreValueBase: number;
   navBase: number;
   funds: FundPerformance[];
+  comparisonFunds: FundPerformance[];
 };
 
 function dateYearsAgo(asOf: string, years: number): string {
@@ -98,8 +99,18 @@ export const getCorePerformance = createServerFn({ method: "POST" })
       const series = toGbpSeries(fund.symbol, fund.currency, raw, eurGbp, gbpUsd);
       return { ...fund, series };
     });
-    const aligned = alignSeriesCommonWindow(converted);
-    const funds = aligned.map((fund): FundPerformance => {
+    const funds = converted.map((fund): FundPerformance => {
+      const metrics = calculatePerformance(fund.series);
+      return {
+        symbol: fund.symbol,
+        name: fund.name,
+        currency: "GBP",
+        series: fund.series,
+        metrics,
+        targetAllocationReturn: metrics ? targetAllocationReturn(metrics.totalReturn, core.targetPct) : null,
+      };
+    });
+    const comparisonFunds = alignSeriesCommonWindow(converted).map((fund): FundPerformance => {
       const metrics = calculatePerformance(fund.series);
       return {
         symbol: fund.symbol,
@@ -132,5 +143,6 @@ export const getCorePerformance = createServerFn({ method: "POST" })
       coreValueBase,
       navBase,
       funds,
+      comparisonFunds,
     };
   });
