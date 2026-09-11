@@ -2765,17 +2765,22 @@ export async function runDailyTick(
       // When the AI model is unavailable the rule-set fallback is driving.
       // Hard-cap any single name at FALLBACK_MAX_NAME_WEIGHT_PCT of account
       // value so an offline tick can never build a concentrated bet.
-      const isCoreOrder =
-        order.side === "buy" &&
-        coreSizing != null &&
-        engineSymbolKey(meta.symbol) === coreSizing.key;
+      const allocationCapPct =
+        order.side === "buy"
+          ? (coreSizing != null && engineSymbolKey(meta.symbol) === coreSizing.key
+              ? coreSizing.capPct
+              : cashSleeveSizing != null && engineSymbolKey(meta.symbol) === cashSleeveSizing.key
+                ? cashSleeveSizing.capPct
+                : null)
+          : null;
+      const isCoreOrder = allocationCapPct != null;
       const effMaxPosVal = isCoreOrder
-        ? Math.max(maxPosVal, totalValue * coreSizing!.capPct)
+        ? Math.max(maxPosVal, totalValue * allocationCapPct!)
         : aiUnavailable
           ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
           : maxPosVal;
       if (isCoreOrder) {
-        sizingNotes.push(`core holding ≤${(coreSizing!.capPct * 100).toFixed(0)}% NAV`);
+        sizingNotes.push(`allocation holding ≤${(allocationCapPct! * 100).toFixed(0)}% NAV`);
       }
       if (!isCoreOrder && aiUnavailable && effMaxPosVal < maxPosVal) {
         sizingNotes.push(`AI offline · single name ≤${FALLBACK_MAX_NAME_WEIGHT_PCT}% NAV`);
