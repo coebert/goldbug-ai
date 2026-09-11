@@ -30,6 +30,12 @@ export type SectorCandidate = {
    * silently blocks the core allocation on every run.
    */
   diversified?: boolean;
+  /** Conviction in [0,1] (|unifiedScore|) for the cap-stretch test. */
+  edgeScore?: number;
+  /** Expected favourable move as a fraction of notional. */
+  expectedMovePct?: number;
+  /** Estimated round-trip friction for this ticket, base currency. */
+  estCostBase?: number;
 };
 
 export type SectorDecision =
