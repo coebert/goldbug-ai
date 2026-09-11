@@ -447,6 +447,24 @@ async function runHourlyCycleInner(
               rec.drift.note,
             );
           }
+
+          // Spare currency legs sitting on a loss are flattened at the live
+          // rate so the book never carries an unwanted, stale FX bet.
+          try {
+            const { sweepLosingFxLegs } = await import("@/lib/fx-auto-close.server");
+            const sweep = await sweepLosingFxLegs({
+              supabase: supabaseAdmin,
+              userId: p.user_id as string,
+              portfolioId: p.id,
+            });
+            for (const o of sweep.outcomes) {
+              if (o.closed) srvLog.info("hourly-run: auto-closed FX leg", p.id, o.symbol, o.reason);
+              else if (o.detail)
+                srvLog.warn("hourly-run: FX auto-close failed", p.id, o.symbol, o.detail);
+            }
+          } catch (e) {
+            srvLog.warn("hourly-run: FX auto-close sweep failed", p.id, String(e));
+          }
         }
 
 
