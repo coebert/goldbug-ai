@@ -26,6 +26,8 @@ export function isLsePenceQuoted(symbol: string): boolean {
 const GBP_QUOTED_LSE_TICKERS = new Set([
   "VUKE", "VMID", "VUSA", "VWRL", "VHYL", "VEUR", "VJPN", "VFEM", "VEVE",
   "VAGP", "VGOV", "VERX", "VDPX", "VWRP", "VUAG",
+  // iShares £ Ultrashort Bond (cash sleeve) quotes in whole GBP (~101.55).
+  "ERNS",
 ]);
 
 /**

@@ -1897,6 +1897,10 @@ export async function runDailyTick(
   // per-name concentration cap, the target-weight nibbler or the net-edge
   // gate (a broad tracker's expected daily move never clears a trading hurdle).
   let coreSizing: { key: string; capPct: number } | null = null;
+  // The cash sleeve gets the same treatment as the core: it is an allocation
+  // instruction, not a single-name bet, so the concentration cap, the
+  // target-weight nibbler and the net-edge gate must not shrink it.
+  let cashSleeveSizing: { key: string; capPct: number } | null = null;
   try {
     const { loadCoreAllocationSettings } = await import("./trading-controls.server");
     const coreCfg = await loadCoreAllocationSettings();
@@ -1975,6 +1979,79 @@ export async function runDailyTick(
     srvLog.warn("core allocation skipped", e);
   }
 
+  // ---- Cash sleeve -------------------------------------------------------
+  // Whatever cash is left over after the core and the trading sleeve is parked
+  // in a short-dated GBP bond fund so it earns interest instead of nothing.
+  // It is sized purely by the cash balance and is sold back the moment the
+  // working buffer is short, so it can never be the reason a trade fails.
+  try {
+    const { loadCashSleeveSettings } = await import("./trading-controls.server");
+    const sleeveCfg = await loadCashSleeveSettings();
+    if (sleeveCfg.enabled) {
+      const { planCashSleeve } = await import("./cash-sleeve");
+      const sleeveKey = engineSymbolKey(sleeveCfg.symbol);
+      cashSleeveSizing = { key: sleeveKey, capPct: 0.95 };
+      const sleeveHoldings = (holdings ?? []).filter(
+        (h) => engineSymbolKey(String(h.symbol)) === sleeveKey,
+      );
+      const sleeveQuantity = sleeveHoldings.reduce((s, h) => s + Number(h.quantity), 0);
+      const sleeveValue = sleeveHoldings.reduce(
+        (s, h) => s + holdingLivePrice(priceMap, h) * Number(h.quantity),
+        0,
+      );
+      let sleevePrice = holdingPriceBySymbol(priceMap, sleeveCfg.symbol);
+      if (sleevePrice == null) {
+        const extra = await currentPrices([sleeveCfg.symbol], asOf).catch(() => new Map<string, number>());
+        for (const [k, v] of extra) if (!priceMap.has(k)) priceMap.set(k, v);
+        sleevePrice = holdingPriceBySymbol(priceMap, sleeveCfg.symbol);
+      }
+      const sleeveAlreadyOrdered = decision.orders.some(
+        (o) => engineSymbolKey(o.symbol) === sleeveKey,
+      );
+      // Cash already spoken for by orders proposed earlier this tick (core and
+      // the AI's own buys) is NOT spare: deduct it before parking anything.
+      const committed = decision.orders
+        .filter((o) => o.side === "buy")
+        .reduce((s, o) => s + (totalValue * Math.max(0, Number(o.percent) || 0)) / 100, 0);
+      if (sleevePrice != null && !sleeveAlreadyOrdered) {
+        const plan = planCashSleeve({
+          nav: totalValue,
+          sleeveValue,
+          sleeveQuantity,
+          cash: cash - committed,
+          buffer: sleeveCfg.buffer,
+          price: sleevePrice,
+          minTicket: 250,
+        });
+        if (plan.action !== "hold" && plan.quantity > 0) {
+          const holdingSymbol = sleeveHoldings[0]?.symbol;
+          const symbolForOrder = findSymbol(sleeveCfg.symbol.toUpperCase())
+            ? sleeveCfg.symbol
+            : (holdingSymbol && findSymbol(holdingSymbol.toUpperCase())
+                ? holdingSymbol
+                : sleeveCfg.symbol);
+          const percent = plan.action === "buy"
+            ? (totalValue > 0 ? Math.min(100, (plan.notional / totalValue) * 100) : 0)
+            : (sleeveQuantity > 0 ? Math.min(100, (plan.quantity / sleeveQuantity) * 100) : 0);
+          if (percent > 0) {
+            decision.orders.push({
+              symbol: symbolForOrder,
+              side: plan.action,
+              percent,
+              conviction: 0.7,
+              reason: plan.reason,
+              signal_weights: {
+                sma_trend: 0, rsi: 0, price_change: 0, news_sentiment: 0, volatility: 0,
+              },
+            });
+            srvLog.info(`[cash-sleeve] ${plan.action} ${plan.quantity} ${symbolForOrder}: ${plan.reason}`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    srvLog.warn("cash sleeve skipped", e);
+  }
 
   // Build correlation map covering current holdings + candidate buys
   const buySymbols = decision.orders
@@ -2315,8 +2392,8 @@ export async function runDailyTick(
       // fee) instead of being shaved by the risk dial and signal haircuts.
       const isCoreBuyOrder =
         order.side === "buy" &&
-        coreSizing != null &&
-        engineSymbolKey(meta.symbol) === coreSizing.key;
+        ((coreSizing != null && engineSymbolKey(meta.symbol) === coreSizing.key) ||
+          (cashSleeveSizing != null && engineSymbolKey(meta.symbol) === cashSleeveSizing.key));
       // Risk dial, buy side: position-size multiplier × buy aggressiveness.
       // Every downstream cap (per-symbol, class, vol, cash) still applies.
       let spend = isCoreBuyOrder
@@ -2688,17 +2765,22 @@ export async function runDailyTick(
       // When the AI model is unavailable the rule-set fallback is driving.
       // Hard-cap any single name at FALLBACK_MAX_NAME_WEIGHT_PCT of account
       // value so an offline tick can never build a concentrated bet.
-      const isCoreOrder =
-        order.side === "buy" &&
-        coreSizing != null &&
-        engineSymbolKey(meta.symbol) === coreSizing.key;
+      const allocationCapPct =
+        order.side === "buy"
+          ? (coreSizing != null && engineSymbolKey(meta.symbol) === coreSizing.key
+              ? coreSizing.capPct
+              : cashSleeveSizing != null && engineSymbolKey(meta.symbol) === cashSleeveSizing.key
+                ? cashSleeveSizing.capPct
+                : null)
+          : null;
+      const isCoreOrder = allocationCapPct != null;
       const effMaxPosVal = isCoreOrder
-        ? Math.max(maxPosVal, totalValue * coreSizing!.capPct)
+        ? Math.max(maxPosVal, totalValue * allocationCapPct!)
         : aiUnavailable
           ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
           : maxPosVal;
       if (isCoreOrder) {
-        sizingNotes.push(`core holding ≤${(coreSizing!.capPct * 100).toFixed(0)}% NAV`);
+        sizingNotes.push(`allocation holding ≤${(allocationCapPct! * 100).toFixed(0)}% NAV`);
       }
       if (!isCoreOrder && aiUnavailable && effMaxPosVal < maxPosVal) {
         sizingNotes.push(`AI offline · single name ≤${FALLBACK_MAX_NAME_WEIGHT_PCT}% NAV`);

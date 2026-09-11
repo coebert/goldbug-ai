@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { PositionRiskCard } from "@/components/position-risk-card";
 import { CoreAllocationCard } from "@/components/core-allocation-card";
+import { CashSleeveCard } from "@/components/cash-sleeve-card";
 
 const TITLE = "Live risk dashboard — Aegis";
 const DESC =
@@ -57,6 +58,7 @@ function RiskPage() {
           </p>
         </div>
         <CoreAllocationCard />
+        <CashSleeveCard />
         <PositionRiskCard portfolioId={id} />
         <p className="text-xs text-muted-foreground">
           Currency legs also have their own page with rate history, stress scenarios and a close
