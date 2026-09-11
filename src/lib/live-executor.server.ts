@@ -264,6 +264,8 @@ export async function routeOrdersToBroker(params: {
   // order until the remaining daily budget is exhausted.
   // Unspent daily BUY notional, shared with the placement loop below.
   let dailyBuyHeadroom = 0;
+  /** Smallest ticket worth trimming an oversized buy down to, base currency. */
+  const DAILY_CAP_TRIM_MIN_TICKET_BASE = 250;
   let budget = gate.remaining;
   const admitted: ExecutedOrderLike[] = [];
   const capped: { symbol: string; notional: number }[] = [];
