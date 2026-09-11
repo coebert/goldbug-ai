@@ -31,6 +31,65 @@ function money(n: number, ccy: string, signed = true) {
 }
 
 /**
+ * Switch and trigger for the automatic close of spare, losing currency legs.
+ * Legs still funding foreign holdings are never touched by it, so this only
+ * governs money the book isn't using.
+ */
+function AutoCloseControl() {
+  const getFn = useServerFn(getFxAutoCloseSettings);
+  const setFn = useServerFn(setFxAutoCloseSettings);
+  const queryClient = useQueryClient();
+  const settings = useQuery({
+    queryKey: ["fx-auto-close-settings"],
+    queryFn: () => getFn(),
+    staleTime: 5 * 60_000,
+  });
+  const save = useMutation({
+    mutationFn: (next: { enabled: boolean; lossPct: number }) => setFn({ data: next }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("Could not save the setting", { description: res.error });
+        return;
+      }
+      void queryClient.invalidateQueries({ queryKey: ["fx-auto-close-settings"] });
+    },
+  });
+
+  const s = settings.data;
+  if (!s) return null;
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Switch
+        id="fx-auto-close"
+        checked={s.enabled}
+        disabled={save.isPending}
+        onCheckedChange={(enabled) => save.mutate({ enabled, lossPct: s.lossPct })}
+      />
+      <Label htmlFor="fx-auto-close" className="text-xs font-normal">
+        Auto-close spare currency losing
+      </Label>
+      <Input
+        type="number"
+        step="0.1"
+        min="0.1"
+        max="25"
+        defaultValue={s.lossPct}
+        disabled={!s.enabled || save.isPending}
+        className="h-7 w-16 text-xs"
+        onBlur={(e) => {
+          const lossPct = Number(e.currentTarget.value);
+          if (Number.isFinite(lossPct) && lossPct >= 0.1 && lossPct !== s.lossPct) {
+            save.mutate({ enabled: s.enabled, lossPct });
+          }
+        }}
+      />
+      <span>% or more</span>
+    </div>
+  );
+}
+
+/**
  * One row per open FX funding leg: entry rate, live rate, unrealised P&L net
  * of the exit fee and that leg's own worst-case stress number. Selecting a row
  * filters the rest of the dashboard to that pair.
