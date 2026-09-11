@@ -1937,8 +1937,18 @@ export async function routeOrdersToBroker(params: {
       const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
       const spendable = spendLedger.get(orderCcy) ?? 0;
       const onePrice = Number(order.price) || 0;
-      if (order.side === "buy" && onePrice > 0 && spendable >= onePrice) {
+      const extraOne = Math.max(0, (1 - Math.max(0, Number(order.quantity) || 0)) * onePrice);
+      const headroomOne = Math.min(
+        dailyBuyHeadroom,
+        capRoomBySymbol.get(order.symbol.toUpperCase()) ?? Infinity,
+      );
+      if (order.side === "buy" && onePrice > 0 && spendable >= onePrice && extraOne <= headroomOne) {
         qty = 1;
+        dailyBuyHeadroom = Math.max(0, dailyBuyHeadroom - extraOne);
+        const roomOne = capRoomBySymbol.get(order.symbol.toUpperCase());
+        if (roomOne !== undefined) {
+          capRoomBySymbol.set(order.symbol.toUpperCase(), Math.max(0, roomOne - extraOne));
+        }
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: portfolio.id,
           user_id: userId,
@@ -2001,15 +2011,30 @@ export async function routeOrdersToBroker(params: {
     if (!viability.viable && order.side === "buy") {
       const orderCcy = (routeSymToCcy.get(order.symbol) ?? portfolioCurrency).toUpperCase();
       const spendable = spendLedger.get(orderCcy) ?? 0;
+      // An uplift is extra spend the daily BUY ceiling and the single-name cap
+      // never sanctioned upstream, so it is bounded by whatever room each has
+      // left — cash alone is not a safety limit.
+      const capRoom = capRoomBySymbol.get(order.symbol.toUpperCase());
+      const baseNotional = qty * order.price;
+      const maxNotional = Math.min(
+        baseNotional + dailyBuyHeadroom,
+        capRoom === undefined ? Infinity : baseNotional + capRoom,
+      );
       const plan = planViableSizeUp({
         quantity: qty,
         price: order.price,
         minViableNotional: viability.minViableNotional,
         spendable,
+        maxNotional,
       });
       sizeUpNote = plan.note;
       if (plan.applied) {
         sizeUpApplied = true;
+        const extra = Math.max(0, (plan.quantity - qty) * order.price);
+        dailyBuyHeadroom = Math.max(0, dailyBuyHeadroom - extra);
+        if (capRoom !== undefined) {
+          capRoomBySymbol.set(order.symbol.toUpperCase(), Math.max(0, capRoom - extra));
+        }
         qty = plan.quantity;
         viability = assessTradeViability({
           symbol: order.symbol,
