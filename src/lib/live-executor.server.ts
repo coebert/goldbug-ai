@@ -267,7 +267,28 @@ export async function routeOrdersToBroker(params: {
   let budget = gate.remaining;
   const admitted: ExecutedOrderLike[] = [];
   const capped: { symbol: string; notional: number }[] = [];
-  for (const e of routable) {
+  // The owner-set core top-up gets first call on the day's BUY budget: it is
+  // an allocation instruction, so it must never lose its slot to short-term
+  // ideas queued ahead of it. The money ceiling itself still binds.
+  const coreKeyForOrder = await (async () => {
+    try {
+      const { loadCoreAllocationSettings } = await import("./trading-controls.server");
+      const { engineSymbolKey } = await import("./price-symbol");
+      const c = await loadCoreAllocationSettings();
+      return c.targetPct > 0 ? engineSymbolKey(c.symbol) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const orderedForDailyCap = coreKeyForOrder
+    ? await (async () => {
+        const { engineSymbolKey } = await import("./price-symbol");
+        const isCoreOrder = (e: ExecutedOrderLike) =>
+          e.side === "buy" && engineSymbolKey(e.symbol) === coreKeyForOrder;
+        return [...routable.filter(isCoreOrder), ...routable.filter((e) => !isCoreOrder(e))];
+      })()
+    : routable;
+  for (const e of orderedForDailyCap) {
     if (e.side !== "buy") {
       admitted.push(e);
       continue;
