@@ -2660,10 +2660,19 @@ export async function runDailyTick(
       // When the AI model is unavailable the rule-set fallback is driving.
       // Hard-cap any single name at FALLBACK_MAX_NAME_WEIGHT_PCT of account
       // value so an offline tick can never build a concentrated bet.
-      const effMaxPosVal = aiUnavailable
-        ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
-        : maxPosVal;
-      if (aiUnavailable && effMaxPosVal < maxPosVal) {
+      const isCoreOrder =
+        order.side === "buy" &&
+        coreSizing != null &&
+        engineSymbolKey(meta.symbol) === coreSizing.key;
+      const effMaxPosVal = isCoreOrder
+        ? Math.max(maxPosVal, totalValue * coreSizing!.capPct)
+        : aiUnavailable
+          ? Math.min(maxPosVal, totalValue * (FALLBACK_MAX_NAME_WEIGHT_PCT / 100))
+          : maxPosVal;
+      if (isCoreOrder) {
+        sizingNotes.push(`core holding ≤${(coreSizing!.capPct * 100).toFixed(0)}% NAV`);
+      }
+      if (!isCoreOrder && aiUnavailable && effMaxPosVal < maxPosVal) {
         sizingNotes.push(`AI offline · single name ≤${FALLBACK_MAX_NAME_WEIGHT_PCT}% NAV`);
       }
       const roomInPosition = Math.max(0, effMaxPosVal - existingVal);
@@ -2673,8 +2682,10 @@ export async function runDailyTick(
       // name until it bumps the concentration cap, decide the weight we
       // actually want and buy only the gap to it. Sub-scale gaps are skipped
       // outright, so a position can never be walked into the cap inch by inch.
+      // The core holding is exempt: its size is already decided by the core
+      // target, so re-deciding a weight here would shrink every top-up.
       let targetWeightRejected: string | null = null;
-      if (totalValue > 0 && effMaxPosVal > 0) {
+      if (!isCoreOrder && totalValue > 0 && effMaxPosVal > 0) {
         const maxWeight = effMaxPosVal / totalValue;
         const tw = desiredWeight({
           baseWeight: maxWeight * 0.5,
