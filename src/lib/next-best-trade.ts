@@ -173,16 +173,34 @@ function toRow(
     input.maxDiversifiedPositionPctOfNav ?? DEFAULT_MAX_DIVERSIFIED_POSITION_PCT_OF_NAV,
   );
   const capRoomBase = Math.max(0, input.navBase * capPct - c.heldValueBase);
+
+  // Money this account can actually put to work today: free cash less the
+  // reserve the live path keeps back, and no more than one suggestion's share
+  // of it, so a single idea never drains the book.
+  const reserveBase = input.cashReserveBase ?? cashReserveForNav(input.navBase);
+  const freeCashBase = Math.max(0, input.cashBase - reserveBase);
+  const shareCap = Math.min(1, Math.max(0.1, input.maxCashSharePct ?? DEFAULT_MAX_CASH_SHARE_PCT));
+  // One idea may still take the whole free balance when that is the only way
+  // to reach a fee-viable ticket — the alternative is an over-priced stub.
+  const cashForTicketBase = Math.max(
+    Math.min(freeCashBase, input.minTicketBase),
+    freeCashBase * shareCap,
+  );
+
   const targetBase = Math.max(
     input.minTicketBase,
     input.navBase * (input.targetWeightPct ?? DEFAULT_TARGET_WEIGHT_PCT),
   );
-  const spendableBase = Math.max(0, Math.min(input.cashBase, capRoomBase));
+  const spendableBase = Math.max(0, Math.min(cashForTicketBase, capRoomBase));
   const ticketBase = Math.min(targetBase, spendableBase);
+
+  // Under the minimum viable ticket the dealing costs eat the idea; say so in
+  // money terms instead of quietly suggesting a stub trade.
+  const cashShort = ticketBase < input.minTicketBase - 0.01;
 
   let quantity = Math.floor(ticketBase / priceBase);
   if (quantity < 1) {
-    // Not even one share fits inside cash or the cap — nothing to suggest.
+    // Not even one share fits inside spare cash or the cap.
     if (spendableBase < priceBase) return null;
     quantity = 1;
   }
