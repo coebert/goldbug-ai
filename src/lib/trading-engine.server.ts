@@ -2014,12 +2014,20 @@ export async function runDailyTick(
         .filter((o) => o.side === "buy")
         .reduce((s, o) => s + (totalValue * Math.max(0, Number(o.percent) || 0)) / 100, 0);
       if (sleevePrice != null && !sleeveAlreadyOrdered) {
+        // One fixed buffer cannot fit every book: the same £1,500 that is a
+        // sensible working float on the real account would leave a £1m
+        // simulation with nothing to trade on, and would swallow a tiny
+        // backtest whole. Scale it with NAV, never below a workable ticket.
+        const effectiveBuffer = Math.min(
+          Math.max(sleeveCfg.buffer, totalValue * 0.05),
+          Math.max(250, totalValue * 0.25),
+        );
         const plan = planCashSleeve({
           nav: totalValue,
           sleeveValue,
           sleeveQuantity,
           cash: cash - committed,
-          buffer: sleeveCfg.buffer,
+          buffer: effectiveBuffer,
           price: sleevePrice,
           minTicket: 250,
         });
