@@ -4097,6 +4097,9 @@ export type Database = {
           core_symbol: string
           cost_hurdle_multiple: number
           daily_notional_limit: number
+          fx_auto_close_enabled: boolean
+          fx_auto_close_loss_pct: number
+          fx_auto_close_min_notional_base: number
           halt_reason: string | null
           id: boolean
           trading_enabled: boolean
@@ -4110,6 +4113,9 @@ export type Database = {
           core_symbol?: string
           cost_hurdle_multiple?: number
           daily_notional_limit?: number
+          fx_auto_close_enabled?: boolean
+          fx_auto_close_loss_pct?: number
+          fx_auto_close_min_notional_base?: number
           halt_reason?: string | null
           id?: boolean
           trading_enabled?: boolean
@@ -4123,6 +4129,9 @@ export type Database = {
           core_symbol?: string
           cost_hurdle_multiple?: number
           daily_notional_limit?: number
+          fx_auto_close_enabled?: boolean
+          fx_auto_close_loss_pct?: number
+          fx_auto_close_min_notional_base?: number
           halt_reason?: string | null
           id?: boolean
           trading_enabled?: boolean
