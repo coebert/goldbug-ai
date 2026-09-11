@@ -150,12 +150,20 @@ describe("sector concentration", () => {
     expect(plan.exposureAfter["tech"]).toBe(1_500);
   });
 
-  it("holds unknown-sector names to a tighter leash", () => {
-    const plan = planSectorAdmissions(
+  it("holds unknown-sector names to the same leash as a named sector", () => {
+    // Unknown names are no longer on a tighter 15% leash — the per-name
+    // position cap and the strong-signal stretch govern them instead.
+    const inside = planSectorAdmissions(
       [{ symbol: "???", sector: null, notionalBase: 1_600 }],
       {},
       { navBase: 10_000, ...DEFAULT_SECTOR_BUDGET },
     );
-    expect(plan.decisions[0]!.kind).toBe("skip");
+    expect(inside.decisions[0]!.kind).toBe("admit");
+    const past = planSectorAdmissions(
+      [{ symbol: "???", sector: null, notionalBase: 2_600 }],
+      {},
+      { navBase: 10_000, ...DEFAULT_SECTOR_BUDGET },
+    );
+    expect(past.decisions[0]!.kind).toBe("skip");
   });
 });
