@@ -10,3 +10,7 @@ Idle cash earns nothing at the broker, so a deterministic cash sleeve parks anyt
 - Sized by the cash balance only, never by a signal. Cash already committed to buys proposed earlier in the same tick is deducted before parking.
 - Runs after the core-allocation block in `trading-engine.server.ts`; exempt from the concentration cap, target-weight nibbler and net-edge gate, like the core.
 - Settings: `trading_controls.cash_sleeve_enabled / _symbol / _buffer`, surfaced on the Risk page. Reads fail safe to off.
+
+Applies to every portfolio (live, live_sim, paper, backtest), not just the real book:
+- Buffer scales with NAV: `min(max(configuredBuffer, 5% NAV), max(250, 25% NAV))`.
+- Sleeve fund follows the book's base currency — GBP: configured `ERNS.L`; EUR: `XEON.DE` (Xtrackers EUR Overnight Rate). Other currencies keep cash as cash rather than importing FX risk.
