@@ -2531,7 +2531,7 @@ export async function runDailyTick(
         brk.mult < 1 ? { label: "breakout", mult: brk.mult } : null,
 
       ]);
-      if (haircuts.mult < 1) {
+      if (haircuts.mult < 1 && !isCoreBuyOrder) {
         spend *= haircuts.mult;
         if (haircuts.note) sizingNotes.push(haircuts.note);
         if (systematic.note) sizingNotes.push(systematic.note);
@@ -2542,7 +2542,7 @@ export async function runDailyTick(
         phaseMult.mult > 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
         brk.mult > 1 ? { label: "breakout", mult: brk.mult } : null,
       ]);
-      if (boosts.mult > 1) {
+      if (boosts.mult > 1 && !isCoreBuyOrder) {
         spend *= boosts.mult;
         if (boosts.note) sizingNotes.push(boosts.note);
       }
