@@ -47,14 +47,18 @@ export const getCoreProgress = createServerFn({ method: "POST" })
         if (error || !p) throw new Error(error?.message ?? "Portfolio not found");
         return p;
       }
+      // The real-money book comes first: a paper/sim account must never be
+      // what this page reports the core against.
       const { data: rows, error } = await db
         .from("portfolios")
-        .select("id, name, currency, current_cash, mode, created_at")
+        .select("id, name, currency, current_cash, mode, status, created_at")
         .in("mode", ["live_prod", "live_sim"])
-        .order("created_at", { ascending: true })
-        .limit(1);
+        .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
-      const p = rows?.[0];
+      const all = rows ?? [];
+      const active = all.filter((r) => String(r.status ?? "active") === "active");
+      const pool = active.length > 0 ? active : all;
+      const p = pool.find((r) => r.mode === "live_prod") ?? pool[0];
       if (!p) throw new Error("No live portfolio found");
       return p;
     })();
