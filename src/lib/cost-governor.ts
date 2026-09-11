@@ -543,7 +543,11 @@ export function planAdmissions(
       continue;
     }
 
-    if (buysAdmitted >= roomToday) {
+    // The core top-up is an allocation instruction, not a trading idea: it
+    // must not lose its slot to short-term ideas that filled the day's ticket
+    // count, or a 50% core target is never reached. Its own core cap
+    // (target + drift band) still bounds how large the holding can get.
+    if (buysAdmitted >= roomToday && !isCore) {
       decisions.push({
         kind: "skip",
         candidate: c,
