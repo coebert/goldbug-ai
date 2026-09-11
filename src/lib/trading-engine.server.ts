@@ -2422,11 +2422,17 @@ export async function runDailyTick(
       // Scheduled earnings: veto new entries inside a confirmed blackout,
       // haircut them just outside it. Exits are never gated.
       const earnRow = earningsBySymbol.get(String(meta.symbol).toUpperCase());
+      // Window is region-aware: European and Japanese report dates are usually
+      // estimates with long lead times, so the US 2/5-day blackout would park
+      // those names permanently inside the haircut band.
+      const earnThresh = earningsThresholdsFor(meta.symbol);
       const earnGate = earningsGate({
         side: order.side,
         asOf,
         nextEarningsDate: earnRow?.next_earnings_date ?? null,
         confidence: earnRow?.confidence ?? null,
+        vetoDays: earnThresh.vetoDays,
+        haircutDays: earnThresh.haircutDays,
       });
       if (earnGate.veto) {
         executed.push({
