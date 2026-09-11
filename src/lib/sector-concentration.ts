@@ -58,9 +58,12 @@ export const DEFAULT_SECTOR_BUDGET: Omit<SectorBudgetConfig, "navBase"> = {
   // A quarter of the book in one sector is already an aggressive factor bet
   // for a long-only, cash-funded account.
   maxSectorPctOfNav: 0.25,
-  // Unclassified names get a tighter leash: we cannot reason about what they
-  // are correlated with.
-  maxUnknownPctOfNav: 0.15,
+  // Unclassified names now get the same leash as a named sector: broad
+  // trackers are detected and exempted upstream, and the per-name position
+  // cap plus the very-strong-signal stretch still bound what an unknown name
+  // can become. A tighter 15% here was blocking profitable ideas purely for
+  // missing metadata.
+  maxUnknownPctOfNav: 0.25,
 };
 
 const UNKNOWN = "__unknown__";
