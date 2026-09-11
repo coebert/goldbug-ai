@@ -27,12 +27,14 @@ export const setFxAutoCloseSettings = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }): Promise<{ ok: boolean; error?: string }> => {
-    const patch: Record<string, unknown> = {
+    const patch = {
       fx_auto_close_enabled: data.enabled,
       fx_auto_close_loss_pct: data.lossPct,
       updated_by: context.userId,
+      ...(data.minNotionalBase != null
+        ? { fx_auto_close_min_notional_base: data.minNotionalBase }
+        : {}),
     };
-    if (data.minNotionalBase != null) patch.fx_auto_close_min_notional_base = data.minNotionalBase;
     const { error } = await context.supabase.from("trading_controls").update(patch).eq("id", true);
     return error ? { ok: false, error: error.message } : { ok: true };
   });
