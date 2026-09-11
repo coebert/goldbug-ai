@@ -194,7 +194,7 @@ export function financialFlags(f: Fundamentals, asOf: string): string[] {
 /** Compact human summary used in the prompt cell and the decision audit. */
 function summarise(f: Fundamentals, subs: FundamentalsSubscores): string {
   const bits: string[] = [];
-  const tier = scaleTier(f.market_cap);
+  const tier = scaleTier(f.market_cap, reportingCurrency(f));
   if (tier) bits.push(`${tier}-cap`);
   if (f.trailing_pe != null) bits.push(`P/E ${f.trailing_pe.toFixed(1)}`);
   else if (f.forward_pe != null) bits.push(`fwd P/E ${f.forward_pe.toFixed(1)}`);
