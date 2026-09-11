@@ -17,6 +17,7 @@
 
 import type { Fundamentals, FundamentalsScore, FundamentalsSubscores } from "./types";
 import { EMPTY_FUNDAMENTALS_SCORE } from "./types";
+import { qualityTolerance, scaleBonus, scaleTier } from "../quality-scale";
 
 const clamp1 = (x: number): number =>
   Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
