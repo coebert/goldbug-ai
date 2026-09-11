@@ -10,6 +10,12 @@
 // hold, how much more of this sector can we buy? It is pure — the caller
 // resolves NAV, existing exposure by sector and the sector of each candidate.
 
+import {
+  qualifiesForCapOverride,
+  stretchedCapPct,
+  OVERRIDE_MAX_SECTOR_PCT,
+} from "./high-conviction-override";
+
 export type SectorBudgetConfig = {
   navBase: number;
   /** Max gross exposure to any one sector, as a fraction of NAV. */
