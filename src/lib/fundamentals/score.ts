@@ -126,7 +126,7 @@ export function scoreShareholder(f: Fundamentals, region: MarketRegion = "us"): 
   // than US ones by convention, so a US payout bar marks the whole region
   // down. The "not covered at all" flag in financialFlags still bites.
   const coverBar = isNonUsDeveloped(region) ? 1 : 0.85;
-  const yieldScore = higherBetter(f.dividend_yield, 0, isNonUsDeveloped(region) ? 0.06 : 0.05);
+  const yieldScore = higherBetter(f.dividend_yield, 0, 0.05);
   // A payout above 100% of earnings is a cut risk, not a reward.
   const cover =
     f.payout_ratio == null || !Number.isFinite(f.payout_ratio)
