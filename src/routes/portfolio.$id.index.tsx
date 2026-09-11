@@ -87,6 +87,11 @@ const MultiCurrencyExposureCard = lazy(() =>
     default: m.MultiCurrencyExposureCard,
   })),
 );
+const HoldingCurrencyRiskCard = lazy(() =>
+  import("@/components/holding-currency-risk-card").then((m) => ({
+    default: m.HoldingCurrencyRiskCard,
+  })),
+);
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -1170,6 +1175,11 @@ function PortfolioPage() {
 
                   </div>
                 )}
+                <div className="mb-6">
+                  <Suspense fallback={<div className="h-40 rounded-lg border bg-card" aria-hidden />}>
+                    <HoldingCurrencyRiskCard portfolioId={id} active={tab === "overview"} />
+                  </Suspense>
+                </div>
                 {p.mode === "live_prod" && (
                   <div className="mb-6">
                     <HoldingEquityChangeChart portfolioId={id} />
