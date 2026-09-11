@@ -95,7 +95,12 @@ export function planSectorAdmissions(
       continue;
     }
     const key = keyFor(c.sector);
-    const cap = capFor(key);
+    // An exceptionally strong, cost-clearing idea stretches its sector cap
+    // (bounded by OVERRIDE_MAX_SECTOR_PCT) instead of being turned away.
+    const override = qualifiesForCapOverride(c);
+    const capPct = key === UNKNOWN ? cfg.maxUnknownPctOfNav : cfg.maxSectorPctOfNav;
+    const effPct = override ? stretchedCapPct(capPct, OVERRIDE_MAX_SECTOR_PCT) : capPct;
+    const cap = nav * effPct;
     const current = exposure[key] ?? 0;
     const after = current + Math.max(0, c.notionalBase);
     if (nav > 0 && after > cap) {
