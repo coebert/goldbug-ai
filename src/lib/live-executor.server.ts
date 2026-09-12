@@ -298,12 +298,11 @@ export async function routeOrdersToBroker(params: {
       continue;
     }
     const notional = e.quantity * e.price;
-    // The owner-set core is an allocation instruction sized by its own
-    // target + drift cap and the cash reserve. Building it in one large
-    // ticket costs one dealing fee instead of many, so the day's ticket
-    // budget must not chop it into pieces.
-    const isCoreBuy = coreKeyForOrder != null && dailyCapKeyOf(e.symbol) === coreKeyForOrder;
-    if (notional > budget && !isCoreBuy) {
+    // The owner-set core is an allocation instruction, so it is queued first
+    // and gets the whole of the day's remaining budget before anything else.
+    // The money ceiling itself still binds: an oversized core ticket is
+    // trimmed to the headroom, never routed past it.
+    if (notional > budget) {
       // Dropping the whole idea because it is bigger than the day's leftover
       // money threw away good signals outright (a £25k sim ticket against a
       // £10k ceiling routed nothing at all). Trim it to the headroom instead,
@@ -320,6 +319,7 @@ export async function routeOrdersToBroker(params: {
       capped.push({ symbol: e.symbol, notional });
       continue;
     }
+
     budget -= notional;
     admitted.push(e);
   }
