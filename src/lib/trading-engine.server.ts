@@ -1530,6 +1530,15 @@ export async function runDailyTick(
   const holdingsByS = new Map(
     (holdings ?? []).map((h) => [engineSymbolKey(h.symbol), { ...h }] as const),
   );
+  // Quantity actually held at the broker when this tick started. Anything the
+  // tick *plans* to buy is not owned yet, so no later stage may sell it: doing
+  // so sends the broker a sell for stock the account does not hold, which is
+  // rejected ("you are selling contracts you do not own") and, worse, the
+  // ticket aggregator drops the paired buy in favour of the sell — so the
+  // intended purchase never happens and the failure repeats every run.
+  const startQtyByKey = new Map<string, number>(
+    (holdings ?? []).map((h) => [engineSymbolKey(h.symbol), Number(h.quantity) || 0] as const),
+  );
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
@@ -3304,7 +3313,15 @@ export async function runDailyTick(
   for (const t of trims) {
     const cur = holdingsByS.get(t.symbol);
     if (!cur) continue;
-    let qty = Math.min(Number(cur.quantity), t.qtyToTrim);
+    // The core allocation and the cash sleeve are deliberate targets, not
+    // discretionary overweights — trimming them back the moment they are
+    // bought produces an endless buy/trim loop.
+    if (coreSizing != null && t.symbol === coreSizing.key) continue;
+    if (cashSleeveSizing != null && t.symbol === cashSleeveSizing.key) continue;
+    // Never trim more than was actually held before this tick's buys: the
+    // planned purchases have not settled at the broker yet.
+    const ownedAtStart = startQtyByKey.get(t.symbol) ?? 0;
+    let qty = Math.min(Number(cur.quantity), t.qtyToTrim, ownedAtStart);
     if (qty <= 0) continue;
     // Phase 6 — discretionary trim: gate on TOD and record slice plan.
     const eaPreview = applyExecAlphaSell(t.symbol, qty * t.price, t.price);
