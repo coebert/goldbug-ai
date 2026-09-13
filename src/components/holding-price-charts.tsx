@@ -75,7 +75,7 @@ function HoldingChart({
   const pnlPct =
     last != null && s.avg_cost > 0 ? ((last - s.avg_cost) / s.avg_cost) * 100 : null;
   const up = (pnlPct ?? 0) >= 0;
-  const stroke = up ? "hsl(var(--chart-2))" : "hsl(var(--destructive))";
+  const stroke = up ? CHART_ROLE.positive : CHART_ROLE.negative;
   const gradId = `hpc-${s.symbol.replace(/[^A-Za-z0-9]/g, "")}`;
 
   if (points.length < 2) {
