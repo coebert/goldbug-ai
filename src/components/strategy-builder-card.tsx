@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { POLL, qk } from "@/lib/query-keys";
 import {
   listStrategies,
   saveStrategy,
@@ -87,12 +88,12 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
       }
       return r;
     },
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["strategies", portfolioId] });
-    void qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+    void qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
     void qc.invalidateQueries({ queryKey: ["order-fills", portfolioId] });
   };
 

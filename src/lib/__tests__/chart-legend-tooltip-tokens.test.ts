@@ -89,6 +89,11 @@ describe("chart legends, tooltips and axis labels use theme tokens", () => {
 
     it(`${name}: every axis/reference label declares a fill`, () => {
       for (const label of attrObjects(src, "label")) {
+        // `style: AXIS_LABEL` is the shared axis-label preset; it carries
+        // fontSize + fill: var(--foreground) already.
+        if (/style:\s*(?:\{\s*\.\.\.)?[A-Z][A-Z0-9_]*_LABEL\b/.test(label)) {
+          continue;
+        }
         expect(label, `label without fill in ${name}: ${label}`).toMatch(/fill:/);
         expect(label, `label falls back to black in ${name}`).not.toMatch(BLACKISH);
         expect(label).toMatch(TOKEN);

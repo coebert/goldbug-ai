@@ -179,7 +179,8 @@ describe("broker account resolution — call-site contracts", () => {
 
   it("the adapter builder documents that callers must pass the portfolio's key", () => {
     const src = read("src/lib/brokers/saxo.server.ts");
-    expect(src).toContain("accountKey?: string | null");
-    expect(src).toContain("opts.accountKey ?? process.env.SAXO_ACCOUNT_KEY");
+    expect(src).toContain("accountKey?: string");
+    // The portfolio's own key wins; the process-wide env var is only a fallback.
+    expect(src).toContain("explicitKey ?? process.env.SAXO_ACCOUNT_KEY");
   });
 });

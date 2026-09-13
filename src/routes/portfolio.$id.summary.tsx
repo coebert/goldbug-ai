@@ -21,6 +21,7 @@ import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 import { readWallet } from "@/lib/portfolio-wallet";
 import { holdingNativeValue } from "@/lib/fx-leg-value";
+import { qk, POLL } from "@/lib/query-keys";
 
 const TITLE = "Portfolio Summary — Aegis";
 const DESC =
@@ -55,9 +56,9 @@ function SummaryPage() {
 
   const get = useServerFn(getPortfolio);
   const q = useQuery({
-    queryKey: ["portfolio", "detail", id],
+    queryKey: qk.portfolio.detail(id),
     queryFn: () => get({ data: { id } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const getHistory = useServerFn(getHoldingsHistory);
   const historyQ = useQuery({

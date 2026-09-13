@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPositionRisk, type PositionRiskRow } from "@/lib/position-risk.functions";
+import { POLL } from "@/lib/query-keys";
 
 function money(n: number | null | undefined, ccy: string) {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -84,7 +85,7 @@ export function PositionRiskCard({ portfolioId }: { portfolioId: string }) {
   const q = useQuery({
     queryKey: ["position-risk", portfolioId],
     queryFn: () => fn({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   if (q.isPending) {

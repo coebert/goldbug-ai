@@ -220,8 +220,10 @@ describe("callAiForDecision — deterministic prompt construction", () => {
     expect(calls[0].system).toContain("Bearish exposure is allowed ONLY through the SHORT SLEEVE");
     expect(calls[0].system).toContain("no naked shorting");
     expect(calls[0].system).toContain("SHORT SLEEVE: XUKS.L and XSPS.L are available.");
-    expect(calls[0].prompt).toContain('side="buy" on XUKS.L (bearish FTSE 100) or XSPS.L (bearish S&P 500)');
-    expect(calls[0].prompt).toContain('There is no "short" side');
+    // The output contract (including the short-sleeve instruction) lives in the
+    // cached static system prefix, not in the per-tick user message.
+    expect(calls[0].system).toContain('side="buy" on XUKS.L (bearish FTSE 100) or XSPS.L (bearish S&P 500)');
+    expect(calls[0].system).toContain('There is no "short" side');
   });
 
   it("renders the no-events and no-cooldown branches explicitly", async () => {

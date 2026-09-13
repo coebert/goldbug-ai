@@ -30,6 +30,7 @@ const NON_DESTINATIONS = new Set([
   // Detail pages reached from a parent listing, not from global nav.
   "portfolio.$id",
   "market.$symbol",
+  "symbols.$symbol",
   "long-horizon.$id",
   "walk-forward.$id",
   "markets",
@@ -41,6 +42,8 @@ function routeSlugs(): string[] {
     .filter((f) => f.endsWith(".tsx"))
     .map((f) => f.replace(/\.tsx$/, ""))
     .filter((slug) => !slug.startsWith("portfolio.$id."))
+    // `foo.index.tsx` renders at `/foo`, which is how the registry lists it.
+    .map((slug) => slug.replace(/\.index$/, ""))
     .filter((slug) => !NON_DESTINATIONS.has(slug));
 }
 
@@ -67,7 +70,8 @@ describe("navigation registry", () => {
   });
 
   it("search matches on label, keyword and path", () => {
-    expect(searchDestinations("stamp").length).toBe(0);
+    // "stamp" is a dealing-cost keyword, so it resolves to the cost pages.
+    expect(searchDestinations("stamp").map((d) => d.to)).toContain("/costs");
     expect(searchDestinations("saxo").map((d) => d.to)).toContain("/saxo-status");
     expect(searchDestinations("backtest").map((d) => d.to)).toContain("/research");
     expect(searchDestinations("").length).toBe(DESTINATIONS.length);

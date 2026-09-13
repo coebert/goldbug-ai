@@ -33,6 +33,9 @@ const { generateText, NoObjectGeneratedError } = vi.hoisted(() => {
 
 vi.mock("ai", () => ({
   generateText: (a: Any) => generateText(a),
+  // Production streams the decision; the stream result exposes the same
+  // structured `output` promise the non-streaming call returns.
+  streamText: (a: Any) => ({ output: (async () => (await generateText(a)).output)() }),
   Output: { object: (o: Any) => o },
   NoObjectGeneratedError,
 }));

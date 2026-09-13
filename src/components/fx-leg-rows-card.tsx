@@ -26,6 +26,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { POLL } from "@/lib/query-keys";
 
 
 function money(n: number, ccy: string, signed = true) {
@@ -120,7 +121,7 @@ export function FxLegRowsCard({
   const quotes = useQuery({
     queryKey: ["fx-leg-quotes", portfolioId],
     queryFn: () => quotesFn({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const stress = useQuery({
     queryKey: ["fx-stress-report", portfolioId],

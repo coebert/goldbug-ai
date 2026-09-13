@@ -28,6 +28,9 @@ const { generateText, NoObjectGeneratedError } = vi.hoisted(() => {
 
 vi.mock("ai", () => ({
   generateText: (a: Any) => generateText(a),
+  // Production streams the decision; the stream result exposes the same
+  // structured `output` promise the non-streaming call returns.
+  streamText: (a: Any) => ({ output: (async () => (await generateText(a)).output)() }),
   Output: { object: (o: Any) => o },
   NoObjectGeneratedError,
 }));
@@ -375,7 +378,9 @@ describe("fuzz: ai-decision output is total and sizeable", () => {
         arbRisk, arbDial, num(0, 1_000_000), num(0.5, 5_000),
         async (risk, dial, cash, price) => {
           generateText.mockImplementation(async () => {
-            throw new Error("429 rate limited");
+            // Terminal status: the production path skips its retry/backoff
+            // ladder, so the property runs without real 2s/4s sleeps.
+            throw Object.assign(new Error("403 Forbidden"), { statusCode: 403 });
           });
           const out = await callAiForDecision(args(risk, dial, cash, cash));
           expect(typeof out.briefing).toBe("string");

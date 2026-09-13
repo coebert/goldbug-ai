@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { getOrderFills } from "@/lib/order-fills.functions";
+import { POLL } from "@/lib/query-keys";
 
 function ukTime(iso: string | null) {
   if (!iso) return "—";
@@ -41,7 +42,7 @@ export function OrderFillsCard({ portfolioId }: { portfolioId: string }) {
   const q = useQuery({
     queryKey: ["order-fills", portfolioId],
     queryFn: () => fn({ data: { portfolioId, limit: 40 } }),
-    refetchInterval: 15_000,
+    refetchInterval: POLL.LIVE,
   });
 
   const rows = q.data?.rows ?? [];

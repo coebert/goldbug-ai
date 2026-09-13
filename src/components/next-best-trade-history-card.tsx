@@ -7,6 +7,7 @@ import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatMoney, formatMoneySigned } from "@/lib/format-money";
 import { getNextBestTradeHistory } from "@/lib/next-best-trade-history.functions";
 import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
+import { POLL } from "@/lib/query-keys";
 
 function dayLabel(iso: string) {
   const date = new Date(iso);
@@ -31,7 +32,7 @@ export function NextBestTradeHistoryCard({ portfolioId }: { portfolioId: string 
     queryKey: ["next-best-trade-history", portfolioId],
     queryFn: () => fetchHistory({ data: { portfolioId, days: 60 } }),
     staleTime: 60_000,
-    refetchInterval: 300_000,
+    refetchInterval: POLL.SLOW,
   });
   useLiveFillStream(portfolioId, () => void query.refetch());
 

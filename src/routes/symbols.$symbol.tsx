@@ -3,6 +3,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
+
+const PRICE_COLOR = CHART_ROLE.deposits;
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
@@ -243,23 +254,21 @@ function SymbolDetailPage() {
                   <div className="h-48 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.history}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <CartesianGrid {...GRID_PROPS} />
                         <XAxis dataKey="date" hide />
-                        <YAxis domain={["auto", "auto"]} width={56} tick={{ fontSize: 11 }} />
+                        <YAxis domain={["auto", "auto"]} width={56} {...AXIS_PROPS} />
                         <Tooltip
-                          contentStyle={{
-                            background: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: 8,
-                            fontSize: 12,
-                          }}
+                          contentStyle={TOOLTIP_CONTENT_STYLE}
+                          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                          labelStyle={TOOLTIP_LABEL_STYLE}
+                          itemStyle={TOOLTIP_ITEM_STYLE}
                         />
                         <Line
                           type="monotone"
                           dataKey="close"
                           dot={false}
                           strokeWidth={2}
-                          stroke="hsl(var(--primary))"
+                          stroke={PRICE_COLOR}
                         />
                       </LineChart>
                     </ResponsiveContainer>

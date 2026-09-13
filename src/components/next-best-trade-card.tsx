@@ -11,6 +11,7 @@ import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatMoney, formatMoneySigned } from "@/lib/format-money";
 import { getNextBestTrade } from "@/lib/next-best-trade.functions";
 import { placeManualOrder, type ManualOrderResult } from "@/lib/manual-order.functions";
+import { POLL } from "@/lib/query-keys";
 
 function priceLabel(price: number, currency: string) {
   return formatMoney(price, currency);
@@ -33,7 +34,7 @@ export function NextBestTradeCard({
     queryKey: ["next-best-trade", portfolioId],
     queryFn: () => fetchNext({ data: { portfolioId } }),
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
     refetchOnWindowFocus: true,
   });
   const data = query.data;

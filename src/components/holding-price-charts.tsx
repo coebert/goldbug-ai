@@ -17,6 +17,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatUk } from "@/lib/uk-time";
+import {
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
 
 export type HoldingChartSeries = {
   symbol: string;
@@ -65,7 +75,7 @@ function HoldingChart({
   const pnlPct =
     last != null && s.avg_cost > 0 ? ((last - s.avg_cost) / s.avg_cost) * 100 : null;
   const up = (pnlPct ?? 0) >= 0;
-  const stroke = up ? "hsl(var(--chart-2))" : "hsl(var(--destructive))";
+  const stroke = up ? CHART_ROLE.positive : CHART_ROLE.negative;
   const gradId = `hpc-${s.symbol.replace(/[^A-Za-z0-9]/g, "")}`;
 
   if (points.length < 2) {
@@ -111,31 +121,30 @@ function HoldingChart({
                 <stop offset="100%" stopColor={stroke} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 10 }}
-              minTickGap={28}
-              tickLine={false}
-              axisLine={false}
-            />
+            <CartesianGrid {...GRID_PROPS} vertical={false} />
+            <XAxis dataKey="label" {...AXIS_PROPS} minTickGap={28} />
             <YAxis
               width={52}
-              tick={{ fontSize: 10 }}
+              {...AXIS_PROPS}
               domain={["auto", "auto"]}
               tickFormatter={(v: number) => fmtPrice(v)}
-              tickLine={false}
-              axisLine={false}
             />
             <Tooltip
               formatter={(v: number) => [fmtPrice(v), "Price"]}
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
+              wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+              labelStyle={TOOLTIP_LABEL_STYLE}
+              itemStyle={TOOLTIP_ITEM_STYLE}
             />
             <ReferenceLine
               y={s.avg_cost}
-              stroke="hsl(var(--muted-foreground))"
-              strokeDasharray="4 4"
-              label={{ value: "avg cost", fontSize: 9, position: "insideTopLeft" }}
+              {...REFERENCE_LINE}
+              label={{
+                value: "avg cost",
+                fontSize: 11,
+                fill: "var(--foreground)",
+                position: "insideTopLeft",
+              }}
             />
             <Area
               type="monotone"

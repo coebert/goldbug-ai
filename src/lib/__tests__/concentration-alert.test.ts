@@ -31,7 +31,7 @@ describe("buildConcentrationAlert", () => {
   it("flags a breach and sizes the trim back inside the cap", () => {
     const a = buildConcentrationAlert({
       nav: 10_000,
-      // 30% of NAV against a 15% cap.
+      // 30% of NAV against a 20% cap.
       positions: [pos("MKS", 3_000, 775), pos("VUSA", 1_400, 21)],
     });
     expect(a).not.toBeNull();
@@ -40,16 +40,16 @@ describe("buildConcentrationAlert", () => {
     expect(b.symbol).toBe("MKS");
     expect(b.weight).toBeCloseTo(0.3, 6);
     expect(b.capPct).toBe(DEFAULT_CONCENTRATION_CAP);
-    expect(b.excessBase).toBeCloseTo(1_500, 6);
-    // Target is cap − 1pp buffer = 14% => sell 1,600 of 3,000 = 53.3% → 54%.
-    expect(b.trimPercent).toBe(54);
+    expect(b.excessBase).toBeCloseTo(1_000, 6);
+    // Target is cap − 1pp buffer = 19% => sell 1,100 of 3,000 = 36.7% → 37%.
+    expect(b.trimPercent).toBe(37);
     expect(b.weightAfter).toBeLessThan(DEFAULT_CONCENTRATION_CAP);
   });
 
   it("rounds the suggested percentage up so the sale clears the cap", () => {
     const a = buildConcentrationAlert({
       nav: 10_000,
-      positions: [pos("AAA", 1_700, 1_000)],
+      positions: [pos("AAA", 2_300, 1_000)],
     });
     const b = a!.breaches[0];
     expect(Number.isInteger(b.trimPercent)).toBe(true);
@@ -88,14 +88,14 @@ describe("buildConcentrationAlert", () => {
   it("orders breaches by weight and aggregates risk impact", () => {
     const a = buildConcentrationAlert({
       nav: 10_000,
-      positions: [pos("SMALL", 1_800, 100), pos("BIG", 4_000, 100), pos("OK", 1_000, 100)],
+      positions: [pos("SMALL", 2_500, 100), pos("BIG", 4_000, 100), pos("OK", 1_000, 100)],
     })!;
     expect(a.breaches.map((b) => b.symbol)).toEqual(["BIG", "SMALL"]);
     expect(a.impact.topWeightBefore).toBeCloseTo(0.4, 6);
     expect(a.impact.topWeightAfter).toBeLessThanOrEqual(DEFAULT_CONCENTRATION_CAP);
     expect(a.impact.hhiAfter).toBeLessThan(a.impact.hhiBefore);
     expect(a.impact.shockLossAfter).toBeLessThan(a.impact.shockLossBefore);
-    expect(a.impact.shockLossBefore).toBeCloseTo((4_000 + 1_800) * SHOCK_MOVE, 6);
+    expect(a.impact.shockLossBefore).toBeCloseTo((4_000 + 2_500) * SHOCK_MOVE, 6);
     expect(a.impact.totalTrimBase).toBeGreaterThan(0);
   });
 

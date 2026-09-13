@@ -30,6 +30,22 @@ import {
 import { getBacktestVsReal } from "@/lib/backtest-vs-real.functions";
 import { verdictFor } from "@/lib/backtest-vs-real";
 import { formatUk } from "@/lib/uk-time";
+import {
+  AXIS_LABEL,
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_PROPS,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
+
+// Blue = the strategy's own path, vermillion = what the live book did.
+const BACKTEST_COLOR = CHART_ROLE.deposits;
+const REAL_COLOR = CHART_ROLE.negative;
 
 function money(n: number, ccy: string): string {
   const sign = n < 0 ? "−" : "";
@@ -243,37 +259,32 @@ export function BacktestVsRealCard({
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    minTickGap={32}
-                    tickLine={false}
-                    axisLine={false}
-                  />
+                  <CartesianGrid {...GRID_PROPS} vertical={false} />
+                  <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={32} />
                   <YAxis
                     width={52}
-                    tick={{ fontSize: 10 }}
+                    {...AXIS_PROPS}
                     domain={["auto", "auto"]}
                     tickFormatter={(v: number) => v.toFixed(1)}
-                    tickLine={false}
-                    axisLine={false}
                     label={{
                       value: "Index (=100 at start)",
                       angle: -90,
                       position: "insideLeft",
-                      style: { fontSize: 10 },
+                      style: AXIS_LABEL,
                     }}
                   />
                   <Tooltip
                     formatter={(v: number, name: string) => [v.toFixed(2), name]}
-                    contentStyle={{ fontSize: 12 }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend {...LEGEND_PROPS} />
                   <Line
                     type="monotone"
                     dataKey="Backtest"
-                    stroke="#0072B2"
+                    stroke={BACKTEST_COLOR}
                     strokeWidth={2}
                     strokeDasharray="5 4"
                     dot={false}
@@ -282,7 +293,7 @@ export function BacktestVsRealCard({
                   <Line
                     type="monotone"
                     dataKey="Real"
-                    stroke="#D55E00"
+                    stroke={REAL_COLOR}
                     strokeWidth={2}
                     dot={false}
                     isAnimationActive={false}
@@ -298,42 +309,37 @@ export function BacktestVsRealCard({
                 <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="btGapFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#D55E00" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#D55E00" stopOpacity={0.02} />
+                      <stop offset="0%" stopColor={REAL_COLOR} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={REAL_COLOR} stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    minTickGap={32}
-                    tickLine={false}
-                    axisLine={false}
-                  />
+                  <CartesianGrid {...GRID_PROPS} vertical={false} />
+                  <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={32} />
                   <YAxis
                     width={62}
-                    tick={{ fontSize: 10 }}
+                    {...AXIS_PROPS}
                     domain={["auto", "auto"]}
                     tickFormatter={(v: number) => v.toFixed(0)}
-                    tickLine={false}
-                    axisLine={false}
                     label={{
                       value: "Gap (money)",
                       angle: -90,
                       position: "insideLeft",
-                      style: { fontSize: 10 },
+                      style: AXIS_LABEL,
                     }}
                   />
                   <Tooltip
                     formatter={(v: number) => [money(v, currency), "Live minus backtest"]}
-                    contentStyle={{ fontSize: 12 }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
                   />
-                  <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.4} />
+                  <ReferenceLine y={0} {...REFERENCE_LINE} />
                   <Area
                     type="monotone"
                     dataKey="MoneyGap"
                     name="Live minus backtest"
-                    stroke="#D55E00"
+                    stroke={REAL_COLOR}
                     strokeWidth={2}
                     fill="url(#btGapFill)"
                     dot={false}

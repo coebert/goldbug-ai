@@ -18,6 +18,7 @@ import { CHART_SEQUENCE, LEGEND_PROPS, TOOLTIP_WRAPPER_STYLE } from "@/lib/chart
 import { buildHoldingEquityChangeRows } from "@/lib/holding-equity-change";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { SAXO_AXIS, SAXO_GRID, SAXO_REFERENCE_LINE } from "@/lib/saxo-chart";
+import { POLL } from "@/lib/query-keys";
 
 const LINE_DASHES = [undefined, "7 4", "2 3", "10 3 2 3", "12 4", "4 3"] as const;
 
@@ -32,7 +33,7 @@ export function HoldingEquityChangeChart({ portfolioId }: { portfolioId: string 
   const history = useQuery({
     queryKey: ["holdings-history", portfolioId],
     queryFn: () => fetchHistory({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const chart = useMemo(() => buildHoldingEquityChangeRows(history.data ?? []), [history.data]);
 

@@ -30,7 +30,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { reconcilePortfolio } from "@/lib/live.functions";
 import { getFxLegQuotes, type FxLegQuote } from "@/lib/fx-leg-quotes.functions";
 import { toast } from "sonner";
-import { qk } from "@/lib/query-keys";
+import { qk, POLL } from "@/lib/query-keys";
 import { ValuationFreshnessBadge } from "@/components/valuation-freshness-badge";
 import { checkPositionsConsistency } from "@/lib/positions-consistency";
 
@@ -136,7 +136,7 @@ export function LiveHoldingsCard({
     queryKey: ["fx-leg-quotes", portfolioId],
     enabled: Boolean(portfolioId) && hasFxLeg,
     queryFn: () => fxQuotesFn({ data: { portfolioId: portfolioId as string } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
     refetchOnWindowFocus: true,
     staleTime: 30_000,
   });
