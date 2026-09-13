@@ -115,6 +115,12 @@ export class SaxoAdapter implements BrokerAdapter {
   // this adapter — the reconciler treats "unknown" the same way and we
   // avoid flooding live_broker_log with one row per open order per pass.
   private histUnsupported = false;
+  // Same story for /chart/v1/charts: the chart service is a separately
+  // entitled OpenAPI product, and environments without it answer with an
+  // IIS HTML 404 before the request reaches the API. One 404 is enough to
+  // know bars are unavailable for this session — retrying per symbol just
+  // floods the broker log and slows every price refresh.
+  private chartUnsupported = false;
 
   constructor(opts: {
     env: BrokerEnv;
