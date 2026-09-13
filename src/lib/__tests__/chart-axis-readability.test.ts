@@ -34,7 +34,16 @@ function walk(dir: string): string[] {
   });
 }
 
-const chartFiles = walk(SRC).filter((p) => readFileSync(p, "utf8").includes("<YAxis"));
+// Comments illustrate the very patterns this suite bans (the shared
+// `chart.tsx` preset documents `<YAxis ... />` usage in a JSDoc block), so
+// strip them before scanning — only real JSX counts.
+function sourceOf(p: string): string {
+  return readFileSync(p, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+
+const chartFiles = walk(SRC).filter((p) => sourceOf(p).includes("<YAxis"));
 
 // Same surfaces as chart-palette-contrast.test.ts (src/styles.css tokens).
 const SURFACES = {
@@ -52,7 +61,7 @@ describe("chart axis readability", () => {
   });
 
   it("uses the shared AXIS_TICK token for every axis tick", () => {
-    const offenders = chartFiles.filter((p) => /tick=\{\{/.test(readFileSync(p, "utf8")));
+    const offenders = chartFiles.filter((p) => /tick=\{\{/.test(sourceOf(p)));
     expect(offenders.map((p) => p.replace(SRC, "src"))).toEqual([]);
   });
 
@@ -62,7 +71,7 @@ describe("chart axis readability", () => {
     expect(SAXO_TICK.fontSize).toBeGreaterThanOrEqual(11);
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      const src = readFileSync(p, "utf8");
+      const src = sourceOf(p);
       for (const m of src.matchAll(/fontSize:\s*(\d+)/g)) {
         if (Number(m[1]) < SAXO_TICK.fontSize) offenders.push(`${p.replace(SRC, "src")}: ${m[0]}`);
       }
@@ -73,7 +82,7 @@ describe("chart axis readability", () => {
   it("gives numeric y-axes enough width for wide currency ticks", () => {
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      const src = readFileSync(p, "utf8");
+      const src = sourceOf(p);
       for (const tag of src.match(/<YAxis\b[\s\S]*?\/>/g) ?? []) {
         if (/type=\{?"category"/.test(tag)) continue;
         // A hidden axis paints nothing: no ticks to fit, no line to colour.
@@ -131,7 +140,7 @@ describe("chart gridline and axis-line styling", () => {
   it("spreads GRID_PROPS on every CartesianGrid", () => {
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      const src = readFileSync(p, "utf8");
+      const src = sourceOf(p);
       for (const tag of src.match(/<CartesianGrid\b[\s\S]*?\/>/g) ?? []) {
         if (!tag.includes("{...GRID_PROPS}") && !tag.includes("{...SAXO_GRID}")) {
           offenders.push(`${p.replace(SRC, "src")}: ${tag}`);
@@ -144,7 +153,7 @@ describe("chart gridline and axis-line styling", () => {
   it("never re-styles a grid with an ad-hoc stroke or opacity", () => {
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      const src = readFileSync(p, "utf8");
+      const src = sourceOf(p);
       for (const tag of src.match(/<CartesianGrid\b[\s\S]*?\/>/g) ?? []) {
         if (/\b(stroke|strokeDasharray|strokeOpacity|opacity|className)=/.test(tag)) {
           offenders.push(`${p.replace(SRC, "src")}: ${tag}`);
@@ -157,7 +166,7 @@ describe("chart gridline and axis-line styling", () => {
   it("pins axisLine and tickLine on every axis so neither falls back to #666", () => {
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      const src = readFileSync(p, "utf8");
+      const src = sourceOf(p);
       for (const tag of src.match(/<(?:X|Y)Axis\b[\s\S]*?\/>/g) ?? []) {
         if (/\bhide\b/.test(tag)) continue;
         // A percent axis renders at most "-100%" — it needs no currency gutter.
