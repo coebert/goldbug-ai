@@ -30,6 +30,22 @@ import {
 import { getBacktestVsReal } from "@/lib/backtest-vs-real.functions";
 import { verdictFor } from "@/lib/backtest-vs-real";
 import { formatUk } from "@/lib/uk-time";
+import {
+  AXIS_LABEL,
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_PROPS,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
+
+// Blue = the strategy's own path, vermillion = what the live book did.
+const BACKTEST_COLOR = CHART_ROLE.deposits;
+const REAL_COLOR = CHART_ROLE.negative;
 
 function money(n: number, ccy: string): string {
   const sign = n < 0 ? "−" : "";
