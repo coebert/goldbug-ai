@@ -3,6 +3,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
+
+const PRICE_COLOR = CHART_ROLE.deposits;
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
