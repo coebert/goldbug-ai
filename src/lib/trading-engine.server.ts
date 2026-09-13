@@ -1530,6 +1530,15 @@ export async function runDailyTick(
   const holdingsByS = new Map(
     (holdings ?? []).map((h) => [engineSymbolKey(h.symbol), { ...h }] as const),
   );
+  // Quantity actually held at the broker when this tick started. Anything the
+  // tick *plans* to buy is not owned yet, so no later stage may sell it: doing
+  // so sends the broker a sell for stock the account does not hold, which is
+  // rejected ("you are selling contracts you do not own") and, worse, the
+  // ticket aggregator drops the paired buy in favour of the sell — so the
+  // intended purchase never happens and the failure repeats every run.
+  const startQtyByKey = new Map<string, number>(
+    (holdings ?? []).map((h) => [engineSymbolKey(h.symbol), Number(h.quantity) || 0] as const),
+  );
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
