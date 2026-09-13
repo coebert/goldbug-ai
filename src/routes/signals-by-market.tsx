@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
 import { getSignalsByMarket } from "@/lib/signals-by-market.functions";
 import type { MarketSignalRow } from "@/lib/signals-by-market";
+import { POLL } from "@/lib/query-keys";
 
 const DESCRIPTION = "Current AI signals, confidence, expected edge and coverage gaps across every configured market.";
 
@@ -47,7 +48,7 @@ function SignalsByMarketPage() {
     queryKey: ["signals-by-market"],
     queryFn: () => load({ data: {} }),
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
   useLiveFillStream(query.data?.portfolioId ?? null, () => void query.refetch());
   const groups = useMemo(() => (query.data?.groups ?? [])

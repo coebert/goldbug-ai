@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { formatMoney } from "@/lib/format-money";
 import { getCoreProgress } from "@/lib/core-progress.functions";
+import { POLL } from "@/lib/query-keys";
 
 const TITLE = "Core allocation progress | Goldbug";
 const DESC =
@@ -49,7 +50,7 @@ function CoreProgressPage() {
     queryKey: ["core-progress"],
     queryFn: () => fetchProgress({ data: {} }),
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
   const d = query.data;
 

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
+import { POLL } from "@/lib/query-keys";
 
 function money(n: number, ccy: string, signed = true) {
   return new Intl.NumberFormat("en-GB", {
@@ -26,7 +27,7 @@ export function FxCashAtRiskCard({ portfolioId }: { portfolioId: string }) {
   const quotes = useQuery({
     queryKey: ["fx-leg-quotes", portfolioId],
     queryFn: () => quotesFn({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const stress = useQuery({
     queryKey: ["fx-stress-report", portfolioId],

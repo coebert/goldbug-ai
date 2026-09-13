@@ -7,6 +7,7 @@ import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatMoney, formatMoneySigned } from "@/lib/format-money";
 import { getTradeImpact } from "@/lib/trade-impact.functions";
 import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
+import { POLL } from "@/lib/query-keys";
 
 const signClass = (value: number) =>
   value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-400" : "text-muted-foreground";
@@ -29,7 +30,7 @@ export function TradeImpactPanel({ portfolioId }: { portfolioId: string }) {
     queryKey: ["trade-impact", portfolioId],
     queryFn: () => fetchImpact({ data: { portfolioId, limit: 30 } }),
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
     refetchOnWindowFocus: true,
   });
   const stream = useLiveFillStream(portfolioId, () => void query.refetch());

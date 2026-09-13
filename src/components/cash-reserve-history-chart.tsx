@@ -14,6 +14,7 @@ import { getCashReserveHistory } from "@/lib/cash-reserve-history.functions";
 import { CHART_ROLE, LEGEND_PROPS, OKABE_ITO } from "@/lib/chart-palette";
 import { useChartPreset } from "@/lib/chart-axis";
 import { SAXO_AXIS, SAXO_GRID, SAXO_TOOLTIP_CONTENT, SAXO_TOOLTIP_CURSOR, SAXO_TOOLTIP_LABEL, fadeStops } from "@/lib/saxo-chart";
+import { POLL } from "@/lib/query-keys";
 
 type Range = "30d" | "90d" | "1y" | "all";
 const RANGES: Array<{ value: Range; label: string; days: number | null }> = [
@@ -52,7 +53,7 @@ export function CashReserveHistoryChart({ portfolioId, enabled = true, className
     queryFn: () => fetchHistory({ data: { portfolioId } }),
     enabled,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const [range, setRange] = useState<Range>("all");
   const { isMobile, margin } = useChartPreset();

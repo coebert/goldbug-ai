@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { formatMoney, formatMoneySigned } from "@/lib/format-money";
 import { getSymbolCashFlow } from "@/lib/symbol-cash-flow.functions";
+import { POLL } from "@/lib/query-keys";
 
 export function SymbolCashFlowTable({ portfolioId }: { portfolioId: string }) {
   const fetchCashFlow = useServerFn(getSymbolCashFlow);
@@ -13,7 +14,7 @@ export function SymbolCashFlowTable({ portfolioId }: { portfolioId: string }) {
     queryKey: ["symbol-cash-flow", portfolioId],
     queryFn: () => fetchCashFlow({ data: { portfolioId } }),
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
     refetchOnWindowFocus: true,
   });
   const data = query.data;

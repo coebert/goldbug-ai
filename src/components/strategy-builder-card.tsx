@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+import { POLL } from "@/lib/query-keys";
   listStrategies,
   saveStrategy,
   deleteStrategy,
@@ -87,7 +88,7 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
       }
       return r;
     },
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const invalidate = () => {

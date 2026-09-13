@@ -9,6 +9,7 @@ import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
 import { getFxStressReport } from "@/lib/fx-stress-report.functions";
 import { closeFxLeg } from "@/lib/fx-leg-close.functions";
 import { assessFxRisk } from "@/lib/fx-risk-alert";
+import { POLL } from "@/lib/query-keys";
 
 /**
  * Live FX risk banner: red when an open funding leg's stress worst case eats
@@ -28,7 +29,7 @@ export function FxRiskAlertCard({
   const quotes = useQuery({
     queryKey: ["fx-leg-quotes", portfolioId],
     queryFn: () => quotesFn({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const stress = useQuery({
     queryKey: ["fx-stress-report", portfolioId],

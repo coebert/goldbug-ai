@@ -31,6 +31,7 @@ import { getPortfolioPositions, type PositionRow } from "@/lib/portfolio-positio
 import { RealMoneyCostPanel } from "@/components/real-money-cost-panel";
 import { HoldingEquityChangeChart } from "@/components/holding-equity-change-chart";
 import { formatUkDate, formatUkTime } from "@/lib/uk-time";
+import { POLL } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/positions")({
   component: PositionsPage,
@@ -100,7 +101,7 @@ function PositionsPage() {
     queryKey: ["portfolio-positions", portfolioId],
     queryFn: () => fetchPositions({ data: { portfolioId: portfolioId! } }),
     enabled: !!portfolioId,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   return (

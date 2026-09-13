@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
 import { formatMoneySigned } from "@/lib/format-money";
 import { getGlobalCoverage } from "@/lib/global-coverage.functions";
+import { POLL } from "@/lib/query-keys";
 
 const DESCRIPTION = "Fill rates and missed trading signals across every market group available to the AI.";
 
@@ -32,7 +33,7 @@ function GlobalCoveragePage() {
   const [days, setDays] = useState<30 | 60 | 90>(60);
   const [market, setMarket] = useState("all");
   const [reason, setReason] = useState("all");
-  const query = useQuery({ queryKey: ["global-coverage", days], queryFn: () => load({ data: { days } }), staleTime: 60_000, refetchInterval: 5 * 60_000 });
+  const query = useQuery({ queryKey: ["global-coverage", days], queryFn: () => load({ data: { days } }), staleTime: 60_000, refetchInterval: POLL.SLOW});
   useLiveFillStream(query.data?.portfolioId ?? null, () => void query.refetch());
   const groups = useMemo(() => (query.data?.groups ?? []).filter((group) => market === "all" || group.market === market), [query.data, market]);
   const missed = useMemo(() => groups.flatMap((group) => group.rows).filter((row) => row.status === "missed" && (reason === "all" || row.missReason === reason)).sort((a, b) => (b.missedOutcomeBase ?? 0) - (a.missedOutcomeBase ?? 0)), [groups, reason]);

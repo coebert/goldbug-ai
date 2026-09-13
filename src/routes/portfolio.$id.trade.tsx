@@ -23,6 +23,7 @@ import { getOrderFills } from "@/lib/order-fills.functions";
 import { manualSellHolding } from "@/lib/manual-sell.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 import { holdingNativeValue } from "@/lib/fx-leg-value";
+import { qk, POLL } from "@/lib/query-keys";
 
 const TITLE = "Trading Desk — Aegis";
 const DESC =
@@ -64,7 +65,7 @@ function TradePage() {
   const sell = useServerFn(manualSellHolding);
 
   const q = useQuery({
-    queryKey: ["portfolio", "detail", id],
+    queryKey: qk.portfolio.detail(id),
     queryFn: () => get({ data: { id } }),
     refetchInterval: 30_000,
   });
@@ -72,12 +73,12 @@ function TradePage() {
     queryKey: ["holdings-history", id],
     queryFn: () => getHistory({ data: { portfolioId: id } }),
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const ordersQ = useQuery({
     queryKey: ["order-fills", id],
     queryFn: () => fills({ data: { portfolioId: id, limit: 40 } }),
-    refetchInterval: 15_000,
+    refetchInterval: POLL.LIVE,
   });
 
   const p = q.data?.portfolio as
@@ -176,7 +177,7 @@ function TradePage() {
       toast.success(`Sell ${r.symbol}: ${r.status}`, {
         description: `${r.qty} @ ${r.price} ${r.instrument_ccy}`,
       });
-      qc.invalidateQueries({ queryKey: ["portfolio", "detail", id] });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(id) });
       qc.invalidateQueries({ queryKey: ["order-fills", id] });
       qc.invalidateQueries({ queryKey: ["holdings-history", id] });
     },
@@ -221,7 +222,7 @@ function TradePage() {
               variant="outline"
               className="h-8"
               onClick={() => {
-                qc.invalidateQueries({ queryKey: ["portfolio", "detail", id] });
+                qc.invalidateQueries({ queryKey: qk.portfolio.detail(id) });
                 qc.invalidateQueries({ queryKey: ["order-fills", id] });
                 qc.invalidateQueries({ queryKey: ["holdings-history", id] });
               }}

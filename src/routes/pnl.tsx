@@ -51,6 +51,7 @@ import { verdictFor } from "@/lib/backtest-vs-real";
 import { formatUk } from "@/lib/uk-time";
 import { useLiveFillStream } from "@/hooks/use-live-fill-stream";
 import { RealMoneyCostPanel } from "@/components/real-money-cost-panel";
+import { POLL } from "@/lib/query-keys";
 
 const BacktestVsRealCard = lazy(() =>
   import("@/components/backtest-vs-real-card").then((m) => ({ default: m.BacktestVsRealCard })),
@@ -148,7 +149,7 @@ function PnlDashboard() {
     queryFn: () => fetchCompare({ data: { portfolioId: selectedId!, runId } }),
     enabled: Boolean(selectedId),
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const c = q.data;
 

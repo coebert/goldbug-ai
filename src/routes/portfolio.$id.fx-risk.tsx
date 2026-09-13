@@ -12,6 +12,7 @@ import { FxLegHistoryCard } from "@/components/fx-leg-history-card";
 import { FxStressReportCard } from "@/components/fx-stress-report-card";
 import { FxPlaybookBacktestCard } from "@/components/fx-playbook-backtest-card";
 import { getFxLegQuotes } from "@/lib/fx-leg-quotes.functions";
+import { POLL } from "@/lib/query-keys";
 
 
 const TITLE = "FX Risk Dashboard — Aegis";
@@ -50,7 +51,7 @@ function FxRiskPage() {
   const quotes = useQuery({
     queryKey: ["fx-leg-quotes", id],
     queryFn: () => quotesFn({ data: { portfolioId: id } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const openPairs = Array.from(
