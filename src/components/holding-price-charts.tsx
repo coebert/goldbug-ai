@@ -111,31 +111,30 @@ function HoldingChart({
                 <stop offset="100%" stopColor={stroke} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 10 }}
-              minTickGap={28}
-              tickLine={false}
-              axisLine={false}
-            />
+            <CartesianGrid {...GRID_PROPS} vertical={false} />
+            <XAxis dataKey="label" {...AXIS_PROPS} minTickGap={28} />
             <YAxis
               width={52}
-              tick={{ fontSize: 10 }}
+              {...AXIS_PROPS}
               domain={["auto", "auto"]}
               tickFormatter={(v: number) => fmtPrice(v)}
-              tickLine={false}
-              axisLine={false}
             />
             <Tooltip
               formatter={(v: number) => [fmtPrice(v), "Price"]}
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
+              wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+              labelStyle={TOOLTIP_LABEL_STYLE}
+              itemStyle={TOOLTIP_ITEM_STYLE}
             />
             <ReferenceLine
               y={s.avg_cost}
-              stroke="hsl(var(--muted-foreground))"
-              strokeDasharray="4 4"
-              label={{ value: "avg cost", fontSize: 9, position: "insideTopLeft" }}
+              {...REFERENCE_LINE}
+              label={{
+                value: "avg cost",
+                fontSize: 11,
+                fill: "var(--foreground)",
+                position: "insideTopLeft",
+              }}
             />
             <Area
               type="monotone"
