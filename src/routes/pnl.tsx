@@ -17,6 +17,24 @@ import {
   YAxis,
 } from "recharts";
 import { AppHeader } from "@/components/app-header";
+import {
+  AXIS_PROPS,
+  CHART_NEUTRAL_SERIES,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_PROPS,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
+
+// Real money in blue, the shadow replay as a neutral dashed line, and the
+// shortfall between them in the loss colour.
+const REAL_COLOR = CHART_ROLE.deposits;
+const SHADOW_COLOR = CHART_NEUTRAL_SERIES;
+const GAP_COLOR = CHART_ROLE.negative;
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
