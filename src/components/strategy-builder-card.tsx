@@ -93,7 +93,7 @@ export function StrategyBuilderCard({ portfolioId }: { portfolioId: string }) {
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["strategies", portfolioId] });
-    void qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+    void qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
     void qc.invalidateQueries({ queryKey: ["order-fills", portfolioId] });
   };
 
