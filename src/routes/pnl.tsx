@@ -280,27 +280,30 @@ function PnlDashboard() {
                       <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="pnlReal" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                            <stop offset="5%" stopColor={REAL_COLOR} stopOpacity={0.35} />
+                            <stop offset="95%" stopColor={REAL_COLOR} stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={24} />
+                        <CartesianGrid {...GRID_PROPS} />
+                        <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={24} />
                         <YAxis
-                          tick={{ fontSize: 10 }}
+                          {...AXIS_PROPS}
                           width={70}
                           domain={["auto", "auto"]}
                           tickFormatter={(v: number) => v.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
                         />
                         <Tooltip
                           formatter={(v: number, name: string) => [money(Number(v), ccy), name]}
-                          contentStyle={{ fontSize: 12 }}
+                          contentStyle={TOOLTIP_CONTENT_STYLE}
+                          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                          labelStyle={TOOLTIP_LABEL_STYLE}
+                          itemStyle={TOOLTIP_ITEM_STYLE}
                         />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Legend {...LEGEND_PROPS} />
                         <Area
                           type="monotone"
                           dataKey="Real"
-                          stroke="hsl(var(--primary))"
+                          stroke={REAL_COLOR}
                           fill="url(#pnlReal)"
                           strokeWidth={2}
                           dot={false}
@@ -308,7 +311,7 @@ function PnlDashboard() {
                         <Area
                           type="monotone"
                           dataKey="Shadow"
-                          stroke="hsl(var(--muted-foreground))"
+                          stroke={SHADOW_COLOR}
                           fill="none"
                           strokeDasharray="4 3"
                           strokeWidth={2}
@@ -320,21 +323,27 @@ function PnlDashboard() {
                   <div className="mt-3 h-[140px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={24} />
+                        <CartesianGrid {...GRID_PROPS} />
+                        <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={24} />
                         <YAxis
-                          tick={{ fontSize: 10 }}
+                          {...AXIS_PROPS}
                           width={70}
                           tickFormatter={(v: number) => v.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
                         />
-                        <Tooltip formatter={(v: number) => money(Number(v), ccy)} contentStyle={{ fontSize: 12 }} />
-                        <ReferenceLine y={0} className="stroke-border" />
+                        <Tooltip
+                          formatter={(v: number) => money(Number(v), ccy)}
+                          contentStyle={TOOLTIP_CONTENT_STYLE}
+                          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                          labelStyle={TOOLTIP_LABEL_STYLE}
+                          itemStyle={TOOLTIP_ITEM_STYLE}
+                        />
+                        <ReferenceLine y={0} {...REFERENCE_LINE} />
                         <Area
                           type="monotone"
                           dataKey="Gap"
                           name="Real minus shadow"
-                          stroke="hsl(var(--destructive))"
-                          fill="hsl(var(--destructive))"
+                          stroke={GAP_COLOR}
+                          fill={GAP_COLOR}
                           fillOpacity={0.15}
                           strokeWidth={2}
                           dot={false}
