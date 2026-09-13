@@ -115,6 +115,12 @@ export class SaxoAdapter implements BrokerAdapter {
   // this adapter — the reconciler treats "unknown" the same way and we
   // avoid flooding live_broker_log with one row per open order per pass.
   private histUnsupported = false;
+  // Same story for /chart/v1/charts: the chart service is a separately
+  // entitled OpenAPI product, and environments without it answer with an
+  // IIS HTML 404 before the request reaches the API. One 404 is enough to
+  // know bars are unavailable for this session — retrying per symbol just
+  // floods the broker log and slows every price refresh.
+  private chartUnsupported = false;
 
   constructor(opts: {
     env: BrokerEnv;
@@ -754,6 +760,7 @@ export class SaxoAdapter implements BrokerAdapter {
   ): Promise<Array<{
     date: string; open: number; high: number; low: number; close: number; volume: number;
   }>> {
+    if (this.chartUnsupported) return [];
     const inst = await this.lookupUic(symbol);
     const count = Math.min(1200, Math.max(1, Math.round(opts.count)));
     const query: Record<string, string | number> = {
@@ -768,7 +775,7 @@ export class SaxoAdapter implements BrokerAdapter {
       // Saxo wants an instant; end-of-day on the requested session.
       query.Time = `${opts.to}T23:59:59Z`;
     }
-    const res = await this.req<{
+    type ChartResponse = {
       Data?: Array<{
         Time?: string;
         Open?: number; High?: number; Low?: number; Close?: number;
@@ -776,7 +783,37 @@ export class SaxoAdapter implements BrokerAdapter {
         Volume?: number; Interest?: number;
       }>;
       DisplayAndFormat?: { Currency?: string };
-    }>("GET", "/chart/v1/charts", { query });
+    };
+    let res: ChartResponse;
+    try {
+      res = await this.req<ChartResponse>("GET", "/chart/v1/charts", {
+        query,
+        // A 404 here means the chart product isn't enabled for this
+        // environment, not that this instrument is missing: don't write an
+        // error row per symbol per refresh.
+        silentStatuses: [404],
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("failed [404]")) {
+        if (!this.chartUnsupported) {
+          this.chartUnsupported = true;
+          await log({
+            portfolioId: this.portfolioId, userId: this.userId, env: this.env,
+            method: "CHART_UNSUPPORTED",
+            path: "/chart/v1/charts",
+            status: 404,
+            error:
+              "Saxo /chart/v1/charts returned 404 (chart data not entitled on this " +
+              "environment); broker bars are disabled for this session and prices " +
+              "fall back to the public tape.",
+          });
+        }
+        return [];
+      }
+      throw e;
+    }
+
 
     const ccy = res.DisplayAndFormat?.Currency ?? inst.currency;
     const out: Array<{
