@@ -243,23 +243,21 @@ function SymbolDetailPage() {
                   <div className="h-48 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.history}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <CartesianGrid {...GRID_PROPS} />
                         <XAxis dataKey="date" hide />
-                        <YAxis domain={["auto", "auto"]} width={56} tick={{ fontSize: 11 }} />
+                        <YAxis domain={["auto", "auto"]} width={56} {...AXIS_PROPS} />
                         <Tooltip
-                          contentStyle={{
-                            background: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: 8,
-                            fontSize: 12,
-                          }}
+                          contentStyle={TOOLTIP_CONTENT_STYLE}
+                          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+                          labelStyle={TOOLTIP_LABEL_STYLE}
+                          itemStyle={TOOLTIP_ITEM_STYLE}
                         />
                         <Line
                           type="monotone"
                           dataKey="close"
                           dot={false}
                           strokeWidth={2}
-                          stroke="hsl(var(--primary))"
+                          stroke={PRICE_COLOR}
                         />
                       </LineChart>
                     </ResponsiveContainer>
