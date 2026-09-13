@@ -20,8 +20,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Aegis";
   const options = {
     body: data.body || "",
-    icon: data.icon || "/favicon.ico",
-    badge: data.badge || "/favicon.ico",
+    icon: data.icon || "/icon-192.png",
+    badge: data.badge || "/favicon.png",
     tag: data.tag || "aegis-notification",
     data: { url: data.url || "/" },
     requireInteraction: !!data.requireInteraction,

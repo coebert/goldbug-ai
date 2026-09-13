@@ -122,7 +122,7 @@ export type EndpointClass = "document" | "api" | "asset";
 /** Classify a request path into the policy that should apply to it. */
 export function classifyEndpoint(pathname: string): EndpointClass {
   if (pathname.startsWith("/api/")) return "api";
-  if (/^\/(assets|_build|favicon\.ico|sw-push\.js|manifest\.webmanifest)/.test(pathname)) {
+  if (/^\/(assets|_build|favicon\.png|icon-(192|512)\.png|apple-touch-icon\.png|sw-push\.js|manifest\.webmanifest)/.test(pathname)) {
     return "asset";
   }
   return "document";

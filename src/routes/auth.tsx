@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { TrendingUp } from "lucide-react";
+import { AegisLogo } from "@/components/aegis-logo";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -77,7 +77,7 @@ function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex items-center gap-2 text-primary">
-            <TrendingUp className="h-6 w-6" />
+            <AegisLogo size={28} />
             <span className="font-semibold">Aegis</span>
           </div>
           <CardTitle>Sign in</CardTitle>

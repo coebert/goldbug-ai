@@ -40,6 +40,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { UkClock } from "@/components/uk-clock";
 import { EnvBadge } from "@/components/env-badge";
 import { useStickyHeaderHeight } from "@/hooks/use-sticky-header-height";
+import { AegisLogo } from "@/components/aegis-logo";
 
 import { PRIMARY } from "@/components/nav/destinations";
 
@@ -144,9 +145,7 @@ export function AppHeader({ email }: { email?: string | null }) {
           to="/"
           className="flex min-w-0 shrink-0 items-center gap-2 overflow-hidden font-semibold tracking-tight"
         >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
-            <TrendingUp className="h-4 w-4" />
-          </span>
+          <AegisLogo size={32} />
           <span className="truncate font-display text-lg leading-none">Aegis</span>
           <EnvBadge />
         </Link>
@@ -222,7 +221,7 @@ export function AppHeader({ email }: { email?: string | null }) {
             <SheetContent side="right" className="w-[85vw] max-w-sm p-0">
               <SheetHeader className="border-b border-border px-4 py-4 text-left">
                 <SheetTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <AegisLogo size={24} />
                   <span className="font-display">Aegis</span>
                 </SheetTitle>
                 {email && (
