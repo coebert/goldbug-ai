@@ -20,7 +20,7 @@ describe("cost governor single-name cap", () => {
   it("blocks an add that would push one name past the NAV cap", () => {
     const plan = planAdmissions([buy("MKS.L", 400)], {
       ...base,
-      positionExposureBase: { "MKS.L": 1_300 }, // 13% already
+      positionExposureBase: { "MKS.L": 1_800 }, // 18% already
     });
     const d = plan.decisions[0]!;
     expect(d.kind).toBe("skip");
@@ -31,7 +31,7 @@ describe("cost governor single-name cap", () => {
     // Exposure keyed as the holdings table stores it, normalised on load.
     const plan = planAdmissions([buy("MKS.L", 400)], {
       ...base,
-      positionExposureBase: { "MKS.L": 1_600 },
+      positionExposureBase: { "MKS.L": 1_900 },
     });
     expect(plan.decisions[0]!.kind).toBe("skip");
   });
@@ -39,11 +39,11 @@ describe("cost governor single-name cap", () => {
   it("admits a first entry comfortably inside the cap", () => {
     const plan = planAdmissions([buy("VUSA.L", 400)], { ...base, positionExposureBase: {} });
     expect(plan.decisions[0]!.kind).toBe("admit");
-    expect(DEFAULT_MAX_POSITION_PCT_OF_NAV).toBe(0.15);
+    expect(DEFAULT_MAX_POSITION_PCT_OF_NAV).toBe(0.2);
   });
 
   it("counts admissions inside one tick so two tickets cannot jointly breach", () => {
-    const plan = planAdmissions([buy("VUSA.L", 800), buy("VUSA.L", 800)], {
+    const plan = planAdmissions([buy("VUSA.L", 1_200), buy("VUSA.L", 1_200)], {
       ...base,
       positionExposureBase: {},
     });

@@ -36,10 +36,10 @@ describe("position cap", () => {
     diversifiedFund,
   });
 
-  it("blocks a single name above 15% of NAV", () => {
+  it("blocks a single name above 20% of NAV", () => {
     const plan = planAdmissions([candidate("BP.L", false)], {
       ...base,
-      positionExposureBase: { "BP.L": 900 },
+      positionExposureBase: { "BP.L": 1_300 },
     });
     const d = plan.decisions[0]!;
     expect(d.kind).toBe("skip");

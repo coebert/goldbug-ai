@@ -33,7 +33,7 @@ describe("ConcentrationAlertCard", () => {
   it("prompts a trim when a holding breaches the cap", () => {
     const out = html(9962.32);
     expect(out).toContain("MKS:xlon");
-    expect(out).toContain("over your 15% single-holding cap");
+    expect(out).toContain("over your 20% single-holding cap");
     expect(out).toMatch(/Trim \d+%/);
     expect(out).toContain("Expected impact on risk");
     // HSBA (~3.7%) and VUSA (~22.9%)… VUSA also breaches, MKS is listed first.
