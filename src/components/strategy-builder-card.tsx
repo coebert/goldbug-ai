@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { POLL, qk } from "@/lib/query-keys";
 import {
-import { POLL } from "@/lib/query-keys";
   listStrategies,
   saveStrategy,
   deleteStrategy,
