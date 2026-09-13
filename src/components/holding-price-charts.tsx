@@ -17,6 +17,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatUk } from "@/lib/uk-time";
+import {
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+  TOOLTIP_WRAPPER_STYLE,
+} from "@/lib/chart-palette";
 
 export type HoldingChartSeries = {
   symbol: string;
