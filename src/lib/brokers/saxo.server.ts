@@ -760,6 +760,7 @@ export class SaxoAdapter implements BrokerAdapter {
   ): Promise<Array<{
     date: string; open: number; high: number; low: number; close: number; volume: number;
   }>> {
+    if (this.chartUnsupported) return [];
     const inst = await this.lookupUic(symbol);
     const count = Math.min(1200, Math.max(1, Math.round(opts.count)));
     const query: Record<string, string | number> = {
