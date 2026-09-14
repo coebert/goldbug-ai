@@ -130,6 +130,25 @@ export async function loadDailyReportEquity(params: {
   const today = rows.find((r) => r.date === date) ?? null;
   if (!today) return emptyEquity(currency);
 
+  // `daily_equity_changes` is written once per day and can lag the valuation
+  // snapshot that every other screen reads (the snapshot is re-written on each
+  // broker sync as prices move). Where both exist for the same date, the
+  // snapshot wins so the report headline matches the portfolio card exactly.
+  const sameDaySnapshot = (snapRes.data ?? []).find(
+    (s) => String(s.snapshot_date) === date,
+  );
+  if (sameDaySnapshot) {
+    const snapEquity = num(sameDaySnapshot.total_value);
+    if (snapEquity > 0 && Math.abs(snapEquity - today.equity) > 0.01) {
+      today.equity = snapEquity;
+      today.pnl = Math.round((snapEquity - today.prevEquity - today.netFlow) * 100) / 100;
+      today.pct =
+        today.prevEquity > 0
+          ? ((snapEquity - today.netFlow) / today.prevEquity - 1) * 100
+          : null;
+    }
+  }
+
   // --- FX rates for anything not already in the base currency -----------
   const holdings = (holdingsRes.data ?? []).filter((h) => Number(h.quantity));
   const { loadFxRates } = await import("./valuation/value-holdings.server");
