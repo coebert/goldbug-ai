@@ -63,6 +63,8 @@ export type DailyReportPortfolio = {
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
   fxLegs: DailyReportFxLeg[];
+  /** Why the account's value moved, and how the engine is reacting to it. */
+  equity: DailyReportEquity;
 };
 
 export type DailyReport = {
