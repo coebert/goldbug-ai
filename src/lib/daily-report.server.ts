@@ -200,20 +200,43 @@ async function narrate(
       note: "notional already sits in cash; only the unrealised P&L changes the account value",
     })),
     engine_run_note: p.runExplanation?.slice(0, 400) ?? null,
+    account_value_change: p.equity?.hasData
+      ? {
+          account_value: p.equity.equity,
+          day: p.equity.day,
+          week: p.equity.week,
+          month: p.equity.month,
+          split: p.equity.split,
+          helped_most: p.equity.helped,
+          hurt_most: p.equity.hurt,
+          persistence: {
+            direction: p.equity.persistence.direction,
+            run_length_days: p.equity.persistence.runLengthDays,
+            typical_daily_move_pct: p.equity.persistence.dailyVolPct,
+            biggest_mover_share_pct: p.equity.persistence.concentrationPct,
+            regime: p.equity.persistence.regime,
+            verdict: p.equity.persistence.verdict,
+          },
+          how_the_engine_reacts: p.equity.reaction,
+          note: "day/week/month figures already have deposits and withdrawals removed",
+        }
+      : null,
   };
 
   const prompt = `You are writing the end-of-day report for a non-technical private investor who owns this automated trading account.
 
-Write 3-5 short sentences of plain English. No markdown, no bullet points, no headings, no financial advice or predictions.
+Write 6-9 short sentences of plain English. No markdown, no bullet points, no headings, no financial advice.
 
 Cover, in this order:
-1. What the AI considered today, in scale terms.
-2. Each buy and sell it made and the actual reason given.
-3. Any open currency (FX) funding leg: its direction, the rate it was entered at versus now, and whether it is currently up or down. Say plainly that its cash is already counted so only that profit or loss matters.
-4. The most notable things it deliberately passed on and why (guardrails, costs, weak signal, broker refusal).
-5. One sentence on what that means for the money sitting in the account.
+1. How much the account is worth, how much it moved today and over the past week and month, and that money paid in or taken out is already removed.
+2. What drove that move: holdings versus currency hedge legs versus broker charges, naming the holdings that helped and hurt most with their amounts.
+3. Whether this pattern looks likely to continue, using only the persistence evidence given (how many days the run has lasted, the typical daily move, how concentrated the move is, the recorded market regime). Frame it as a likelihood, never a promise, and say plainly when there is not enough history.
+4. How the AI is reacting to that change in value: distance from its stop-buying drawdown level, cash still uninvested versus its per-position target, the daily spending limit, any halt, and any tightened stop on a losing holding.
+5. What the AI considered today, in scale terms, and each buy and sell it made with the actual reason given.
+6. Any open currency (FX) funding leg: direction, entry rate versus now, up or down. Say plainly that its cash is already counted so only that profit or loss matters.
+7. The most notable things it deliberately passed on and why (guardrails, costs, weak signal, broker refusal).
 
-Only use the facts below. If a reason is missing, say the reason was not recorded rather than inventing one.
+Only use the facts below. If a reason or figure is missing, say so rather than inventing one.
 
 Data (JSON):
 ${JSON.stringify(payload)}
