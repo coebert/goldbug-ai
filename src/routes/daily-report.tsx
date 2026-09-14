@@ -137,6 +137,180 @@ function FxLegSection({ legs, portfolioId }: { legs: DailyReportFxLeg[]; portfol
   );
 }
 
+function MoverRow({ mover, currency }: { mover: EquityMover; currency: string }) {
+  const up = mover.contribution >= 0;
+  return (
+    <li className="flex items-center justify-between gap-2 text-xs">
+      <span className="font-medium">{mover.symbol}</span>
+      <span className={cn("tabular-nums", up ? "text-emerald-500" : "text-rose-400")}>
+        {up ? "+" : "−"}
+        {money(Math.abs(mover.contribution), currency)}
+        {mover.pricePct != null && (
+          <span className="ml-1 text-muted-foreground">
+            ({mover.pricePct >= 0 ? "+" : "−"}
+            {Math.abs(mover.pricePct).toFixed(2)}%)
+          </span>
+        )}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Why the account is worth more (or less) than it was, what drove it, whether
+ * that looks likely to persist, and the limits the move already feeds.
+ */
+function EquitySection({ equity }: { equity: DailyReportEquity }) {
+  if (!equity?.hasData || !equity.day) {
+    return (
+      <p className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
+        No measured change in account value was recorded for this date.
+      </p>
+    );
+  }
+  const ccy = equity.currency;
+  const up = equity.day.pnl >= 0;
+  const r = equity.reaction;
+
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Why the account value moved
+      </h3>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <div className="text-[11px] text-muted-foreground">Account value</div>
+          <div className="text-sm font-semibold tabular-nums">{money(equity.equity, ccy)}</div>
+        </div>
+        <div>
+          <div className="text-[11px] text-muted-foreground">Today</div>
+          <div
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              up ? "text-emerald-500" : "text-rose-400",
+            )}
+          >
+            {up ? "+" : "−"}
+            {money(Math.abs(equity.day.pnl), ccy)}
+            {equity.day.pct != null && (
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                ({equity.day.pct >= 0 ? "+" : "−"}
+                {Math.abs(equity.day.pct).toFixed(2)}%)
+              </span>
+            )}
+          </div>
+        </div>
+        {equity.week && (
+          <div>
+            <div className="text-[11px] text-muted-foreground">Past week</div>
+            <div className="text-sm font-semibold tabular-nums">
+              {equity.week.pnl >= 0 ? "+" : "−"}
+              {money(Math.abs(equity.week.pnl), ccy)}
+            </div>
+          </div>
+        )}
+        {equity.month && (
+          <div>
+            <div className="text-[11px] text-muted-foreground">Past month</div>
+            <div className="text-sm font-semibold tabular-nums">
+              {equity.month.pnl >= 0 ? "+" : "−"}
+              {money(Math.abs(equity.month.pnl), ccy)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {equity.split.positions != null && (
+          <Badge variant="outline" className="text-[10px]">
+            Holdings {equity.split.positions >= 0 ? "+" : "−"}
+            {money(Math.abs(equity.split.positions), ccy)}
+          </Badge>
+        )}
+        {equity.split.fxLegs != null && equity.split.fxLegs !== 0 && (
+          <Badge variant="outline" className="text-[10px]">
+            Currency legs {equity.split.fxLegs >= 0 ? "+" : "−"}
+            {money(Math.abs(equity.split.fxLegs), ccy)}
+          </Badge>
+        )}
+        {equity.split.fees != null && equity.split.fees !== 0 && (
+          <Badge variant="outline" className="text-[10px]">
+            Charges {money(equity.split.fees, ccy)}
+          </Badge>
+        )}
+      </div>
+
+      {(equity.helped.length > 0 || equity.hurt.length > 0) && (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {equity.helped.length > 0 && (
+            <div>
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Helped most</div>
+              <ul className="space-y-1">
+                {equity.helped.map((m) => (
+                  <MoverRow key={m.symbol} mover={m} currency={ccy} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {equity.hurt.length > 0 && (
+            <div>
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Hurt most</div>
+              <ul className="space-y-1">
+                {equity.hurt.map((m) => (
+                  <MoverRow key={m.symbol} mover={m} currency={ccy} />
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 space-y-1">
+        <div className="text-[11px] font-medium text-muted-foreground">
+          Is this likely to continue?
+        </div>
+        <p className="text-xs leading-relaxed">{equity.persistence.text}</p>
+      </div>
+
+      <div className="mt-3 space-y-1">
+        <div className="text-[11px] font-medium text-muted-foreground">How the AI is reacting</div>
+        <ul className="space-y-0.5 text-xs leading-relaxed text-muted-foreground">
+          {r.drawdownPct != null && (
+            <li>
+              {r.drawdownPct.toFixed(2)}% below its best-ever value
+              {r.drawdownLimitPct != null
+                ? ` — it stops buying altogether at ${r.drawdownLimitPct.toFixed(1)}%`
+                : ""}
+              .
+            </li>
+          )}
+          {r.cashPct != null && (
+            <li>
+              {r.cashPct.toFixed(0)}% of the account is still in cash
+              {r.targetPerNamePct != null
+                ? `, and each new position is sized towards ${r.targetPerNamePct.toFixed(0)}% of the account`
+                : ""}
+              .
+            </li>
+          )}
+          {r.dailyNotionalLimit != null && (
+            <li>It may spend at most {money(r.dailyNotionalLimit, ccy)} in a single day.</li>
+          )}
+          {r.haltActive && (
+            <li className="text-amber-500">
+              New buying is currently halted{r.haltReason ? ` — ${r.haltReason}` : ""}.
+            </li>
+          )}
+          {r.notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function ItemRow({
   item,
   currency,
