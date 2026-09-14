@@ -488,7 +488,18 @@ function DailyReportPage() {
           </Button>
         </div>
 
-        {query.isLoading && <div className="h-40 animate-pulse rounded-lg bg-muted" aria-hidden />}
+        {signedIn === false && (
+          <p className="text-sm text-muted-foreground">
+            Sign in to see your daily report.{" "}
+            <Link to="/auth" className="text-primary underline">
+              Sign in
+            </Link>
+          </p>
+        )}
+
+        {(signedIn === null || query.isLoading) && signedIn !== false && (
+          <div className="h-40 animate-pulse rounded-lg bg-muted" aria-hidden />
+        )}
         {query.error && (
           <p className="text-sm text-destructive">
             Couldn't build the report: {(query.error as Error).message}
