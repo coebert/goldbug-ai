@@ -95,6 +95,7 @@ function money(n: number | null, ccy: string): string {
 }
 
 export function buildDeterministicNarrative(p: {
+  equity?: DailyReportEquity;
   name: string;
   currency: string;
   considered: number;
