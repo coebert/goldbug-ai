@@ -22,6 +22,7 @@ import {
   type DailyReportFxLeg,
   type DailyReportItem,
 } from "@/lib/daily-report.functions";
+import type { DailyReportEquity, EquityMover } from "@/lib/daily-report-equity";
 import { cn } from "@/lib/utils";
 
 const TITLE = "Daily AI report — Aegis";
