@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AppHeader } from "@/components/app-header";
@@ -419,11 +420,29 @@ function Section({
 function DailyReportPage() {
   const [date, setDate] = useState(todayIso());
   const fetchReport = useServerFn(getDailyAiReport);
+  // The report is owner-scoped, so only ask for it once a session exists —
+  // otherwise the server function throws "no authorization header".
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSignedIn(Boolean(data.session));
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSignedIn(Boolean(session));
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   const query = useQuery({
     queryKey: ["daily-ai-report", date],
     queryFn: () => fetchReport({ data: { date } }),
     staleTime: 5 * 60_000,
+    enabled: signedIn === true,
   });
 
   return (
@@ -469,7 +488,18 @@ function DailyReportPage() {
           </Button>
         </div>
 
-        {query.isLoading && <div className="h-40 animate-pulse rounded-lg bg-muted" aria-hidden />}
+        {signedIn === false && (
+          <p className="text-sm text-muted-foreground">
+            Sign in to see your daily report.{" "}
+            <Link to="/auth" className="text-primary underline">
+              Sign in
+            </Link>
+          </p>
+        )}
+
+        {(signedIn === null || query.isLoading) && signedIn !== false && (
+          <div className="h-40 animate-pulse rounded-lg bg-muted" aria-hidden />
+        )}
         {query.error && (
           <p className="text-sm text-destructive">
             Couldn't build the report: {(query.error as Error).message}
