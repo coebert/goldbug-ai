@@ -419,11 +419,29 @@ function Section({
 function DailyReportPage() {
   const [date, setDate] = useState(todayIso());
   const fetchReport = useServerFn(getDailyAiReport);
+  // The report is owner-scoped, so only ask for it once a session exists —
+  // otherwise the server function throws "no authorization header".
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSignedIn(Boolean(data.session));
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSignedIn(Boolean(session));
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   const query = useQuery({
     queryKey: ["daily-ai-report", date],
     queryFn: () => fetchReport({ data: { date } }),
     staleTime: 5 * 60_000,
+    enabled: signedIn === true,
   });
 
   return (
