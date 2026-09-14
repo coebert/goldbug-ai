@@ -515,6 +515,8 @@ function DailyReportPage() {
                 </div>
               )}
 
+              <EquitySection equity={p.equity} />
+
               <FxLegSection legs={p.fxLegs} portfolioId={p.portfolioId} />
 
               {p.considered > 0 && <Separator />}
