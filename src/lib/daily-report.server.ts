@@ -333,8 +333,14 @@ export async function buildDailyReport(params: {
   }
 
   const runNoteByP = new Map<string, string>();
+  const regimeByP = new Map<string, string>();
   for (const d of decRes.data ?? []) {
     const pid = d.portfolio_id as string;
+    const rawRegime = (d.raw ?? {}) as { regime?: { regime?: unknown } | null };
+    const regimeName = rawRegime.regime?.regime;
+    if (typeof regimeName === "string" && regimeName && !regimeByP.has(pid)) {
+      regimeByP.set(pid, regimeName.replace(/_/g, " "));
+    }
     if (runNoteByP.has(pid)) continue;
     const raw = (d.raw ?? {}) as { plain_explanation?: unknown };
     const note =
