@@ -106,10 +106,13 @@ export function buildDeterministicNarrative(p: {
   passReasonCounts: Array<{ reason: string; count: number }>;
   fxLegs?: DailyReportFxLeg[];
 }): string {
+  const equityBit = p.equity?.hasData ? p.equity.summary : null;
   if (p.considered === 0) {
-    return `No AI decisions were recorded for ${p.name} on this date — the engine either did not run or found nothing in its universe to assess.`;
+    const none = `No AI decisions were recorded for ${p.name} on this date — the engine either did not run or found nothing in its universe to assess.`;
+    return equityBit ? `${equityBit} ${none}` : none;
   }
   const bits: string[] = [
+    ...(equityBit ? [equityBit] : []),
     `${p.name}: the AI looked at ${p.considered} asset${p.considered === 1 ? "" : "s"}.`,
   ];
   if (p.bought.length) {
