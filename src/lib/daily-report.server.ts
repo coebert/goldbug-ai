@@ -10,6 +10,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { labelBlock } from "./decision-summary.helpers";
+import { loadDailyReportEquity } from "./daily-report-equity.server";
+import type { DailyReportEquity } from "./daily-report-equity";
 import { holdingNativeValue, isFxLegHolding } from "./fx-leg-value";
 import { ukDayKey } from "./uk-time";
 
