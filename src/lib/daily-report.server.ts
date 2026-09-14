@@ -432,6 +432,13 @@ export async function buildDailyReport(params: {
       passed,
       passReasonCounts,
       fxLegs: fxByP.get(pid) ?? [],
+      equity: await loadDailyReportEquity({
+        db,
+        portfolioId: pid,
+        date,
+        currency,
+        regime: regimeByP.get(pid) ?? null,
+      }),
     };
     entry.narrative = buildDeterministicNarrative(entry);
     out.push(entry);
