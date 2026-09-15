@@ -934,7 +934,8 @@ export function NewsReel() {
                                       <li key={`${inf.decision_id}-${i}`} className="rounded-sm bg-background/60 p-2 text-[11px]">
                                         <div className="mb-1 flex flex-wrap items-center gap-1.5">
                                           <span className="font-semibold text-foreground">{inf.portfolio_name}</span>
-                                          <span className="text-muted-foreground">· run {inf.run_date}</span>
+                                          <span className="text-muted-foreground">· run {formatUkDate(inf.run_date)}</span>
+                                          <RunReportLink runDate={inf.run_date} className="text-[10px]" />
                                           <Badge
                                             variant="outline"
                                             className={`ml-auto border-transparent text-[10px] ${impactCls}`}
