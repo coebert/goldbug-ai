@@ -41,6 +41,14 @@ export const Route = createFileRoute("/daily-report")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  // `?date=YYYY-MM-DD` lets other pages (e.g. the News reel) deep-link to the
+  // run that reacted to a given headline.
+  validateSearch: (search: Record<string, unknown>): { date?: string } => {
+    const d = typeof search.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.date)
+      ? search.date
+      : undefined;
+    return d ? { date: d } : {};
+  },
   component: DailyReportPage,
 });
 
