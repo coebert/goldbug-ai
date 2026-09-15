@@ -1080,7 +1080,7 @@ export async function runDailyTick(
   // Materiality gate: on a quiet tick (no meaningful price move, no change in
   // holdings/regime/cash, no new headlines) a fresh LLM opinion just re-buys
   // the previous "hold". Deterministic guardrails below still run in full.
-  const decisionHeadlines = scoredNews.slice(0, 15).map((n) => n.headline);
+  const decisionHeadlines = promptNews.slice(0, 15).map((n) => n.headline);
   const materiality = await (async () => {
     if (breakerTripped || allVenuesClosed) return null;
     try {
@@ -1324,7 +1324,7 @@ export async function runDailyTick(
         cashValue: cash,
         totalValue,
         features,
-        news: scoredNews.slice(0, 15).map((n) => ({
+        news: promptNews.slice(0, 15).map((n) => ({
           headline: n.headline,
           source: n.source,
           sentiment: n.sentiment,
@@ -3843,7 +3843,7 @@ export async function runDailyTick(
               : new Date().toISOString(),
           }
         : null,
-      news: scoredNews.slice(0, 12),
+      news: promptNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
         max_position_pct: basePerSymbolPct,
@@ -3984,7 +3984,7 @@ export async function runDailyTick(
             cashValue: cash,
             totalValue,
             features,
-            news: scoredNews.slice(0, 15).map((n) => ({
+            news: promptNews.slice(0, 15).map((n) => ({
               headline: n.headline, source: n.source, sentiment: n.sentiment,
             })),
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
