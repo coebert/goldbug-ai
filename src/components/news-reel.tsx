@@ -1182,12 +1182,9 @@ export function NewsReel() {
                         {item.influences.slice(0, 4).map((inf, i) => (
                           <li key={i} className="flex flex-wrap items-center gap-1.5">
                             <span className="text-foreground">{inf.portfolio_name}</span>
-                            <span>· {inf.run_date}</span>
-                            {inf.actions.length > 0 && (
-                              <span className="text-foreground">
-                                · {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
-                              </span>
-                            )}
+                            <span>· {formatUkDate(inf.run_date)}</span>
+                            <span className="text-foreground">· {adjustedSummary(inf.actions)}</span>
+                            <RunReportLink runDate={inf.run_date} />
                             {inf.impact_pct != null && (
                               <span className="ml-auto text-primary">{inf.impact_pct.toFixed(1)}%</span>
                             )}
