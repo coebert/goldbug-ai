@@ -7,7 +7,8 @@ import { getGlobalNewsReel, refreshGlobalNews } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TranslationBadge } from "@/components/translation-badge";
-import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
+import { Link } from "@tanstack/react-router";
+import { formatUkDate, formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
@@ -65,6 +66,31 @@ function credibilityFor(source: string | null | undefined) {
     : hit.tier === "low" ? "text-destructive bg-destructive/10"
     : "text-foreground bg-muted";
   return { tier: hit.tier, score: hit.score, label: `Credibility ${hit.score}`, cls };
+}
+
+/** Deep-link to the AI report for the run that reacted to a headline. */
+function RunReportLink({ runDate, className = "" }: { runDate: string; className?: string }) {
+  return (
+    <Link
+      to="/daily-report"
+      search={{ date: runDate }}
+      onClick={(e) => e.stopPropagation()}
+      className={`inline-flex items-center gap-0.5 font-medium text-primary hover:underline ${className}`}
+      title={`Open the AI report for ${runDate}`}
+    >
+      Report
+      <ExternalLink className="h-2.5 w-2.5" />
+    </Link>
+  );
+}
+
+/** "BUY NVDA ×4, SELL VWRL" — the holdings a run actually adjusted. */
+function adjustedSummary(actions: Array<{ action: string; symbol: string; qty?: number | null }>): string {
+  if (actions.length === 0) return "no holdings adjusted";
+  return actions
+    .slice(0, 4)
+    .map((a) => `${a.action.toUpperCase()} ${a.symbol}${a.qty != null ? ` ×${a.qty}` : ""}`)
+    .join(", ");
 }
 
 function recencyFor(dateStr: string | null | undefined, now: number) {
@@ -708,7 +734,7 @@ export function NewsReel() {
                   <Fragment key={`${item.id}-${idx}`}>
                     {showDayHeader && item.date && (
                       <li className="sticky top-0 z-10 -mx-2 mb-2 border-y border-border bg-card/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
-                        {item.date}
+                        {formatUkDate(item.date)}
                       </li>
                     )}
                   <li
@@ -729,7 +755,9 @@ export function NewsReel() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                          <span>{item.date}</span>
+                          <span title={item.fetched_at ? formatUkDateTime(item.fetched_at) : item.date}>
+                            {formatUkDate(item.date)}
+                          </span>
                           {item.source && (
                             item.url ? (
                               <a
@@ -908,7 +936,8 @@ export function NewsReel() {
                                       <li key={`${inf.decision_id}-${i}`} className="rounded-sm bg-background/60 p-2 text-[11px]">
                                         <div className="mb-1 flex flex-wrap items-center gap-1.5">
                                           <span className="font-semibold text-foreground">{inf.portfolio_name}</span>
-                                          <span className="text-muted-foreground">· run {inf.run_date}</span>
+                                          <span className="text-muted-foreground">· run {formatUkDate(inf.run_date)}</span>
+                                          <RunReportLink runDate={inf.run_date} className="text-[10px]" />
                                           <Badge
                                             variant="outline"
                                             className={`ml-auto border-transparent text-[10px] ${impactCls}`}
@@ -973,14 +1002,11 @@ export function NewsReel() {
                                   {item.influences.slice(0, 4).map((inf, i) => (
                                     <span
                                       key={i}
-                                      className="rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                      className="inline-flex flex-wrap items-center gap-1 rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
                                     >
-                                      {inf.portfolio_name} · {inf.run_date}
-                                      {inf.actions.length > 0 && (
-                                        <span className="ml-1 text-foreground">
-                                          {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
-                                        </span>
-                                      )}
+                                      <span>{inf.portfolio_name} · {formatUkDate(inf.run_date)}</span>
+                                      <span className="text-foreground">{adjustedSummary(inf.actions)}</span>
+                                      <RunReportLink runDate={inf.run_date} />
                                     </span>
                                   ))}
                                 </div>
@@ -1057,7 +1083,7 @@ export function NewsReel() {
                 <DialogHeader>
                   <DialogTitle className="text-base leading-snug">{item.headline}</DialogTitle>
                   <DialogDescription>
-                    {item.source ? `${item.source} · ` : ""}{item.date} · {rec.ageLabel}
+                    {item.source ? `${item.source} · ` : ""}{formatUkDate(item.date)} · {rec.ageLabel}
                   </DialogDescription>
                   <TranslationBadge
                     originalLanguage={item.original_language}
@@ -1158,12 +1184,9 @@ export function NewsReel() {
                         {item.influences.slice(0, 4).map((inf, i) => (
                           <li key={i} className="flex flex-wrap items-center gap-1.5">
                             <span className="text-foreground">{inf.portfolio_name}</span>
-                            <span>· {inf.run_date}</span>
-                            {inf.actions.length > 0 && (
-                              <span className="text-foreground">
-                                · {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
-                              </span>
-                            )}
+                            <span>· {formatUkDate(inf.run_date)}</span>
+                            <span className="text-foreground">· {adjustedSummary(inf.actions)}</span>
+                            <RunReportLink runDate={inf.run_date} />
                             {inf.impact_pct != null && (
                               <span className="ml-auto text-primary">{inf.impact_pct.toFixed(1)}%</span>
                             )}
