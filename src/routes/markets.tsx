@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
-import { ChartNoAxesCombined, GitCompare, Network, Radar, Target } from "lucide-react";
+import { ChartNoAxesCombined, GitCompare, Network, Newspaper, Radar, Target } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { PageShell, PageSection } from "@/components/layout/page-shell";
 import { SectionIndex } from "@/components/nav/section-index";
@@ -15,17 +15,8 @@ const SmaTrendCard = lazy(() =>
 const MarketHoursCard = lazy(() =>
   import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
 );
-const NewsReel = lazy(() =>
-  import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
-);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
-);
-const ExecPostsCard = lazy(() =>
-  import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
-);
-const PolicyMakersCard = lazy(() =>
-  import("@/components/policy-makers-card").then((m) => ({ default: m.PolicyMakersCard })),
 );
 
 export const Route = createFileRoute("/markets")({
@@ -70,6 +61,12 @@ function MarketsPage() {
         purpose="The state of the wider market — read this before judging your own numbers."
         actions={
           <>
+            <Link
+              to="/news"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
+            >
+              <Newspaper className="h-4 w-4 text-primary" aria-hidden /> News
+            </Link>
             <Link
               to="/compare"
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 text-sm tween hover:bg-surface-3"
@@ -136,19 +133,14 @@ function MarketsPage() {
         <PageSection
           id="intel"
           title="What the AI is reading"
-          description="The headlines, executive posts and policy remarks feeding this hour's decisions."
+          description="Headlines, executive posts and policy remarks now live on their own page, alongside the decisions they fed."
         >
-          <div className="space-y-4">
-            <Suspense fallback={fallback("h-80")}>
-              <NewsReel />
-            </Suspense>
-            <Suspense fallback={fallback("h-64")}>
-              <ExecPostsCard />
-            </Suspense>
-            <Suspense fallback={fallback("h-64")}>
-              <PolicyMakersCard />
-            </Suspense>
-          </div>
+          <Link
+            to="/news"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-4 text-sm tween hover:bg-surface-3"
+          >
+            <Newspaper className="h-4 w-4 text-primary" aria-hidden /> Open the news page
+          </Link>
         </PageSection>
       </PageShell>
     </div>
