@@ -755,7 +755,9 @@ export function NewsReel() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                          <span>{item.date}</span>
+                          <span title={item.fetched_at ? formatUkDateTime(item.fetched_at) : item.date}>
+                            {formatUkDate(item.date)}
+                          </span>
                           {item.source && (
                             item.url ? (
                               <a
