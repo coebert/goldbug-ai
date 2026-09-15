@@ -1083,7 +1083,7 @@ export function NewsReel() {
                 <DialogHeader>
                   <DialogTitle className="text-base leading-snug">{item.headline}</DialogTitle>
                   <DialogDescription>
-                    {item.source ? `${item.source} · ` : ""}{item.date} · {rec.ageLabel}
+                    {item.source ? `${item.source} · ` : ""}{formatUkDate(item.date)} · {rec.ageLabel}
                   </DialogDescription>
                   <TranslationBadge
                     originalLanguage={item.original_language}
