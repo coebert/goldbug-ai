@@ -68,6 +68,31 @@ function credibilityFor(source: string | null | undefined) {
   return { tier: hit.tier, score: hit.score, label: `Credibility ${hit.score}`, cls };
 }
 
+/** Deep-link to the AI report for the run that reacted to a headline. */
+function RunReportLink({ runDate, className = "" }: { runDate: string; className?: string }) {
+  return (
+    <Link
+      to="/daily-report"
+      search={{ date: runDate }}
+      onClick={(e) => e.stopPropagation()}
+      className={`inline-flex items-center gap-0.5 font-medium text-primary hover:underline ${className}`}
+      title={`Open the AI report for ${runDate}`}
+    >
+      Report
+      <ExternalLink className="h-2.5 w-2.5" />
+    </Link>
+  );
+}
+
+/** "BUY NVDA ×4, SELL VWRL" — the holdings a run actually adjusted. */
+function adjustedSummary(actions: Array<{ action: string; symbol: string; qty?: number | null }>): string {
+  if (actions.length === 0) return "no holdings adjusted";
+  return actions
+    .slice(0, 4)
+    .map((a) => `${a.action.toUpperCase()} ${a.symbol}${a.qty != null ? ` ×${a.qty}` : ""}`)
+    .join(", ");
+}
+
 function recencyFor(dateStr: string | null | undefined, now: number) {
   if (!dateStr) return { score: 0, label: "Recency n/a", ageLabel: "unknown", cls: "text-muted-foreground bg-muted" };
   const t = Date.parse(dateStr);
