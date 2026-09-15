@@ -599,6 +599,37 @@ export async function runDailyTick(
     loadScoredNewsWindow(asOf, 8),
   ).catch(() => [] as Awaited<ReturnType<typeof loadScoredNewsWindow>>);
 
+  // Headlines the decision AI actually reads.
+  //
+  // Hourly/daily ticks run with `skipNews: true` (fetching + LLM-scoring the
+  // wire inside the tick is slow and expensive; a dedicated cron does it).
+  // That left `scoredNews` empty, so the decision prompt — and the materiality
+  // gate's "fresh news" test — saw no headlines at all, even on days when the
+  // cache was full of market-moving coverage. Fall back to the already-scored
+  // rolling window (cache read only, no extra LLM cost): most recent first,
+  // strongest sentiment tie-broken, so big stories still reach the model.
+  const promptNews: Array<{ headline: string; source: string | null; sentiment: number | null; date: string | null }> =
+    scoredNews.length > 0
+      ? scoredNews.map((n) => ({
+          headline: n.headline,
+          source: n.source ?? null,
+          sentiment: n.sentiment ?? null,
+          date: (n as { date?: string | null }).date ?? asOf,
+        }))
+      : [...scoredWindow]
+          .sort(
+            (a, b) =>
+              b.news_date.localeCompare(a.news_date) ||
+              Math.abs(b.sentiment ?? 0) - Math.abs(a.sentiment ?? 0),
+          )
+          .slice(0, 20)
+          .map((n) => ({
+            headline: n.headline,
+            source: n.source ?? null,
+            sentiment: n.sentiment ?? null,
+            date: n.news_date,
+          }));
+
   // Tracked CEO/founder social posts (Musk & co.) reported by the wires.
   // These move tickers faster than ordinary coverage, so they get a small,
   // bounded nudge on top of the standard news sentiment.
