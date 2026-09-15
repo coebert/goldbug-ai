@@ -426,7 +426,11 @@ function Section({
 }
 
 function DailyReportPage() {
-  const [date, setDate] = useState(todayIso());
+  const search = Route.useSearch();
+  const [date, setDate] = useState(search.date ?? todayIso());
+  useEffect(() => {
+    if (search.date) setDate(search.date);
+  }, [search.date]);
   const fetchReport = useServerFn(getDailyAiReport);
   // The report is owner-scoped, so only ask for it once a session exists —
   // otherwise the server function throws "no authorization header".
