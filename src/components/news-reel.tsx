@@ -999,14 +999,11 @@ export function NewsReel() {
                                   {item.influences.slice(0, 4).map((inf, i) => (
                                     <span
                                       key={i}
-                                      className="rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                      className="inline-flex flex-wrap items-center gap-1 rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
                                     >
-                                      {inf.portfolio_name} · {inf.run_date}
-                                      {inf.actions.length > 0 && (
-                                        <span className="ml-1 text-foreground">
-                                          {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
-                                        </span>
-                                      )}
+                                      <span>{inf.portfolio_name} · {formatUkDate(inf.run_date)}</span>
+                                      <span className="text-foreground">{adjustedSummary(inf.actions)}</span>
+                                      <RunReportLink runDate={inf.run_date} />
                                     </span>
                                   ))}
                                 </div>
