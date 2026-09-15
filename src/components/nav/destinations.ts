@@ -9,6 +9,7 @@ import {
   Wrench,
   GitCompare,
   Network,
+  Newspaper,
   BookOpen,
   Brain,
   Sparkles,
@@ -131,6 +132,14 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     icon: Target,
     area: "markets",
     keywords: "global fills missed execution gaps markets",
+  },
+  {
+    to: "/news",
+    label: "News",
+    hint: "Latest headlines and how the AI's decisions reacted to them.",
+    icon: Newspaper,
+    area: "markets",
+    keywords: "news headlines reel sentiment stories press",
   },
   {
     to: "/spillover",
