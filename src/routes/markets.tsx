@@ -12,6 +12,9 @@ const MarketPulseCard = lazy(() =>
 const SmaTrendCard = lazy(() =>
   import("@/components/home/sma-trend-card").then((m) => ({ default: m.SmaTrendCard })),
 );
+const InflationCard = lazy(() =>
+  import("@/components/inflation-card").then((m) => ({ default: m.InflationCard })),
+);
 const MarketHoursCard = lazy(() =>
   import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
 );
