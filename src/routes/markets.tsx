@@ -21,6 +21,9 @@ const MarketHoursCard = lazy(() =>
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
 );
+const PriceFeedStatusCard = lazy(() =>
+  import("@/components/price-feed-status-card").then((m) => ({ default: m.PriceFeedStatusCard })),
+);
 
 export const Route = createFileRoute("/markets")({
   ssr: false,
