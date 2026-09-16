@@ -40,8 +40,20 @@ async function closeBody(res: Response): Promise<void> {
  * the FX leg/stress/backtest paths and 404 forever, silently serving stale
  * cache — so normalise them here.
  */
+/**
+ * Tickers Yahoo has renamed/retired. These 404 on every fetch, which silently
+ * pins the symbol to its last cached close forever. Mapped here (feed layer
+ * only) so broker routing keeps using the tradable line unchanged.
+ */
+const YAHOO_FEED_ALIASES: Record<string, string> = {
+  "ROG.SW": "ROP.SW",   // Roche Holding participation cert. relisted as ROP.SW
+  "AIGB.L": "AIGC.L",   // WisdomTree Broad Commodities LSE line is AIGC.L
+};
+
 export function toYahooSymbol(symbol: string): string {
   const s = symbol.trim().toUpperCase();
+  const alias = YAHOO_FEED_ALIASES[s];
+  if (alias) return alias;
   if (/^[A-Z]{6}$/.test(s)) return `${s}=X`;
   return symbol;
 }
