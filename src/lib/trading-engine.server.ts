@@ -716,6 +716,20 @@ export async function runDailyTick(
     detectPolicyStatements(policyRows),
   )}\n${formatPolicyRegimeLine(policyRegime)}`;
 
+  // Hard inflation prints (UK, US, euro area, Japan, Australia). Policy-maker
+  // talk is what they say; CPI is what they are reacting to, so the decision
+  // prompt gets both. Fetched from public official sources and cached hourly,
+  // so this costs no AI credits.
+  const inflationSnapshot = await (async () => {
+    try {
+      const { getInflationSnapshot } = await import("./inflation.server");
+      return await getInflationSnapshot();
+    } catch {
+      return null;
+    }
+  })();
+  const inflationBlock = formatInflationBlock(inflationSnapshot);
+
 
   // Market-event ingestion: type today's + the rolling window's headlines into
   // dated events (earnings, guidance, M&A, rate decisions, tariffs, shocks) so
