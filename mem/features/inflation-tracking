@@ -1,0 +1,11 @@
+---
+name: Inflation tracking
+description: Official CPI year-on-year for UK/US/euro area/Germany/France/Japan/Australia fed into the decision prompt
+type: feature
+---
+- `src/lib/inflation.ts` (pure: targets, `readInflation`, bounded `inflationNudge` ±0.08, `formatInflationBlock`) and `src/lib/inflation.server.ts` (fetching).
+- Sources are keyless and free: OECD SDMX `DSD_PRICES` (`REF_AREA.M.N.CPI.PA._T.N.GY`) first, DBnomics mirror of IMF `CPI` (`PCPI_PC_CP_A_PT`) as gap-filler — Japan is absent from the OECD dataflow, so it comes from IMF.
+- Cached 1h via `market-context-cache.server.ts`; no AI credits.
+- Wired into the live decision prompt and the shadow-variant prompt in `trading-engine.server.ts`, appended after the policy-maker block.
+- UI: `InflationCard` on `/markets` (Conditions), via `getInflation` in `inflation.functions.ts`.
+- Targets: 2% everywhere except Australia 2.5% (RBA 2–3%).
