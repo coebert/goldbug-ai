@@ -233,6 +233,7 @@ export function aggregatedSentimentForSymbol(
 type ScoredCacheRow = {
   news_date: string;
   source: string | null;
+  url: string | null;
   headline: string;
   sentiment: number | null;
   entities: string[];
