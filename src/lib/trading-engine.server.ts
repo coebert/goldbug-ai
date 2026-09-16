@@ -41,6 +41,7 @@ import {
   weeklySnapshot,
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
+import { formatInflationBlock } from "./inflation";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
 import { classifyPanicSell } from "./fear-sell-guard";
 import { computeFearIndex, formatFearIndexBlock } from "./fear-index";
