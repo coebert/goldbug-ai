@@ -24,9 +24,9 @@ export function InflationCard() {
     <Card>
       <CardContent className="space-y-3 p-4">
         <SectionHeader
-          icon={<Gauge className="h-4 w-4 text-primary" aria-hidden />}
+          icon={Gauge}
           title="Inflation by market"
-          subtitle="Latest published consumer-price inflation, used by the AI when it judges the rate path."
+          description="Latest published consumer-price inflation, used by the AI when it judges the rate path."
         />
 
         {isLoading ? (
