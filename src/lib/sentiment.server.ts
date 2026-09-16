@@ -263,6 +263,7 @@ export async function loadScoredNewsWindow(
   return (data ?? []).map((r) => ({
     news_date: r.news_date as string,
     source: (r.source as string | null) ?? null,
+    url: ((r as { url?: string | null }).url as string | null) ?? null,
     headline: r.headline as string,
     sentiment: r.sentiment == null ? null : Number(r.sentiment),
     entities: Array.isArray(r.entities) ? (r.entities as string[]) : [],
