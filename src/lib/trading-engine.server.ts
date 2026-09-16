@@ -4010,7 +4010,7 @@ export async function runDailyTick(
               macroPlaybookBlock
                 ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
                 : marketEventsBlock
-            }\n\n${insiderBlock}`,
+            }\n\n${insiderBlock}\n\n${inflationBlock}`,
             events,
             cooling: coolingSymbols,
             asOf,
