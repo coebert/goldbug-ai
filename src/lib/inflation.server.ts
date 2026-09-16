@@ -81,6 +81,46 @@ async function fetchOecd(): Promise<Map<string, Series>> {
   return out;
 }
 
+/**
+ * OECD G20 price dataflow — carries the current monthly Japanese CPI prints
+ * that `DSD_PRICES` omits (Japan 404s there at every frequency).
+ */
+async function fetchOecdG20(): Promise<Map<string, Series>> {
+  const start = new Date();
+  start.setUTCMonth(start.getUTCMonth() - 26);
+  const startPeriod = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`;
+  const url =
+    `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_G20_PRICES@DF_G20_PRICES,1.0/` +
+    `JPN.M.N.CPI.PA._T.N.GY?startPeriod=${startPeriod}&dimensionAtObservation=AllDimensions&format=jsondata`;
+  const json = (await getJson(url)) as
+    | {
+        data?: {
+          structure?: { dimensions?: { observation?: { id: string; values: { id: string }[] }[] } };
+          dataSets?: { observations?: Record<string, (number | null)[]> }[];
+        };
+      }
+    | null;
+  const out = new Map<string, Series>();
+  const dims = json?.data?.structure?.dimensions?.observation;
+  const obs = json?.data?.dataSets?.[0]?.observations;
+  if (!dims || !obs) return out;
+  const order = dims.map((d) => d.id);
+  const timeIdx = order.indexOf("TIME_PERIOD");
+  if (timeIdx < 0) return out;
+  const timeVals = dims[timeIdx]!.values.map((v) => v.id);
+  const list: Series = [];
+  for (const [key, arr] of Object.entries(obs)) {
+    const parts = key.split(":").map((n) => Number(n));
+    const period = timeVals[parts[timeIdx] ?? -1];
+    const value = arr?.[0];
+    if (!period || typeof value !== "number" || !Number.isFinite(value)) continue;
+    list.push({ period, value });
+  }
+  list.sort((a, b) => a.period.localeCompare(b.period));
+  if (list.length > 0) out.set("JPN", list);
+  return out;
+}
+
 /** IMF CPI (via DBnomics) — fallback and gap-filler. */
 async function fetchImf(): Promise<Map<string, Series>> {
   const areas = AREAS.map((a) => a.imf);
