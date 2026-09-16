@@ -619,6 +619,8 @@ function DailyReportPage() {
 
               <FxLegSection legs={p.fxLegs} portfolioId={p.portfolioId} />
 
+              <NewsSection news={p.news} />
+
               {p.considered > 0 && <Separator />}
 
               {(
