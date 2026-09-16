@@ -255,7 +255,7 @@ export async function loadScoredNewsWindow(
   const startISO = start.toISOString().slice(0, 10);
   const { data } = await supabaseAdmin
     .from("news_cache")
-    .select("news_date, source, headline, sentiment, entities, source_weight")
+    .select("news_date, source, url, headline, sentiment, entities, source_weight")
     .gte("news_date", startISO)
     .lte("news_date", asOfISO)
     .not("sentiment", "is", null)
