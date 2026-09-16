@@ -5,10 +5,17 @@ import type {
   DailyReport,
   DailyReportFxLeg,
   DailyReportItem,
+  DailyReportNewsItem,
   DailyReportPortfolio,
 } from "./daily-report.server";
 
-export type { DailyReport, DailyReportFxLeg, DailyReportItem, DailyReportPortfolio };
+export type {
+  DailyReport,
+  DailyReportFxLeg,
+  DailyReportItem,
+  DailyReportNewsItem,
+  DailyReportPortfolio,
+};
 
 export const getDailyAiReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

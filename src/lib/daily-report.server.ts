@@ -48,6 +48,16 @@ export type DailyReportFxLeg = {
   notional: number | null;
 };
 
+/** A headline that was in front of the decision model on this run. */
+export type DailyReportNewsItem = {
+  headline: string;
+  source: string | null;
+  /** Link to the original article, resolved from the news cache when missing. */
+  url: string | null;
+  sentiment: number | null;
+  date: string | null;
+};
+
 export type DailyReportPortfolio = {
   portfolioId: string;
   name: string;
@@ -63,6 +73,8 @@ export type DailyReportPortfolio = {
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
   fxLegs: DailyReportFxLeg[];
+  /** Headlines this run read, strongest sentiment first. */
+  news: DailyReportNewsItem[];
   /** Why the account's value moved, and how the engine is reacting to it. */
   equity: DailyReportEquity;
 };
@@ -379,6 +391,66 @@ export async function buildDailyReport(params: {
     if (note) runNoteByP.set(pid, note);
   }
 
+  // Headlines the decision model actually read on this run. Older saved runs
+  // stored only headline/source/sentiment, so missing links are backfilled
+  // from the news cache by headline.
+  const newsByP = new Map<string, DailyReportNewsItem[]>();
+  for (const d of decRes.data ?? []) {
+    const pid = d.portfolio_id as string;
+    const raw = (d.raw ?? {}) as { news?: unknown };
+    if (!Array.isArray(raw.news)) continue;
+    const list = newsByP.get(pid) ?? [];
+    const seenHeadlines = new Set(list.map((n) => n.headline.toLowerCase()));
+    for (const n of raw.news as Array<Record<string, unknown>>) {
+      const headline = typeof n?.headline === "string" ? n.headline.trim() : "";
+      if (!headline || seenHeadlines.has(headline.toLowerCase())) continue;
+      seenHeadlines.add(headline.toLowerCase());
+      list.push({
+        headline,
+        source: typeof n.source === "string" ? n.source : null,
+        url: typeof n.url === "string" && n.url ? n.url : null,
+        sentiment: num(n.sentiment),
+        date: typeof n.date === "string" ? n.date : null,
+      });
+    }
+    newsByP.set(pid, list);
+  }
+  for (const [pid, list] of newsByP) {
+    list.sort((a, b) => Math.abs(b.sentiment ?? 0) - Math.abs(a.sentiment ?? 0));
+    newsByP.set(pid, list.slice(0, 10));
+  }
+  const missing = Array.from(
+    new Set(
+      Array.from(newsByP.values())
+        .flat()
+        .filter((n) => !n.url)
+        .map((n) => n.headline),
+    ),
+  ).slice(0, 120);
+  if (missing.length > 0) {
+    const urlByHeadline = new Map<string, string>();
+    for (let i = 0; i < missing.length; i += 60) {
+      const chunk = missing.slice(i, i + 60);
+      const { data } = await db
+        .from("news_cache")
+        .select("headline, url")
+        .in("headline", chunk)
+        .not("url", "is", null)
+        .limit(chunk.length * 3);
+      for (const row of data ?? []) {
+        const h = String((row as { headline: string }).headline).toLowerCase();
+        const u = (row as { url?: string | null }).url;
+        if (u && !urlByHeadline.has(h)) urlByHeadline.set(h, u);
+      }
+    }
+    for (const list of newsByP.values()) {
+      for (const n of list) {
+        if (!n.url) n.url = urlByHeadline.get(n.headline.toLowerCase()) ?? null;
+      }
+    }
+  }
+
+
   const out: DailyReportPortfolio[] = [];
 
   for (const p of portfolios) {
@@ -459,6 +531,7 @@ export async function buildDailyReport(params: {
       passed,
       passReasonCounts,
       fxLegs: fxByP.get(pid) ?? [],
+      news: newsByP.get(pid) ?? [],
       equity: await loadDailyReportEquity({
         db,
         portfolioId: pid,

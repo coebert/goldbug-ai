@@ -22,6 +22,7 @@ import {
   getDailyAiReport,
   type DailyReportFxLeg,
   type DailyReportItem,
+  type DailyReportNewsItem,
 } from "@/lib/daily-report.functions";
 import type { DailyReportEquity, EquityMover } from "@/lib/daily-report-equity";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,63 @@ function money(n: number | null, ccy: string): string {
  * sits in the cash wallet, so only the unrealised P&L is live equity. The
  * report says that in words and links straight to the holdings card.
  */
+function NewsSection({ news }: { news: DailyReportNewsItem[] }) {
+  if (news.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Headlines this run read
+        </h3>
+        <Link
+          to="/news"
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          All news
+          <ArrowUpRight className="h-3 w-3" />
+        </Link>
+      </div>
+      <ul className="space-y-2">
+        {news.map((n) => {
+          const tone = n.sentiment == null ? 0 : n.sentiment;
+          return (
+            <li key={n.headline} className="text-sm">
+              {n.url ? (
+                <a
+                  href={n.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary hover:underline"
+                >
+                  {n.headline}
+                </a>
+              ) : (
+                <span className="font-medium">{n.headline}</span>
+              )}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {n.source && <span>{n.source}</span>}
+                {n.date && <span>{formatUkDate(n.date.slice(0, 10))}</span>}
+                {n.sentiment != null && (
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      tone > 0.05 ? "text-emerald-500" : tone < -0.05 ? "text-rose-400" : "",
+                    )}
+                  >
+                    sentiment {tone > 0 ? "+" : ""}
+                    {tone.toFixed(2)}
+                  </span>
+                )}
+                {!n.url && <span>link unavailable for this saved run</span>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function FxLegSection({ legs, portfolioId }: { legs: DailyReportFxLeg[]; portfolioId: string }) {
   if (legs.length === 0) return null;
   return (
@@ -560,6 +618,8 @@ function DailyReportPage() {
               <EquitySection equity={p.equity} />
 
               <FxLegSection legs={p.fxLegs} portfolioId={p.portfolioId} />
+
+              <NewsSection news={p.news} />
 
               {p.considered > 0 && <Separator />}
 
