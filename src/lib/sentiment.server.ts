@@ -233,6 +233,7 @@ export function aggregatedSentimentForSymbol(
 type ScoredCacheRow = {
   news_date: string;
   source: string | null;
+  url: string | null;
   headline: string;
   sentiment: number | null;
   entities: string[];
@@ -254,7 +255,7 @@ export async function loadScoredNewsWindow(
   const startISO = start.toISOString().slice(0, 10);
   const { data } = await supabaseAdmin
     .from("news_cache")
-    .select("news_date, source, headline, sentiment, entities, source_weight")
+    .select("news_date, source, url, headline, sentiment, entities, source_weight")
     .gte("news_date", startISO)
     .lte("news_date", asOfISO)
     .not("sentiment", "is", null)
@@ -262,6 +263,7 @@ export async function loadScoredNewsWindow(
   return (data ?? []).map((r) => ({
     news_date: r.news_date as string,
     source: (r.source as string | null) ?? null,
+    url: ((r as { url?: string | null }).url as string | null) ?? null,
     headline: r.headline as string,
     sentiment: r.sentiment == null ? null : Number(r.sentiment),
     entities: Array.isArray(r.entities) ? (r.entities as string[]) : [],
