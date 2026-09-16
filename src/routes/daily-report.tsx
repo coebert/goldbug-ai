@@ -22,6 +22,7 @@ import {
   getDailyAiReport,
   type DailyReportFxLeg,
   type DailyReportItem,
+  type DailyReportNewsItem,
 } from "@/lib/daily-report.functions";
 import type { DailyReportEquity, EquityMover } from "@/lib/daily-report-equity";
 import { cn } from "@/lib/utils";
