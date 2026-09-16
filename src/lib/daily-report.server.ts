@@ -48,6 +48,16 @@ export type DailyReportFxLeg = {
   notional: number | null;
 };
 
+/** A headline that was in front of the decision model on this run. */
+export type DailyReportNewsItem = {
+  headline: string;
+  source: string | null;
+  /** Link to the original article, resolved from the news cache when missing. */
+  url: string | null;
+  sentiment: number | null;
+  date: string | null;
+};
+
 export type DailyReportPortfolio = {
   portfolioId: string;
   name: string;
@@ -63,6 +73,8 @@ export type DailyReportPortfolio = {
   passed: DailyReportItem[];
   passReasonCounts: Array<{ reason: string; count: number }>;
   fxLegs: DailyReportFxLeg[];
+  /** Headlines this run read, strongest sentiment first. */
+  news: DailyReportNewsItem[];
   /** Why the account's value moved, and how the engine is reacting to it. */
   equity: DailyReportEquity;
 };
