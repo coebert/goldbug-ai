@@ -609,11 +609,23 @@ export async function runDailyTick(
   // cache was full of market-moving coverage. Fall back to the already-scored
   // rolling window (cache read only, no extra LLM cost): most recent first,
   // strongest sentiment tie-broken, so big stories still reach the model.
-  const promptNews: Array<{ headline: string; source: string | null; sentiment: number | null; date: string | null }> =
+  // `url` and `source_weight` ride along: the persisted `raw.news` is what the
+  // News page links out to and weights influence by, so dropping them turned
+  // every cited headline into dead plain text and flattened impact shares.
+  const promptNews: Array<{
+    headline: string;
+    source: string | null;
+    url: string | null;
+    source_weight: number | null;
+    sentiment: number | null;
+    date: string | null;
+  }> =
     scoredNews.length > 0
       ? scoredNews.map((n) => ({
           headline: n.headline,
           source: n.source ?? null,
+          url: (n as { url?: string | null }).url ?? null,
+          source_weight: (n as { source_weight?: number | null }).source_weight ?? null,
           sentiment: n.sentiment ?? null,
           date: (n as { date?: string | null }).date ?? asOf,
         }))
@@ -627,6 +639,8 @@ export async function runDailyTick(
           .map((n) => ({
             headline: n.headline,
             source: n.source ?? null,
+            url: n.url ?? null,
+            source_weight: n.source_weight ?? null,
             sentiment: n.sentiment ?? null,
             date: n.news_date,
           }));
