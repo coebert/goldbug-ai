@@ -531,6 +531,7 @@ export async function buildDailyReport(params: {
       passed,
       passReasonCounts,
       fxLegs: fxByP.get(pid) ?? [],
+      news: newsByP.get(pid) ?? [],
       equity: await loadDailyReportEquity({
         db,
         portfolioId: pid,
