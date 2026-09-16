@@ -120,6 +120,9 @@ function MarketsPage() {
             <Suspense fallback={fallback("h-40")}>
               <MarketHoursCard />
             </Suspense>
+            <Suspense fallback={fallback("h-72")}>
+              <InflationCard />
+            </Suspense>
           </div>
         </PageSection>
 
