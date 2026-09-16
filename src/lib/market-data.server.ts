@@ -120,11 +120,38 @@ async function recordFeedStatus(
 }
 
 async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> {
+  const candidates = yahooSymbolCandidates(symbol);
+  let lastErr: unknown = null;
+  for (const feedSymbol of candidates) {
+    try {
+      const out = await fetchYahooDailyFor(symbol, feedSymbol, days);
+      resolvedFeedSymbol.set(symbol.trim().toUpperCase(), feedSymbol);
+      void recordFeedStatus(symbol, true, feedSymbol);
+      return out;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  resolvedFeedSymbol.delete(symbol.trim().toUpperCase());
+  void recordFeedStatus(
+    symbol,
+    false,
+    candidates[0] ?? null,
+    lastErr instanceof Error ? lastErr.message : String(lastErr),
+  );
+  throw lastErr instanceof Error ? lastErr : new Error(`Yahoo fetch failed for ${symbol}`);
+}
+
+async function fetchYahooDailyFor(
+  symbol: string,
+  feedSymbol: string,
+  days: number,
+): Promise<Candle[]> {
   // range picks: buffer to ensure we get `days` trading days back
   const range =
     days <= 30 ? "3mo" : days <= 180 ? "1y" : days <= 365 ? "2y" : days <= 1200 ? "5y" : "10y";
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    toYahooSymbol(symbol),
+    feedSymbol,
   )}?interval=1d&range=${range}`;
   const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
   const res = await runWithBreaker("yahoo", () =>
