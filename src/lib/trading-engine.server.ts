@@ -1352,7 +1352,7 @@ export async function runDailyTick(
         crossSectional: formatCrossSectionalBlock(rankMap),
         marketEvents: `${
           macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
-        }\n\n${insiderBlock}\n\n${policyBlock}\n\n${lossMemoryBlock}`,
+        }\n\n${insiderBlock}\n\n${policyBlock}\n\n${inflationBlock}\n\n${lossMemoryBlock}`,
         events,
         cooling: coolingSymbols,
         asOf,
