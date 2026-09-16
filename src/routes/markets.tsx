@@ -126,6 +126,9 @@ function MarketsPage() {
             <Suspense fallback={fallback("h-72")}>
               <InflationCard />
             </Suspense>
+            <Suspense fallback={fallback("h-40")}>
+              <PriceFeedStatusCard />
+            </Suspense>
           </div>
         </PageSection>
 
