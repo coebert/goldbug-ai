@@ -41,29 +41,117 @@ async function closeBody(res: Response): Promise<void> {
  * cache — so normalise them here.
  */
 /**
- * Tickers Yahoo has renamed/retired. These 404 on every fetch, which silently
- * pins the symbol to its last cached close forever. Mapped here (feed layer
- * only) so broker routing keeps using the tradable line unchanged.
+ * Tickers Yahoo has renamed/retired. A single alias is brittle (the feed can
+ * rename again), so each entry is an ordered candidate list: the fetcher tries
+ * them in turn and remembers whichever one answered. Feed layer only — broker
+ * routing keeps using the tradable line unchanged.
  */
-const YAHOO_FEED_ALIASES: Record<string, string> = {
-  "ROG.SW": "ROP.SW",   // Roche Holding participation cert. relisted as ROP.SW
-  "AIGB.L": "AIGC.L",   // WisdomTree Broad Commodities LSE line is AIGC.L
+const YAHOO_FEED_CANDIDATES: Record<string, string[]> = {
+  // Roche Holding participation cert.: ROG.SW/ROG.VX are retired, ROP.SW is
+  // the live Swiss line, RHHBY the US ADR as a last resort.
+  "ROG.SW": ["ROP.SW", "ROG.SW", "RHHBY"],
+  // WisdomTree Broad Commodities: the LSE line quotes as AIGC.L.
+  "AIGB.L": ["AIGC.L", "AIGB.L"],
 };
 
-export function toYahooSymbol(symbol: string): string {
+/** Feed symbol last known to answer, per app symbol. */
+const resolvedFeedSymbol = new Map<string, string>();
+
+/** Ordered feed symbols to try for an app symbol. */
+export function yahooSymbolCandidates(symbol: string): string[] {
   const s = symbol.trim().toUpperCase();
-  const alias = YAHOO_FEED_ALIASES[s];
-  if (alias) return alias;
-  if (/^[A-Z]{6}$/.test(s)) return `${s}=X`;
-  return symbol;
+  const mapped = YAHOO_FEED_CANDIDATES[s];
+  const base = mapped ?? [/^[A-Z]{6}$/.test(s) ? `${s}=X` : symbol];
+  const learned = resolvedFeedSymbol.get(s);
+  const ordered = learned ? [learned, ...base.filter((c) => c !== learned)] : base;
+  return Array.from(new Set(ordered));
+}
+
+export function toYahooSymbol(symbol: string): string {
+  return yahooSymbolCandidates(symbol)[0] ?? symbol;
+}
+
+/**
+ * Record whether a symbol is currently priced from the live feed or has fallen
+ * back to cache, so the UI can show it instead of silently serving stale data.
+ */
+async function recordFeedStatus(
+  symbol: string,
+  ok: boolean,
+  feedSymbol: string | null,
+  error?: string,
+): Promise<void> {
+  try {
+    if (ok) {
+      await supabaseAdmin.from("price_feed_status").upsert(
+        {
+          symbol,
+          feed_symbol: feedSymbol,
+          status: "ok",
+          last_ok_at: new Date().toISOString(),
+          last_error: null,
+          consecutive_failures: 0,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "symbol" },
+      );
+      return;
+    }
+    const { data: prev } = await supabaseAdmin
+      .from("price_feed_status")
+      .select("consecutive_failures,last_ok_at")
+      .eq("symbol", symbol)
+      .maybeSingle();
+    await supabaseAdmin.from("price_feed_status").upsert(
+      {
+        symbol,
+        feed_symbol: feedSymbol,
+        status: "fallback",
+        last_ok_at: prev?.last_ok_at ?? null,
+        last_error: (error ?? "feed unavailable").slice(0, 300),
+        consecutive_failures: (prev?.consecutive_failures ?? 0) + 1,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "symbol" },
+    );
+  } catch {
+    /* status reporting is best-effort */
+  }
 }
 
 async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> {
+  const candidates = yahooSymbolCandidates(symbol);
+  let lastErr: unknown = null;
+  for (const feedSymbol of candidates) {
+    try {
+      const out = await fetchYahooDailyFor(symbol, feedSymbol, days);
+      resolvedFeedSymbol.set(symbol.trim().toUpperCase(), feedSymbol);
+      void recordFeedStatus(symbol, true, feedSymbol);
+      return out;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  resolvedFeedSymbol.delete(symbol.trim().toUpperCase());
+  void recordFeedStatus(
+    symbol,
+    false,
+    candidates[0] ?? null,
+    lastErr instanceof Error ? lastErr.message : String(lastErr),
+  );
+  throw lastErr instanceof Error ? lastErr : new Error(`Yahoo fetch failed for ${symbol}`);
+}
+
+async function fetchYahooDailyFor(
+  symbol: string,
+  feedSymbol: string,
+  days: number,
+): Promise<Candle[]> {
   // range picks: buffer to ensure we get `days` trading days back
   const range =
     days <= 30 ? "3mo" : days <= 180 ? "1y" : days <= 365 ? "2y" : days <= 1200 ? "5y" : "10y";
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    toYahooSymbol(symbol),
+    feedSymbol,
   )}?interval=1d&range=${range}`;
   const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
   const res = await runWithBreaker("yahoo", () =>
@@ -592,7 +680,7 @@ export async function getDailyCandlesRange(
   const period1 = Math.floor(new Date(from).getTime() / 1000);
   const period2 = Math.floor(new Date(to).getTime() / 1000) + 86400;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    symbol,
+    toYahooSymbol(symbol),
   )}?interval=1d&period1=${period1}&period2=${period2}`;
   try {
     const { runWithBreaker } = await import("@/lib/_server/provider-circuit");

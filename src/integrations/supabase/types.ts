@@ -3010,6 +3010,36 @@ export type Database = {
         }
         Relationships: []
       }
+      price_feed_status: {
+        Row: {
+          consecutive_failures: number
+          feed_symbol: string | null
+          last_error: string | null
+          last_ok_at: string | null
+          status: string
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          feed_symbol?: string | null
+          last_error?: string | null
+          last_ok_at?: string | null
+          status?: string
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          feed_symbol?: string | null
+          last_error?: string | null
+          last_ok_at?: string | null
+          status?: string
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       price_intraday: {
         Row: {
           bucket_hour: string
