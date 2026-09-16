@@ -41,6 +41,7 @@ import {
   weeklySnapshot,
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
+import { formatInflationBlock } from "./inflation";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
 import { classifyPanicSell } from "./fear-sell-guard";
 import { computeFearIndex, formatFearIndexBlock } from "./fear-index";
@@ -716,6 +717,20 @@ export async function runDailyTick(
     detectPolicyStatements(policyRows),
   )}\n${formatPolicyRegimeLine(policyRegime)}`;
 
+  // Hard inflation prints (UK, US, euro area, Japan, Australia). Policy-maker
+  // talk is what they say; CPI is what they are reacting to, so the decision
+  // prompt gets both. Fetched from public official sources and cached hourly,
+  // so this costs no AI credits.
+  const inflationSnapshot = await (async () => {
+    try {
+      const { getInflationSnapshot } = await import("./inflation.server");
+      return await getInflationSnapshot();
+    } catch {
+      return null;
+    }
+  })();
+  const inflationBlock = formatInflationBlock(inflationSnapshot);
+
 
   // Market-event ingestion: type today's + the rolling window's headlines into
   // dated events (earnings, guidance, M&A, rate decisions, tariffs, shocks) so
@@ -1337,7 +1352,7 @@ export async function runDailyTick(
         crossSectional: formatCrossSectionalBlock(rankMap),
         marketEvents: `${
           macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
-        }\n\n${insiderBlock}\n\n${policyBlock}\n\n${lossMemoryBlock}`,
+        }\n\n${insiderBlock}\n\n${policyBlock}\n\n${inflationBlock}\n\n${lossMemoryBlock}`,
         events,
         cooling: coolingSymbols,
         asOf,
@@ -3995,7 +4010,7 @@ export async function runDailyTick(
               macroPlaybookBlock
                 ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
                 : marketEventsBlock
-            }\n\n${insiderBlock}`,
+            }\n\n${insiderBlock}\n\n${inflationBlock}`,
             events,
             cooling: coolingSymbols,
             asOf,
