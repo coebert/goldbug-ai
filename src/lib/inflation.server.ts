@@ -167,21 +167,20 @@ function pointFrom(spec: AreaSpec, series: Series | undefined, source: string): 
 }
 
 async function loadInflation(): Promise<InflationSnapshot> {
-  const [oecd, imf] = await Promise.all([
+  const [oecd, g20, imf] = await Promise.all([
     fetchOecd().catch(() => new Map<string, Series>()),
+    fetchOecdG20().catch(() => new Map<string, Series>()),
     fetchImf().catch(() => new Map<string, Series>()),
   ]);
   const points: InflationPoint[] = [];
   for (const spec of AREAS) {
-    const fromOecd = spec.oecd ? pointFrom(spec, oecd.get(spec.oecd), "OECD") : null;
-    const fromImf = pointFrom(spec, imf.get(spec.imf), "IMF");
-    // Prefer whichever source has the more recent print.
-    const best =
-      fromOecd && fromImf
-        ? fromOecd.period >= fromImf.period
-          ? fromOecd
-          : fromImf
-        : (fromOecd ?? fromImf);
+    const candidates = [
+      spec.oecd ? pointFrom(spec, oecd.get(spec.oecd), "OECD") : null,
+      spec.oecd ? pointFrom(spec, g20.get(spec.oecd), "OECD G20") : null,
+      pointFrom(spec, imf.get(spec.imf), "IMF"),
+    ].filter((p): p is InflationPoint => p !== null);
+    // Prefer whichever source has the most recent print.
+    const best = candidates.sort((a, b) => b.period.localeCompare(a.period))[0];
     if (best) points.push(best);
   }
   return { fetchedAt: new Date().toISOString(), points };
