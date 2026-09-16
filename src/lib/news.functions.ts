@@ -332,6 +332,42 @@ export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
       };
     });
 
+    // Older saved runs recorded the headline but not its link, so those cited
+    // headlines rendered as dead text. Resolve the real article URL from the
+    // news cache by headline so every cited story opens its source.
+    const missing = Array.from(
+      new Set(
+        items.flatMap((i) => i.top_news.filter((n) => !n.url).map((n) => n.headline)),
+      ),
+    ).slice(0, 300);
+    if (missing.length > 0) {
+      const found = new Map<string, { url: string | null; source: string | null }>();
+      for (let i = 0; i < missing.length; i += 60) {
+        const chunk = missing.slice(i, i + 60);
+        const { data } = await context.supabase
+          .from("news_cache")
+          .select("headline, url, source")
+          .in("headline", chunk)
+          .not("url", "is", null)
+          .limit(chunk.length * 3);
+        for (const r of data ?? []) {
+          if (!found.has(r.headline as string)) {
+            found.set(r.headline as string, {
+              url: (r.url as string | null) ?? null,
+              source: (r.source as string | null) ?? null,
+            });
+          }
+        }
+      }
+      for (const item of items) {
+        item.top_news = item.top_news.map((n) => {
+          if (n.url) return n;
+          const hit = found.get(n.headline);
+          return hit ? { ...n, url: hit.url, source: n.source ?? hit.source } : n;
+        });
+      }
+    }
+
     return { items, as_of: asOf.toISOString() };
   });
 
