@@ -680,7 +680,7 @@ export async function getDailyCandlesRange(
   const period1 = Math.floor(new Date(from).getTime() / 1000);
   const period2 = Math.floor(new Date(to).getTime() / 1000) + 86400;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    symbol,
+    toYahooSymbol(symbol),
   )}?interval=1d&period1=${period1}&period2=${period2}`;
   try {
     const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
