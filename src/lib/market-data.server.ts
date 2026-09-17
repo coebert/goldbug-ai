@@ -47,14 +47,17 @@ async function closeBody(res: Response): Promise<void> {
  * routing keeps using the tradable line unchanged.
  */
 const YAHOO_FEED_CANDIDATES: Record<string, string[]> = {
-  // Roche Holding participation cert.: ROG.VX is retired, ROP.SW is the live
-  // Swiss line. Never list the US ADR (RHHBY) here: it quotes in USD at a
-  // different share ratio, so its closes would be persisted against the CHF
-  // SIX line and corrupt valuation, history and the trading engine.
-  "ROG.SW": ["ROP.SW", "ROG.SW"],
-  // WisdomTree Broad Commodities: the LSE line quotes as AIGC.L.
-  "AIGB.L": ["AIGC.L", "AIGB.L"],
+  // Roche Holding participation cert.: ROG.SW/ROG.VX are retired, ROP.SW is
+  // the live Swiss line. Never list the US ADR (RHHBY) here: it quotes in USD
+  // at a different share ratio, so its closes would be persisted against the
+  // CHF SIX line and corrupt valuation, history and the trading engine.
+  "ROG.SW": ["ROP.SW"],
+  // WisdomTree Broad Commodities: AIGB.L is retired and 404s forever; the live
+  // LSE line is AIGC.L (USD-quoted, same fund) — keeping the dead ticker as a
+  // fallback only burned a request and risked a stale-cache fallback.
+  "AIGB.L": ["AIGC.L"],
 };
+
 
 
 /** Feed symbol last known to answer, per app symbol. */
