@@ -47,12 +47,15 @@ async function closeBody(res: Response): Promise<void> {
  * routing keeps using the tradable line unchanged.
  */
 const YAHOO_FEED_CANDIDATES: Record<string, string[]> = {
-  // Roche Holding participation cert.: ROG.SW/ROG.VX are retired, ROP.SW is
-  // the live Swiss line, RHHBY the US ADR as a last resort.
-  "ROG.SW": ["ROP.SW", "ROG.SW", "RHHBY"],
+  // Roche Holding participation cert.: ROG.VX is retired, ROP.SW is the live
+  // Swiss line. Never list the US ADR (RHHBY) here: it quotes in USD at a
+  // different share ratio, so its closes would be persisted against the CHF
+  // SIX line and corrupt valuation, history and the trading engine.
+  "ROG.SW": ["ROP.SW", "ROG.SW"],
   // WisdomTree Broad Commodities: the LSE line quotes as AIGC.L.
   "AIGB.L": ["AIGC.L", "AIGB.L"],
 };
+
 
 /** Feed symbol last known to answer, per app symbol. */
 const resolvedFeedSymbol = new Map<string, string>();
