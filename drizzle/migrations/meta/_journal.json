@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794834217504,
+      "tag": "0000_restrict_shared_reference_reads_to_admin",
+      "breakpoints": true
+    }
+  ]
+}
