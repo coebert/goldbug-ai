@@ -9,201 +9,81 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TradesRouteImport } from './routes/trades'
-import { Route as SpilloverRouteImport } from './routes/spillover'
-import { Route as SimulationReportRouteImport } from './routes/simulation-report'
-import { Route as SignalsByMarketRouteImport } from './routes/signals-by-market'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
-import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
-import { Route as ResearchRouteImport } from './routes/research'
-import { Route as PositionsRouteImport } from './routes/positions'
-import { Route as PnlRouteImport } from './routes/pnl'
-import { Route as NewsRouteImport } from './routes/news'
-import { Route as MarketsRouteImport } from './routes/markets'
-import { Route as LiveDashboardRouteImport } from './routes/live-dashboard'
-import { Route as LearnRouteImport } from './routes/learn'
-import { Route as HedgeFallbacksRouteImport } from './routes/hedge-fallbacks'
-import { Route as GlobalCoverageRouteImport } from './routes/global-coverage'
-import { Route as GetStartedRouteImport } from './routes/get-started'
-import { Route as DecisionModelRouteImport } from './routes/decision-model'
-import { Route as DailyReportRouteImport } from './routes/daily-report'
-import { Route as CostsRouteImport } from './routes/costs'
-import { Route as CoreProgressRouteImport } from './routes/core-progress'
-import { Route as CorePerformanceRouteImport } from './routes/core-performance'
-import { Route as CompareRouteImport } from './routes/compare'
-import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SymbolsIndexRouteImport } from './routes/symbols.index'
-import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
-import { Route as SymbolsSymbolRouteImport } from './routes/symbols.$symbol'
-import { Route as MarketSymbolRouteImport } from './routes/market.$symbol'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
+import { Route as CompareRouteImport } from './routes/compare'
+import { Route as CorePerformanceRouteImport } from './routes/core-performance'
+import { Route as CoreProgressRouteImport } from './routes/core-progress'
+import { Route as CostsRouteImport } from './routes/costs'
+import { Route as DailyReportRouteImport } from './routes/daily-report'
+import { Route as DecisionModelRouteImport } from './routes/decision-model'
+import { Route as GetStartedRouteImport } from './routes/get-started'
+import { Route as GlobalCoverageRouteImport } from './routes/global-coverage'
+import { Route as HedgeFallbacksRouteImport } from './routes/hedge-fallbacks'
+import { Route as LearnRouteImport } from './routes/learn'
+import { Route as LiveDashboardRouteImport } from './routes/live-dashboard'
+import { Route as MarketsRouteImport } from './routes/markets'
+import { Route as NewsRouteImport } from './routes/news'
+import { Route as PnlRouteImport } from './routes/pnl'
+import { Route as PositionsRouteImport } from './routes/positions'
+import { Route as ResearchRouteImport } from './routes/research'
+import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
+import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SignalsByMarketRouteImport } from './routes/signals-by-market'
+import { Route as SimulationReportRouteImport } from './routes/simulation-report'
+import { Route as SpilloverRouteImport } from './routes/spillover'
+import { Route as TradesRouteImport } from './routes/trades'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
-import { Route as PortfolioIdIndexRouteImport } from './routes/portfolio.$id.index'
-import { Route as PortfolioIdTradeRouteImport } from './routes/portfolio.$id.trade'
-import { Route as PortfolioIdSummaryRouteImport } from './routes/portfolio.$id.summary'
-import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
-import { Route as PortfolioIdRiskRouteImport } from './routes/portfolio.$id.risk'
-import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
-import { Route as PortfolioIdPerformanceRouteImport } from './routes/portfolio.$id.performance'
-import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
-import { Route as PortfolioIdFxRiskRouteImport } from './routes/portfolio.$id.fx-risk'
-import { Route as PortfolioIdDailyPnlRouteImport } from './routes/portfolio.$id.daily-pnl'
-import { Route as PortfolioIdDailyComparisonRouteImport } from './routes/portfolio.$id.daily-comparison'
-import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
-import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
-import { Route as ApiPublicSetupScanCronRouteImport } from './routes/api/public/setup-scan-cron'
-import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
-import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
+import { Route as MarketSymbolRouteImport } from './routes/market.$symbol'
+import { Route as SymbolsIndexRouteImport } from './routes/symbols.index'
+import { Route as SymbolsSymbolRouteImport } from './routes/symbols.$symbol'
+import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
 import { Route as ApiBrokerBlocksClearRouteImport } from './routes/api/broker-blocks/clear'
-import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
-import { Route as ApiPublicHooksValuationDriftRouteImport } from './routes/api/public/hooks/valuation-drift'
-import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
-import { Route as ApiPublicHooksTickerWatchRouteImport } from './routes/api/public/hooks/ticker-watch'
-import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
-import { Route as ApiPublicHooksSaxoAccountKeyAuditRouteImport } from './routes/api/public/hooks/saxo-account-key-audit'
-import { Route as ApiPublicHooksOrphanOrderSweepRouteImport } from './routes/api/public/hooks/orphan-order-sweep'
-import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/public/hooks/news-refresh'
-import { Route as ApiPublicHooksNewsBackfillRouteImport } from './routes/api/public/hooks/news-backfill'
-import { Route as ApiPublicHooksMarketOpenAlertsRouteImport } from './routes/api/public/hooks/market-open-alerts'
-import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
-import { Route as ApiPublicHooksInsiderScanRouteImport } from './routes/api/public/hooks/insider-scan'
-import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
-import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
-import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
-import { Route as ApiPublicHooksCreditBudgetCheckRouteImport } from './routes/api/public/hooks/credit-budget-check'
-import { Route as ApiPublicHooksCorporateActionDeadlinesRouteImport } from './routes/api/public/hooks/corporate-action-deadlines'
-import { Route as ApiPublicHooksBreakoutExpectancyRouteImport } from './routes/api/public/hooks/breakout-expectancy'
-import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
-import { Route as ApiPublicHooksBackfillIntradayEquityRouteImport } from './routes/api/public/hooks/backfill-intraday-equity'
-import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './routes/api/public/hooks/backfill-daily-equity-changes'
+import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
+import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
+import { Route as ApiPublicSetupScanCronRouteImport } from './routes/api/public/setup-scan-cron'
+import { Route as PortfolioIdIndexRouteImport } from './routes/portfolio.$id.index'
+import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
+import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
+import { Route as PortfolioIdDailyComparisonRouteImport } from './routes/portfolio.$id.daily-comparison'
+import { Route as PortfolioIdDailyPnlRouteImport } from './routes/portfolio.$id.daily-pnl'
+import { Route as PortfolioIdFxRiskRouteImport } from './routes/portfolio.$id.fx-risk'
+import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
+import { Route as PortfolioIdPerformanceRouteImport } from './routes/portfolio.$id.performance'
+import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
+import { Route as PortfolioIdRiskRouteImport } from './routes/portfolio.$id.risk'
+import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
+import { Route as PortfolioIdSummaryRouteImport } from './routes/portfolio.$id.summary'
+import { Route as PortfolioIdTradeRouteImport } from './routes/portfolio.$id.trade'
 import { Route as ApiPublicHooksAiGatewayHealthRouteImport } from './routes/api/public/hooks/ai-gateway-health'
+import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './routes/api/public/hooks/backfill-daily-equity-changes'
+import { Route as ApiPublicHooksBackfillIntradayEquityRouteImport } from './routes/api/public/hooks/backfill-intraday-equity'
+import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
+import { Route as ApiPublicHooksBreakoutExpectancyRouteImport } from './routes/api/public/hooks/breakout-expectancy'
+import { Route as ApiPublicHooksCorporateActionDeadlinesRouteImport } from './routes/api/public/hooks/corporate-action-deadlines'
+import { Route as ApiPublicHooksCreditBudgetCheckRouteImport } from './routes/api/public/hooks/credit-budget-check'
+import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
+import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
+import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
+import { Route as ApiPublicHooksInsiderScanRouteImport } from './routes/api/public/hooks/insider-scan'
+import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
+import { Route as ApiPublicHooksMarketOpenAlertsRouteImport } from './routes/api/public/hooks/market-open-alerts'
+import { Route as ApiPublicHooksNewsBackfillRouteImport } from './routes/api/public/hooks/news-backfill'
+import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/public/hooks/news-refresh'
+import { Route as ApiPublicHooksOrphanOrderSweepRouteImport } from './routes/api/public/hooks/orphan-order-sweep'
+import { Route as ApiPublicHooksSaxoAccountKeyAuditRouteImport } from './routes/api/public/hooks/saxo-account-key-audit'
+import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
+import { Route as ApiPublicHooksTickerWatchRouteImport } from './routes/api/public/hooks/ticker-watch'
+import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
+import { Route as ApiPublicHooksValuationDriftRouteImport } from './routes/api/public/hooks/valuation-drift'
+import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 
-const TradesRoute = TradesRouteImport.update({
-  id: '/trades',
-  path: '/trades',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SpilloverRoute = SpilloverRouteImport.update({
-  id: '/spillover',
-  path: '/spillover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SimulationReportRoute = SimulationReportRouteImport.update({
-  id: '/simulation-report',
-  path: '/simulation-report',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignalsByMarketRoute = SignalsByMarketRouteImport.update({
-  id: '/signals-by-market',
-  path: '/signals-by-market',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SaxoStatusRoute = SaxoStatusRouteImport.update({
-  id: '/saxo-status',
-  path: '/saxo-status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
-  id: '/saxo-reconnect',
-  path: '/saxo-reconnect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResearchRoute = ResearchRouteImport.update({
-  id: '/research',
-  path: '/research',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PositionsRoute = PositionsRouteImport.update({
-  id: '/positions',
-  path: '/positions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PnlRoute = PnlRouteImport.update({
-  id: '/pnl',
-  path: '/pnl',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewsRoute = NewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MarketsRoute = MarketsRouteImport.update({
-  id: '/markets',
-  path: '/markets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LiveDashboardRoute = LiveDashboardRouteImport.update({
-  id: '/live-dashboard',
-  path: '/live-dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnRoute = LearnRouteImport.update({
-  id: '/learn',
-  path: '/learn',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HedgeFallbacksRoute = HedgeFallbacksRouteImport.update({
-  id: '/hedge-fallbacks',
-  path: '/hedge-fallbacks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GlobalCoverageRoute = GlobalCoverageRouteImport.update({
-  id: '/global-coverage',
-  path: '/global-coverage',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GetStartedRoute = GetStartedRouteImport.update({
-  id: '/get-started',
-  path: '/get-started',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DecisionModelRoute = DecisionModelRouteImport.update({
-  id: '/decision-model',
-  path: '/decision-model',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DailyReportRoute = DailyReportRouteImport.update({
-  id: '/daily-report',
-  path: '/daily-report',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CostsRoute = CostsRouteImport.update({
-  id: '/costs',
-  path: '/costs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CoreProgressRoute = CoreProgressRouteImport.update({
-  id: '/core-progress',
-  path: '/core-progress',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CorePerformanceRoute = CorePerformanceRouteImport.update({
-  id: '/core-performance',
-  path: '/core-performance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CompareRoute = CompareRouteImport.update({
-  id: '/compare',
-  path: '/compare',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrokerBlocksRoute = BrokerBlocksRouteImport.update({
-  id: '/broker-blocks',
-  path: '/broker-blocks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -211,29 +91,129 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SymbolsIndexRoute = SymbolsIndexRouteImport.update({
-  id: '/symbols/',
-  path: '/symbols/',
+const BrokerBlocksRoute = BrokerBlocksRouteImport.update({
+  id: '/broker-blocks',
+  path: '/broker-blocks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
-  id: '/walk-forward/$id',
-  path: '/walk-forward/$id',
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SymbolsSymbolRoute = SymbolsSymbolRouteImport.update({
-  id: '/symbols/$symbol',
-  path: '/symbols/$symbol',
+const CorePerformanceRoute = CorePerformanceRouteImport.update({
+  id: '/core-performance',
+  path: '/core-performance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MarketSymbolRoute = MarketSymbolRouteImport.update({
-  id: '/market/$symbol',
-  path: '/market/$symbol',
+const CoreProgressRoute = CoreProgressRouteImport.update({
+  id: '/core-progress',
+  path: '/core-progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CostsRoute = CostsRouteImport.update({
+  id: '/costs',
+  path: '/costs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyReportRoute = DailyReportRouteImport.update({
+  id: '/daily-report',
+  path: '/daily-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DecisionModelRoute = DecisionModelRouteImport.update({
+  id: '/decision-model',
+  path: '/decision-model',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GetStartedRoute = GetStartedRouteImport.update({
+  id: '/get-started',
+  path: '/get-started',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GlobalCoverageRoute = GlobalCoverageRouteImport.update({
+  id: '/global-coverage',
+  path: '/global-coverage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HedgeFallbacksRoute = HedgeFallbacksRouteImport.update({
+  id: '/hedge-fallbacks',
+  path: '/hedge-fallbacks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnRoute = LearnRouteImport.update({
+  id: '/learn',
+  path: '/learn',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveDashboardRoute = LiveDashboardRouteImport.update({
+  id: '/live-dashboard',
+  path: '/live-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketsRoute = MarketsRouteImport.update({
+  id: '/markets',
+  path: '/markets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsRoute = NewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PnlRoute = PnlRouteImport.update({
+  id: '/pnl',
+  path: '/pnl',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PositionsRoute = PositionsRouteImport.update({
+  id: '/positions',
+  path: '/positions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchRoute = ResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
+  id: '/saxo-reconnect',
+  path: '/saxo-reconnect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SaxoStatusRoute = SaxoStatusRouteImport.update({
+  id: '/saxo-status',
+  path: '/saxo-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignalsByMarketRoute = SignalsByMarketRouteImport.update({
+  id: '/signals-by-market',
+  path: '/signals-by-market',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SimulationReportRoute = SimulationReportRouteImport.update({
+  id: '/simulation-report',
+  path: '/simulation-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpilloverRoute = SpilloverRouteImport.update({
+  id: '/spillover',
+  path: '/spillover',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TradesRoute = TradesRouteImport.update({
+  id: '/trades',
+  path: '/trades',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
@@ -241,80 +221,29 @@ const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
   path: '/long-horizon/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioIdIndexRoute = PortfolioIdIndexRouteImport.update({
-  id: '/portfolio/$id/',
-  path: '/portfolio/$id/',
+const MarketSymbolRoute = MarketSymbolRouteImport.update({
+  id: '/market/$symbol',
+  path: '/market/$symbol',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioIdTradeRoute = PortfolioIdTradeRouteImport.update({
-  id: '/portfolio/$id/trade',
-  path: '/portfolio/$id/trade',
+const SymbolsIndexRoute = SymbolsIndexRouteImport.update({
+  id: '/symbols/',
+  path: '/symbols/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioIdSummaryRoute = PortfolioIdSummaryRouteImport.update({
-  id: '/portfolio/$id/summary',
-  path: '/portfolio/$id/summary',
+const SymbolsSymbolRoute = SymbolsSymbolRouteImport.update({
+  id: '/symbols/$symbol',
+  path: '/symbols/$symbol',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioIdSmaReportRoute = PortfolioIdSmaReportRouteImport.update({
-  id: '/portfolio/$id/sma-report',
-  path: '/portfolio/$id/sma-report',
+const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
+  id: '/walk-forward/$id',
+  path: '/walk-forward/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioIdRiskRoute = PortfolioIdRiskRouteImport.update({
-  id: '/portfolio/$id/risk',
-  path: '/portfolio/$id/risk',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
-  id: '/portfolio/$id/report',
-  path: '/portfolio/$id/report',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdPerformanceRoute = PortfolioIdPerformanceRouteImport.update({
-  id: '/portfolio/$id/performance',
-  path: '/portfolio/$id/performance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdOptimizerRoute = PortfolioIdOptimizerRouteImport.update({
-  id: '/portfolio/$id/optimizer',
-  path: '/portfolio/$id/optimizer',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdFxRiskRoute = PortfolioIdFxRiskRouteImport.update({
-  id: '/portfolio/$id/fx-risk',
-  path: '/portfolio/$id/fx-risk',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdDailyPnlRoute = PortfolioIdDailyPnlRouteImport.update({
-  id: '/portfolio/$id/daily-pnl',
-  path: '/portfolio/$id/daily-pnl',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdDailyComparisonRoute =
-  PortfolioIdDailyComparisonRouteImport.update({
-    id: '/portfolio/$id/daily-comparison',
-    path: '/portfolio/$id/daily-comparison',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
-  id: '/portfolio/$id/attribution',
-  path: '/portfolio/$id/attribution',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioIdAnalyticsRoute = PortfolioIdAnalyticsRouteImport.update({
-  id: '/portfolio/$id/analytics',
-  path: '/portfolio/$id/analytics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicSetupScanCronRoute = ApiPublicSetupScanCronRouteImport.update({
-  id: '/api/public/setup-scan-cron',
-  path: '/api/public/setup-scan-cron',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicNewsPreviewRoute = ApiPublicNewsPreviewRouteImport.update({
-  id: '/api/public/news-preview',
-  path: '/api/public/news-preview',
+const ApiBrokerBlocksClearRoute = ApiBrokerBlocksClearRouteImport.update({
+  id: '/api/broker-blocks/clear',
+  path: '/api/broker-blocks/clear',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicAlgoRegimeAutotuneCronRoute =
@@ -323,126 +252,86 @@ const ApiPublicAlgoRegimeAutotuneCronRoute =
     path: '/api/public/algo-regime-autotune-cron',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiBrokerBlocksClearRoute = ApiBrokerBlocksClearRouteImport.update({
-  id: '/api/broker-blocks/clear',
-  path: '/api/broker-blocks/clear',
+const ApiPublicNewsPreviewRoute = ApiPublicNewsPreviewRouteImport.update({
+  id: '/api/public/news-preview',
+  path: '/api/public/news-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
-  id: '/api/public/saxo/callback',
-  path: '/api/public/saxo/callback',
+const ApiPublicSetupScanCronRoute = ApiPublicSetupScanCronRouteImport.update({
+  id: '/api/public/setup-scan-cron',
+  path: '/api/public/setup-scan-cron',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksValuationDriftRoute =
-  ApiPublicHooksValuationDriftRouteImport.update({
-    id: '/api/public/hooks/valuation-drift',
-    path: '/api/public/hooks/valuation-drift',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksTranslationRefreshRoute =
-  ApiPublicHooksTranslationRefreshRouteImport.update({
-    id: '/api/public/hooks/translation-refresh',
-    path: '/api/public/hooks/translation-refresh',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksTickerWatchRoute =
-  ApiPublicHooksTickerWatchRouteImport.update({
-    id: '/api/public/hooks/ticker-watch',
-    path: '/api/public/hooks/ticker-watch',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksSaxoRefreshRoute =
-  ApiPublicHooksSaxoRefreshRouteImport.update({
-    id: '/api/public/hooks/saxo-refresh',
-    path: '/api/public/hooks/saxo-refresh',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksSaxoAccountKeyAuditRoute =
-  ApiPublicHooksSaxoAccountKeyAuditRouteImport.update({
-    id: '/api/public/hooks/saxo-account-key-audit',
-    path: '/api/public/hooks/saxo-account-key-audit',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksOrphanOrderSweepRoute =
-  ApiPublicHooksOrphanOrderSweepRouteImport.update({
-    id: '/api/public/hooks/orphan-order-sweep',
-    path: '/api/public/hooks/orphan-order-sweep',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksNewsRefreshRoute =
-  ApiPublicHooksNewsRefreshRouteImport.update({
-    id: '/api/public/hooks/news-refresh',
-    path: '/api/public/hooks/news-refresh',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksNewsBackfillRoute =
-  ApiPublicHooksNewsBackfillRouteImport.update({
-    id: '/api/public/hooks/news-backfill',
-    path: '/api/public/hooks/news-backfill',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksMarketOpenAlertsRoute =
-  ApiPublicHooksMarketOpenAlertsRouteImport.update({
-    id: '/api/public/hooks/market-open-alerts',
-    path: '/api/public/hooks/market-open-alerts',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksLiveReconcileRoute =
-  ApiPublicHooksLiveReconcileRouteImport.update({
-    id: '/api/public/hooks/live-reconcile',
-    path: '/api/public/hooks/live-reconcile',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksInsiderScanRoute =
-  ApiPublicHooksInsiderScanRouteImport.update({
-    id: '/api/public/hooks/insider-scan',
-    path: '/api/public/hooks/insider-scan',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksHourlyRunRoute = ApiPublicHooksHourlyRunRouteImport.update({
-  id: '/api/public/hooks/hourly-run',
-  path: '/api/public/hooks/hourly-run',
+const PortfolioIdIndexRoute = PortfolioIdIndexRouteImport.update({
+  id: '/portfolio/$id/',
+  path: '/portfolio/$id/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksDailySummaryRoute =
-  ApiPublicHooksDailySummaryRouteImport.update({
-    id: '/api/public/hooks/daily-summary',
-    path: '/api/public/hooks/daily-summary',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
-  id: '/api/public/hooks/daily-run',
-  path: '/api/public/hooks/daily-run',
+const PortfolioIdAnalyticsRoute = PortfolioIdAnalyticsRouteImport.update({
+  id: '/portfolio/$id/analytics',
+  path: '/portfolio/$id/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksCreditBudgetCheckRoute =
-  ApiPublicHooksCreditBudgetCheckRouteImport.update({
-    id: '/api/public/hooks/credit-budget-check',
-    path: '/api/public/hooks/credit-budget-check',
+const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
+  id: '/portfolio/$id/attribution',
+  path: '/portfolio/$id/attribution',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdDailyComparisonRoute =
+  PortfolioIdDailyComparisonRouteImport.update({
+    id: '/portfolio/$id/daily-comparison',
+    path: '/portfolio/$id/daily-comparison',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksCorporateActionDeadlinesRoute =
-  ApiPublicHooksCorporateActionDeadlinesRouteImport.update({
-    id: '/api/public/hooks/corporate-action-deadlines',
-    path: '/api/public/hooks/corporate-action-deadlines',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksBreakoutExpectancyRoute =
-  ApiPublicHooksBreakoutExpectancyRouteImport.update({
-    id: '/api/public/hooks/breakout-expectancy',
-    path: '/api/public/hooks/breakout-expectancy',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksBatchRetrainRoute =
-  ApiPublicHooksBatchRetrainRouteImport.update({
-    id: '/api/public/hooks/batch-retrain',
-    path: '/api/public/hooks/batch-retrain',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksBackfillIntradayEquityRoute =
-  ApiPublicHooksBackfillIntradayEquityRouteImport.update({
-    id: '/api/public/hooks/backfill-intraday-equity',
-    path: '/api/public/hooks/backfill-intraday-equity',
+const PortfolioIdDailyPnlRoute = PortfolioIdDailyPnlRouteImport.update({
+  id: '/portfolio/$id/daily-pnl',
+  path: '/portfolio/$id/daily-pnl',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdFxRiskRoute = PortfolioIdFxRiskRouteImport.update({
+  id: '/portfolio/$id/fx-risk',
+  path: '/portfolio/$id/fx-risk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdOptimizerRoute = PortfolioIdOptimizerRouteImport.update({
+  id: '/portfolio/$id/optimizer',
+  path: '/portfolio/$id/optimizer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdPerformanceRoute = PortfolioIdPerformanceRouteImport.update({
+  id: '/portfolio/$id/performance',
+  path: '/portfolio/$id/performance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
+  id: '/portfolio/$id/report',
+  path: '/portfolio/$id/report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdRiskRoute = PortfolioIdRiskRouteImport.update({
+  id: '/portfolio/$id/risk',
+  path: '/portfolio/$id/risk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdSmaReportRoute = PortfolioIdSmaReportRouteImport.update({
+  id: '/portfolio/$id/sma-report',
+  path: '/portfolio/$id/sma-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdSummaryRoute = PortfolioIdSummaryRouteImport.update({
+  id: '/portfolio/$id/summary',
+  path: '/portfolio/$id/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdTradeRoute = PortfolioIdTradeRouteImport.update({
+  id: '/portfolio/$id/trade',
+  path: '/portfolio/$id/trade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksAiGatewayHealthRoute =
+  ApiPublicHooksAiGatewayHealthRouteImport.update({
+    id: '/api/public/hooks/ai-gateway-health',
+    path: '/api/public/hooks/ai-gateway-health',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksBackfillDailyEquityChangesRoute =
@@ -451,12 +340,123 @@ const ApiPublicHooksBackfillDailyEquityChangesRoute =
     path: '/api/public/hooks/backfill-daily-equity-changes',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksAiGatewayHealthRoute =
-  ApiPublicHooksAiGatewayHealthRouteImport.update({
-    id: '/api/public/hooks/ai-gateway-health',
-    path: '/api/public/hooks/ai-gateway-health',
+const ApiPublicHooksBackfillIntradayEquityRoute =
+  ApiPublicHooksBackfillIntradayEquityRouteImport.update({
+    id: '/api/public/hooks/backfill-intraday-equity',
+    path: '/api/public/hooks/backfill-intraday-equity',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBatchRetrainRoute =
+  ApiPublicHooksBatchRetrainRouteImport.update({
+    id: '/api/public/hooks/batch-retrain',
+    path: '/api/public/hooks/batch-retrain',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksBreakoutExpectancyRoute =
+  ApiPublicHooksBreakoutExpectancyRouteImport.update({
+    id: '/api/public/hooks/breakout-expectancy',
+    path: '/api/public/hooks/breakout-expectancy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksCorporateActionDeadlinesRoute =
+  ApiPublicHooksCorporateActionDeadlinesRouteImport.update({
+    id: '/api/public/hooks/corporate-action-deadlines',
+    path: '/api/public/hooks/corporate-action-deadlines',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksCreditBudgetCheckRoute =
+  ApiPublicHooksCreditBudgetCheckRouteImport.update({
+    id: '/api/public/hooks/credit-budget-check',
+    path: '/api/public/hooks/credit-budget-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
+  id: '/api/public/hooks/daily-run',
+  path: '/api/public/hooks/daily-run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksDailySummaryRoute =
+  ApiPublicHooksDailySummaryRouteImport.update({
+    id: '/api/public/hooks/daily-summary',
+    path: '/api/public/hooks/daily-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksHourlyRunRoute = ApiPublicHooksHourlyRunRouteImport.update({
+  id: '/api/public/hooks/hourly-run',
+  path: '/api/public/hooks/hourly-run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksInsiderScanRoute =
+  ApiPublicHooksInsiderScanRouteImport.update({
+    id: '/api/public/hooks/insider-scan',
+    path: '/api/public/hooks/insider-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksLiveReconcileRoute =
+  ApiPublicHooksLiveReconcileRouteImport.update({
+    id: '/api/public/hooks/live-reconcile',
+    path: '/api/public/hooks/live-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksMarketOpenAlertsRoute =
+  ApiPublicHooksMarketOpenAlertsRouteImport.update({
+    id: '/api/public/hooks/market-open-alerts',
+    path: '/api/public/hooks/market-open-alerts',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksNewsBackfillRoute =
+  ApiPublicHooksNewsBackfillRouteImport.update({
+    id: '/api/public/hooks/news-backfill',
+    path: '/api/public/hooks/news-backfill',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksNewsRefreshRoute =
+  ApiPublicHooksNewsRefreshRouteImport.update({
+    id: '/api/public/hooks/news-refresh',
+    path: '/api/public/hooks/news-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksOrphanOrderSweepRoute =
+  ApiPublicHooksOrphanOrderSweepRouteImport.update({
+    id: '/api/public/hooks/orphan-order-sweep',
+    path: '/api/public/hooks/orphan-order-sweep',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksSaxoAccountKeyAuditRoute =
+  ApiPublicHooksSaxoAccountKeyAuditRouteImport.update({
+    id: '/api/public/hooks/saxo-account-key-audit',
+    path: '/api/public/hooks/saxo-account-key-audit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksSaxoRefreshRoute =
+  ApiPublicHooksSaxoRefreshRouteImport.update({
+    id: '/api/public/hooks/saxo-refresh',
+    path: '/api/public/hooks/saxo-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksTickerWatchRoute =
+  ApiPublicHooksTickerWatchRouteImport.update({
+    id: '/api/public/hooks/ticker-watch',
+    path: '/api/public/hooks/ticker-watch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksTranslationRefreshRoute =
+  ApiPublicHooksTranslationRefreshRouteImport.update({
+    id: '/api/public/hooks/translation-refresh',
+    path: '/api/public/hooks/translation-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksValuationDriftRoute =
+  ApiPublicHooksValuationDriftRouteImport.update({
+    id: '/api/public/hooks/valuation-drift',
+    path: '/api/public/hooks/valuation-drift',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
+  id: '/api/public/saxo/callback',
+  path: '/api/public/saxo/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -976,179 +976,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/trades': {
-      id: '/trades'
-      path: '/trades'
-      fullPath: '/trades'
-      preLoaderRoute: typeof TradesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/spillover': {
-      id: '/spillover'
-      path: '/spillover'
-      fullPath: '/spillover'
-      preLoaderRoute: typeof SpilloverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/simulation-report': {
-      id: '/simulation-report'
-      path: '/simulation-report'
-      fullPath: '/simulation-report'
-      preLoaderRoute: typeof SimulationReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signals-by-market': {
-      id: '/signals-by-market'
-      path: '/signals-by-market'
-      fullPath: '/signals-by-market'
-      preLoaderRoute: typeof SignalsByMarketRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/saxo-status': {
-      id: '/saxo-status'
-      path: '/saxo-status'
-      fullPath: '/saxo-status'
-      preLoaderRoute: typeof SaxoStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/saxo-reconnect': {
-      id: '/saxo-reconnect'
-      path: '/saxo-reconnect'
-      fullPath: '/saxo-reconnect'
-      preLoaderRoute: typeof SaxoReconnectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/research': {
-      id: '/research'
-      path: '/research'
-      fullPath: '/research'
-      preLoaderRoute: typeof ResearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/positions': {
-      id: '/positions'
-      path: '/positions'
-      fullPath: '/positions'
-      preLoaderRoute: typeof PositionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pnl': {
-      id: '/pnl'
-      path: '/pnl'
-      fullPath: '/pnl'
-      preLoaderRoute: typeof PnlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/news': {
-      id: '/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof NewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/markets': {
-      id: '/markets'
-      path: '/markets'
-      fullPath: '/markets'
-      preLoaderRoute: typeof MarketsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/live-dashboard': {
-      id: '/live-dashboard'
-      path: '/live-dashboard'
-      fullPath: '/live-dashboard'
-      preLoaderRoute: typeof LiveDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/learn': {
-      id: '/learn'
-      path: '/learn'
-      fullPath: '/learn'
-      preLoaderRoute: typeof LearnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hedge-fallbacks': {
-      id: '/hedge-fallbacks'
-      path: '/hedge-fallbacks'
-      fullPath: '/hedge-fallbacks'
-      preLoaderRoute: typeof HedgeFallbacksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/global-coverage': {
-      id: '/global-coverage'
-      path: '/global-coverage'
-      fullPath: '/global-coverage'
-      preLoaderRoute: typeof GlobalCoverageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/get-started': {
-      id: '/get-started'
-      path: '/get-started'
-      fullPath: '/get-started'
-      preLoaderRoute: typeof GetStartedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/decision-model': {
-      id: '/decision-model'
-      path: '/decision-model'
-      fullPath: '/decision-model'
-      preLoaderRoute: typeof DecisionModelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/daily-report': {
-      id: '/daily-report'
-      path: '/daily-report'
-      fullPath: '/daily-report'
-      preLoaderRoute: typeof DailyReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/costs': {
-      id: '/costs'
-      path: '/costs'
-      fullPath: '/costs'
-      preLoaderRoute: typeof CostsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/core-progress': {
-      id: '/core-progress'
-      path: '/core-progress'
-      fullPath: '/core-progress'
-      preLoaderRoute: typeof CoreProgressRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/core-performance': {
-      id: '/core-performance'
-      path: '/core-performance'
-      fullPath: '/core-performance'
-      preLoaderRoute: typeof CorePerformanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/compare': {
-      id: '/compare'
-      path: '/compare'
-      fullPath: '/compare'
-      preLoaderRoute: typeof CompareRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/broker-blocks': {
-      id: '/broker-blocks'
-      path: '/broker-blocks'
-      fullPath: '/broker-blocks'
-      preLoaderRoute: typeof BrokerBlocksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -1158,39 +990,179 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/symbols/': {
-      id: '/symbols/'
-      path: '/symbols'
-      fullPath: '/symbols/'
-      preLoaderRoute: typeof SymbolsIndexRouteImport
+    '/broker-blocks': {
+      id: '/broker-blocks'
+      path: '/broker-blocks'
+      fullPath: '/broker-blocks'
+      preLoaderRoute: typeof BrokerBlocksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/walk-forward/$id': {
-      id: '/walk-forward/$id'
-      path: '/walk-forward/$id'
-      fullPath: '/walk-forward/$id'
-      preLoaderRoute: typeof WalkForwardIdRouteImport
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/symbols/$symbol': {
-      id: '/symbols/$symbol'
-      path: '/symbols/$symbol'
-      fullPath: '/symbols/$symbol'
-      preLoaderRoute: typeof SymbolsSymbolRouteImport
+    '/core-performance': {
+      id: '/core-performance'
+      path: '/core-performance'
+      fullPath: '/core-performance'
+      preLoaderRoute: typeof CorePerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/market/$symbol': {
-      id: '/market/$symbol'
-      path: '/market/$symbol'
-      fullPath: '/market/$symbol'
-      preLoaderRoute: typeof MarketSymbolRouteImport
+    '/core-progress': {
+      id: '/core-progress'
+      path: '/core-progress'
+      fullPath: '/core-progress'
+      preLoaderRoute: typeof CoreProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/costs': {
+      id: '/costs'
+      path: '/costs'
+      fullPath: '/costs'
+      preLoaderRoute: typeof CostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily-report': {
+      id: '/daily-report'
+      path: '/daily-report'
+      fullPath: '/daily-report'
+      preLoaderRoute: typeof DailyReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/decision-model': {
+      id: '/decision-model'
+      path: '/decision-model'
+      fullPath: '/decision-model'
+      preLoaderRoute: typeof DecisionModelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/get-started': {
+      id: '/get-started'
+      path: '/get-started'
+      fullPath: '/get-started'
+      preLoaderRoute: typeof GetStartedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/global-coverage': {
+      id: '/global-coverage'
+      path: '/global-coverage'
+      fullPath: '/global-coverage'
+      preLoaderRoute: typeof GlobalCoverageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hedge-fallbacks': {
+      id: '/hedge-fallbacks'
+      path: '/hedge-fallbacks'
+      fullPath: '/hedge-fallbacks'
+      preLoaderRoute: typeof HedgeFallbacksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn': {
+      id: '/learn'
+      path: '/learn'
+      fullPath: '/learn'
+      preLoaderRoute: typeof LearnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live-dashboard': {
+      id: '/live-dashboard'
+      path: '/live-dashboard'
+      fullPath: '/live-dashboard'
+      preLoaderRoute: typeof LiveDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/markets': {
+      id: '/markets'
+      path: '/markets'
+      fullPath: '/markets'
+      preLoaderRoute: typeof MarketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news': {
+      id: '/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pnl': {
+      id: '/pnl'
+      path: '/pnl'
+      fullPath: '/pnl'
+      preLoaderRoute: typeof PnlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/positions': {
+      id: '/positions'
+      path: '/positions'
+      fullPath: '/positions'
+      preLoaderRoute: typeof PositionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/research': {
+      id: '/research'
+      path: '/research'
+      fullPath: '/research'
+      preLoaderRoute: typeof ResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saxo-reconnect': {
+      id: '/saxo-reconnect'
+      path: '/saxo-reconnect'
+      fullPath: '/saxo-reconnect'
+      preLoaderRoute: typeof SaxoReconnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saxo-status': {
+      id: '/saxo-status'
+      path: '/saxo-status'
+      fullPath: '/saxo-status'
+      preLoaderRoute: typeof SaxoStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signals-by-market': {
+      id: '/signals-by-market'
+      path: '/signals-by-market'
+      fullPath: '/signals-by-market'
+      preLoaderRoute: typeof SignalsByMarketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulation-report': {
+      id: '/simulation-report'
+      path: '/simulation-report'
+      fullPath: '/simulation-report'
+      preLoaderRoute: typeof SimulationReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/spillover': {
+      id: '/spillover'
+      path: '/spillover'
+      fullPath: '/spillover'
+      preLoaderRoute: typeof SpilloverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trades': {
+      id: '/trades'
+      path: '/trades'
+      fullPath: '/trades'
+      preLoaderRoute: typeof TradesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/long-horizon/$id': {
@@ -1200,116 +1172,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LongHorizonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portfolio/$id/': {
-      id: '/portfolio/$id/'
-      path: '/portfolio/$id'
-      fullPath: '/portfolio/$id/'
-      preLoaderRoute: typeof PortfolioIdIndexRouteImport
+    '/market/$symbol': {
+      id: '/market/$symbol'
+      path: '/market/$symbol'
+      fullPath: '/market/$symbol'
+      preLoaderRoute: typeof MarketSymbolRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portfolio/$id/trade': {
-      id: '/portfolio/$id/trade'
-      path: '/portfolio/$id/trade'
-      fullPath: '/portfolio/$id/trade'
-      preLoaderRoute: typeof PortfolioIdTradeRouteImport
+    '/symbols/': {
+      id: '/symbols/'
+      path: '/symbols'
+      fullPath: '/symbols/'
+      preLoaderRoute: typeof SymbolsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portfolio/$id/summary': {
-      id: '/portfolio/$id/summary'
-      path: '/portfolio/$id/summary'
-      fullPath: '/portfolio/$id/summary'
-      preLoaderRoute: typeof PortfolioIdSummaryRouteImport
+    '/symbols/$symbol': {
+      id: '/symbols/$symbol'
+      path: '/symbols/$symbol'
+      fullPath: '/symbols/$symbol'
+      preLoaderRoute: typeof SymbolsSymbolRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portfolio/$id/sma-report': {
-      id: '/portfolio/$id/sma-report'
-      path: '/portfolio/$id/sma-report'
-      fullPath: '/portfolio/$id/sma-report'
-      preLoaderRoute: typeof PortfolioIdSmaReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/risk': {
-      id: '/portfolio/$id/risk'
-      path: '/portfolio/$id/risk'
-      fullPath: '/portfolio/$id/risk'
-      preLoaderRoute: typeof PortfolioIdRiskRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/report': {
-      id: '/portfolio/$id/report'
-      path: '/portfolio/$id/report'
-      fullPath: '/portfolio/$id/report'
-      preLoaderRoute: typeof PortfolioIdReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/performance': {
-      id: '/portfolio/$id/performance'
-      path: '/portfolio/$id/performance'
-      fullPath: '/portfolio/$id/performance'
-      preLoaderRoute: typeof PortfolioIdPerformanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/optimizer': {
-      id: '/portfolio/$id/optimizer'
-      path: '/portfolio/$id/optimizer'
-      fullPath: '/portfolio/$id/optimizer'
-      preLoaderRoute: typeof PortfolioIdOptimizerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/fx-risk': {
-      id: '/portfolio/$id/fx-risk'
-      path: '/portfolio/$id/fx-risk'
-      fullPath: '/portfolio/$id/fx-risk'
-      preLoaderRoute: typeof PortfolioIdFxRiskRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/daily-pnl': {
-      id: '/portfolio/$id/daily-pnl'
-      path: '/portfolio/$id/daily-pnl'
-      fullPath: '/portfolio/$id/daily-pnl'
-      preLoaderRoute: typeof PortfolioIdDailyPnlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/daily-comparison': {
-      id: '/portfolio/$id/daily-comparison'
-      path: '/portfolio/$id/daily-comparison'
-      fullPath: '/portfolio/$id/daily-comparison'
-      preLoaderRoute: typeof PortfolioIdDailyComparisonRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/attribution': {
-      id: '/portfolio/$id/attribution'
-      path: '/portfolio/$id/attribution'
-      fullPath: '/portfolio/$id/attribution'
-      preLoaderRoute: typeof PortfolioIdAttributionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$id/analytics': {
-      id: '/portfolio/$id/analytics'
-      path: '/portfolio/$id/analytics'
-      fullPath: '/portfolio/$id/analytics'
-      preLoaderRoute: typeof PortfolioIdAnalyticsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/setup-scan-cron': {
-      id: '/api/public/setup-scan-cron'
-      path: '/api/public/setup-scan-cron'
-      fullPath: '/api/public/setup-scan-cron'
-      preLoaderRoute: typeof ApiPublicSetupScanCronRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/news-preview': {
-      id: '/api/public/news-preview'
-      path: '/api/public/news-preview'
-      fullPath: '/api/public/news-preview'
-      preLoaderRoute: typeof ApiPublicNewsPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/algo-regime-autotune-cron': {
-      id: '/api/public/algo-regime-autotune-cron'
-      path: '/api/public/algo-regime-autotune-cron'
-      fullPath: '/api/public/algo-regime-autotune-cron'
-      preLoaderRoute: typeof ApiPublicAlgoRegimeAutotuneCronRouteImport
+    '/walk-forward/$id': {
+      id: '/walk-forward/$id'
+      path: '/walk-forward/$id'
+      fullPath: '/walk-forward/$id'
+      preLoaderRoute: typeof WalkForwardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/broker-blocks/clear': {
@@ -1319,144 +1207,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBrokerBlocksClearRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/saxo/callback': {
-      id: '/api/public/saxo/callback'
-      path: '/api/public/saxo/callback'
-      fullPath: '/api/public/saxo/callback'
-      preLoaderRoute: typeof ApiPublicSaxoCallbackRouteImport
+    '/api/public/algo-regime-autotune-cron': {
+      id: '/api/public/algo-regime-autotune-cron'
+      path: '/api/public/algo-regime-autotune-cron'
+      fullPath: '/api/public/algo-regime-autotune-cron'
+      preLoaderRoute: typeof ApiPublicAlgoRegimeAutotuneCronRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/valuation-drift': {
-      id: '/api/public/hooks/valuation-drift'
-      path: '/api/public/hooks/valuation-drift'
-      fullPath: '/api/public/hooks/valuation-drift'
-      preLoaderRoute: typeof ApiPublicHooksValuationDriftRouteImport
+    '/api/public/news-preview': {
+      id: '/api/public/news-preview'
+      path: '/api/public/news-preview'
+      fullPath: '/api/public/news-preview'
+      preLoaderRoute: typeof ApiPublicNewsPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/translation-refresh': {
-      id: '/api/public/hooks/translation-refresh'
-      path: '/api/public/hooks/translation-refresh'
-      fullPath: '/api/public/hooks/translation-refresh'
-      preLoaderRoute: typeof ApiPublicHooksTranslationRefreshRouteImport
+    '/api/public/setup-scan-cron': {
+      id: '/api/public/setup-scan-cron'
+      path: '/api/public/setup-scan-cron'
+      fullPath: '/api/public/setup-scan-cron'
+      preLoaderRoute: typeof ApiPublicSetupScanCronRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/ticker-watch': {
-      id: '/api/public/hooks/ticker-watch'
-      path: '/api/public/hooks/ticker-watch'
-      fullPath: '/api/public/hooks/ticker-watch'
-      preLoaderRoute: typeof ApiPublicHooksTickerWatchRouteImport
+    '/portfolio/$id/': {
+      id: '/portfolio/$id/'
+      path: '/portfolio/$id'
+      fullPath: '/portfolio/$id/'
+      preLoaderRoute: typeof PortfolioIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/saxo-refresh': {
-      id: '/api/public/hooks/saxo-refresh'
-      path: '/api/public/hooks/saxo-refresh'
-      fullPath: '/api/public/hooks/saxo-refresh'
-      preLoaderRoute: typeof ApiPublicHooksSaxoRefreshRouteImport
+    '/portfolio/$id/analytics': {
+      id: '/portfolio/$id/analytics'
+      path: '/portfolio/$id/analytics'
+      fullPath: '/portfolio/$id/analytics'
+      preLoaderRoute: typeof PortfolioIdAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/saxo-account-key-audit': {
-      id: '/api/public/hooks/saxo-account-key-audit'
-      path: '/api/public/hooks/saxo-account-key-audit'
-      fullPath: '/api/public/hooks/saxo-account-key-audit'
-      preLoaderRoute: typeof ApiPublicHooksSaxoAccountKeyAuditRouteImport
+    '/portfolio/$id/attribution': {
+      id: '/portfolio/$id/attribution'
+      path: '/portfolio/$id/attribution'
+      fullPath: '/portfolio/$id/attribution'
+      preLoaderRoute: typeof PortfolioIdAttributionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/orphan-order-sweep': {
-      id: '/api/public/hooks/orphan-order-sweep'
-      path: '/api/public/hooks/orphan-order-sweep'
-      fullPath: '/api/public/hooks/orphan-order-sweep'
-      preLoaderRoute: typeof ApiPublicHooksOrphanOrderSweepRouteImport
+    '/portfolio/$id/daily-comparison': {
+      id: '/portfolio/$id/daily-comparison'
+      path: '/portfolio/$id/daily-comparison'
+      fullPath: '/portfolio/$id/daily-comparison'
+      preLoaderRoute: typeof PortfolioIdDailyComparisonRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/news-refresh': {
-      id: '/api/public/hooks/news-refresh'
-      path: '/api/public/hooks/news-refresh'
-      fullPath: '/api/public/hooks/news-refresh'
-      preLoaderRoute: typeof ApiPublicHooksNewsRefreshRouteImport
+    '/portfolio/$id/daily-pnl': {
+      id: '/portfolio/$id/daily-pnl'
+      path: '/portfolio/$id/daily-pnl'
+      fullPath: '/portfolio/$id/daily-pnl'
+      preLoaderRoute: typeof PortfolioIdDailyPnlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/news-backfill': {
-      id: '/api/public/hooks/news-backfill'
-      path: '/api/public/hooks/news-backfill'
-      fullPath: '/api/public/hooks/news-backfill'
-      preLoaderRoute: typeof ApiPublicHooksNewsBackfillRouteImport
+    '/portfolio/$id/fx-risk': {
+      id: '/portfolio/$id/fx-risk'
+      path: '/portfolio/$id/fx-risk'
+      fullPath: '/portfolio/$id/fx-risk'
+      preLoaderRoute: typeof PortfolioIdFxRiskRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/market-open-alerts': {
-      id: '/api/public/hooks/market-open-alerts'
-      path: '/api/public/hooks/market-open-alerts'
-      fullPath: '/api/public/hooks/market-open-alerts'
-      preLoaderRoute: typeof ApiPublicHooksMarketOpenAlertsRouteImport
+    '/portfolio/$id/optimizer': {
+      id: '/portfolio/$id/optimizer'
+      path: '/portfolio/$id/optimizer'
+      fullPath: '/portfolio/$id/optimizer'
+      preLoaderRoute: typeof PortfolioIdOptimizerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/live-reconcile': {
-      id: '/api/public/hooks/live-reconcile'
-      path: '/api/public/hooks/live-reconcile'
-      fullPath: '/api/public/hooks/live-reconcile'
-      preLoaderRoute: typeof ApiPublicHooksLiveReconcileRouteImport
+    '/portfolio/$id/performance': {
+      id: '/portfolio/$id/performance'
+      path: '/portfolio/$id/performance'
+      fullPath: '/portfolio/$id/performance'
+      preLoaderRoute: typeof PortfolioIdPerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/insider-scan': {
-      id: '/api/public/hooks/insider-scan'
-      path: '/api/public/hooks/insider-scan'
-      fullPath: '/api/public/hooks/insider-scan'
-      preLoaderRoute: typeof ApiPublicHooksInsiderScanRouteImport
+    '/portfolio/$id/report': {
+      id: '/portfolio/$id/report'
+      path: '/portfolio/$id/report'
+      fullPath: '/portfolio/$id/report'
+      preLoaderRoute: typeof PortfolioIdReportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/hourly-run': {
-      id: '/api/public/hooks/hourly-run'
-      path: '/api/public/hooks/hourly-run'
-      fullPath: '/api/public/hooks/hourly-run'
-      preLoaderRoute: typeof ApiPublicHooksHourlyRunRouteImport
+    '/portfolio/$id/risk': {
+      id: '/portfolio/$id/risk'
+      path: '/portfolio/$id/risk'
+      fullPath: '/portfolio/$id/risk'
+      preLoaderRoute: typeof PortfolioIdRiskRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/daily-summary': {
-      id: '/api/public/hooks/daily-summary'
-      path: '/api/public/hooks/daily-summary'
-      fullPath: '/api/public/hooks/daily-summary'
-      preLoaderRoute: typeof ApiPublicHooksDailySummaryRouteImport
+    '/portfolio/$id/sma-report': {
+      id: '/portfolio/$id/sma-report'
+      path: '/portfolio/$id/sma-report'
+      fullPath: '/portfolio/$id/sma-report'
+      preLoaderRoute: typeof PortfolioIdSmaReportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/daily-run': {
-      id: '/api/public/hooks/daily-run'
-      path: '/api/public/hooks/daily-run'
-      fullPath: '/api/public/hooks/daily-run'
-      preLoaderRoute: typeof ApiPublicHooksDailyRunRouteImport
+    '/portfolio/$id/summary': {
+      id: '/portfolio/$id/summary'
+      path: '/portfolio/$id/summary'
+      fullPath: '/portfolio/$id/summary'
+      preLoaderRoute: typeof PortfolioIdSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/credit-budget-check': {
-      id: '/api/public/hooks/credit-budget-check'
-      path: '/api/public/hooks/credit-budget-check'
-      fullPath: '/api/public/hooks/credit-budget-check'
-      preLoaderRoute: typeof ApiPublicHooksCreditBudgetCheckRouteImport
+    '/portfolio/$id/trade': {
+      id: '/portfolio/$id/trade'
+      path: '/portfolio/$id/trade'
+      fullPath: '/portfolio/$id/trade'
+      preLoaderRoute: typeof PortfolioIdTradeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/corporate-action-deadlines': {
-      id: '/api/public/hooks/corporate-action-deadlines'
-      path: '/api/public/hooks/corporate-action-deadlines'
-      fullPath: '/api/public/hooks/corporate-action-deadlines'
-      preLoaderRoute: typeof ApiPublicHooksCorporateActionDeadlinesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/breakout-expectancy': {
-      id: '/api/public/hooks/breakout-expectancy'
-      path: '/api/public/hooks/breakout-expectancy'
-      fullPath: '/api/public/hooks/breakout-expectancy'
-      preLoaderRoute: typeof ApiPublicHooksBreakoutExpectancyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/batch-retrain': {
-      id: '/api/public/hooks/batch-retrain'
-      path: '/api/public/hooks/batch-retrain'
-      fullPath: '/api/public/hooks/batch-retrain'
-      preLoaderRoute: typeof ApiPublicHooksBatchRetrainRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/backfill-intraday-equity': {
-      id: '/api/public/hooks/backfill-intraday-equity'
-      path: '/api/public/hooks/backfill-intraday-equity'
-      fullPath: '/api/public/hooks/backfill-intraday-equity'
-      preLoaderRoute: typeof ApiPublicHooksBackfillIntradayEquityRouteImport
+    '/api/public/hooks/ai-gateway-health': {
+      id: '/api/public/hooks/ai-gateway-health'
+      path: '/api/public/hooks/ai-gateway-health'
+      fullPath: '/api/public/hooks/ai-gateway-health'
+      preLoaderRoute: typeof ApiPublicHooksAiGatewayHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/backfill-daily-equity-changes': {
@@ -1466,11 +1333,144 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/ai-gateway-health': {
-      id: '/api/public/hooks/ai-gateway-health'
-      path: '/api/public/hooks/ai-gateway-health'
-      fullPath: '/api/public/hooks/ai-gateway-health'
-      preLoaderRoute: typeof ApiPublicHooksAiGatewayHealthRouteImport
+    '/api/public/hooks/backfill-intraday-equity': {
+      id: '/api/public/hooks/backfill-intraday-equity'
+      path: '/api/public/hooks/backfill-intraday-equity'
+      fullPath: '/api/public/hooks/backfill-intraday-equity'
+      preLoaderRoute: typeof ApiPublicHooksBackfillIntradayEquityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/batch-retrain': {
+      id: '/api/public/hooks/batch-retrain'
+      path: '/api/public/hooks/batch-retrain'
+      fullPath: '/api/public/hooks/batch-retrain'
+      preLoaderRoute: typeof ApiPublicHooksBatchRetrainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/breakout-expectancy': {
+      id: '/api/public/hooks/breakout-expectancy'
+      path: '/api/public/hooks/breakout-expectancy'
+      fullPath: '/api/public/hooks/breakout-expectancy'
+      preLoaderRoute: typeof ApiPublicHooksBreakoutExpectancyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/corporate-action-deadlines': {
+      id: '/api/public/hooks/corporate-action-deadlines'
+      path: '/api/public/hooks/corporate-action-deadlines'
+      fullPath: '/api/public/hooks/corporate-action-deadlines'
+      preLoaderRoute: typeof ApiPublicHooksCorporateActionDeadlinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/credit-budget-check': {
+      id: '/api/public/hooks/credit-budget-check'
+      path: '/api/public/hooks/credit-budget-check'
+      fullPath: '/api/public/hooks/credit-budget-check'
+      preLoaderRoute: typeof ApiPublicHooksCreditBudgetCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/daily-run': {
+      id: '/api/public/hooks/daily-run'
+      path: '/api/public/hooks/daily-run'
+      fullPath: '/api/public/hooks/daily-run'
+      preLoaderRoute: typeof ApiPublicHooksDailyRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/daily-summary': {
+      id: '/api/public/hooks/daily-summary'
+      path: '/api/public/hooks/daily-summary'
+      fullPath: '/api/public/hooks/daily-summary'
+      preLoaderRoute: typeof ApiPublicHooksDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/hourly-run': {
+      id: '/api/public/hooks/hourly-run'
+      path: '/api/public/hooks/hourly-run'
+      fullPath: '/api/public/hooks/hourly-run'
+      preLoaderRoute: typeof ApiPublicHooksHourlyRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/insider-scan': {
+      id: '/api/public/hooks/insider-scan'
+      path: '/api/public/hooks/insider-scan'
+      fullPath: '/api/public/hooks/insider-scan'
+      preLoaderRoute: typeof ApiPublicHooksInsiderScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/live-reconcile': {
+      id: '/api/public/hooks/live-reconcile'
+      path: '/api/public/hooks/live-reconcile'
+      fullPath: '/api/public/hooks/live-reconcile'
+      preLoaderRoute: typeof ApiPublicHooksLiveReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/market-open-alerts': {
+      id: '/api/public/hooks/market-open-alerts'
+      path: '/api/public/hooks/market-open-alerts'
+      fullPath: '/api/public/hooks/market-open-alerts'
+      preLoaderRoute: typeof ApiPublicHooksMarketOpenAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/news-backfill': {
+      id: '/api/public/hooks/news-backfill'
+      path: '/api/public/hooks/news-backfill'
+      fullPath: '/api/public/hooks/news-backfill'
+      preLoaderRoute: typeof ApiPublicHooksNewsBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/news-refresh': {
+      id: '/api/public/hooks/news-refresh'
+      path: '/api/public/hooks/news-refresh'
+      fullPath: '/api/public/hooks/news-refresh'
+      preLoaderRoute: typeof ApiPublicHooksNewsRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/orphan-order-sweep': {
+      id: '/api/public/hooks/orphan-order-sweep'
+      path: '/api/public/hooks/orphan-order-sweep'
+      fullPath: '/api/public/hooks/orphan-order-sweep'
+      preLoaderRoute: typeof ApiPublicHooksOrphanOrderSweepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/saxo-account-key-audit': {
+      id: '/api/public/hooks/saxo-account-key-audit'
+      path: '/api/public/hooks/saxo-account-key-audit'
+      fullPath: '/api/public/hooks/saxo-account-key-audit'
+      preLoaderRoute: typeof ApiPublicHooksSaxoAccountKeyAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/saxo-refresh': {
+      id: '/api/public/hooks/saxo-refresh'
+      path: '/api/public/hooks/saxo-refresh'
+      fullPath: '/api/public/hooks/saxo-refresh'
+      preLoaderRoute: typeof ApiPublicHooksSaxoRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/ticker-watch': {
+      id: '/api/public/hooks/ticker-watch'
+      path: '/api/public/hooks/ticker-watch'
+      fullPath: '/api/public/hooks/ticker-watch'
+      preLoaderRoute: typeof ApiPublicHooksTickerWatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/translation-refresh': {
+      id: '/api/public/hooks/translation-refresh'
+      path: '/api/public/hooks/translation-refresh'
+      fullPath: '/api/public/hooks/translation-refresh'
+      preLoaderRoute: typeof ApiPublicHooksTranslationRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/valuation-drift': {
+      id: '/api/public/hooks/valuation-drift'
+      path: '/api/public/hooks/valuation-drift'
+      fullPath: '/api/public/hooks/valuation-drift'
+      preLoaderRoute: typeof ApiPublicHooksValuationDriftRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/saxo/callback': {
+      id: '/api/public/saxo/callback'
+      path: '/api/public/saxo/callback'
+      fullPath: '/api/public/saxo/callback'
+      preLoaderRoute: typeof ApiPublicSaxoCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
